@@ -21,6 +21,15 @@ export const site = {
   },
   /** Date shown on the legal pages. Update whenever the documents change. */
   legalLastUpdated: "2026-10-16",
+  /**
+   * Service providers that process personal data on Narixia's behalf. Keep this
+   * list accurate for your deployment: it is published in the privacy policy.
+   */
+  processors: [
+    { name: "Supabase", purpose: "Database, authentication and transactional authentication emails", location: process.env.NEXT_PUBLIC_DATA_REGION || "Region chosen at deployment" },
+    { name: "Stripe", purpose: "Subscription payments, invoices and the billing portal", location: "European Union and United States" },
+    { name: process.env.NEXT_PUBLIC_HOSTING_PROVIDER || "Vercel", purpose: "Application hosting and delivery", location: process.env.NEXT_PUBLIC_HOSTING_REGION || "Region chosen at deployment" },
+  ],
 } as const;
 
 export type Site = typeof site;

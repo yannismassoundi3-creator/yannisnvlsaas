@@ -116,4 +116,12 @@ describe("detectDecimalSeparator", () => {
   it("defaults to dot when ambiguous", () => {
     expect(detectDecimalSeparator(["1,234", "12"])).toBe(".");
   });
+  it("uses structural evidence", () => {
+    expect(detectDecimalSeparator(["0,045"])).toBe(",");
+    expect(detectDecimalSeparator(["0.045"])).toBe(".");
+    expect(detectDecimalSeparator(["1234,567"])).toBe(",");
+    expect(detectDecimalSeparator(["1.234.567"])).toBe(",");
+    expect(detectDecimalSeparator(["1,234,567"])).toBe(".");
+    expect(detectDecimalSeparator(["-12,5"])).toBe(",");
+  });
 });

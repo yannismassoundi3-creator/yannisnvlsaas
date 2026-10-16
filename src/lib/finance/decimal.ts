@@ -124,24 +124,42 @@ export function divideRoundHalfAwayFromZero(numerator: bigint, denominator: bigi
   return negative ? -rounded : rounded;
 }
 
-/** Detects the decimal separator most likely used by a sample of numeric strings. */
+/**
+ * Detects the decimal separator most likely used by a sample of numeric strings.
+ *
+ * Evidence used, per value:
+ * - both separators present: the last one is the decimal separator (1.234,56);
+ * - the same separator repeated: it groups thousands (1,234,567);
+ * - a lone "0" before the separator, or more than three integer digits: it is
+ *   decimal ("0,045", "1234,5"), since thousands groups need 1-3 leading digits;
+ * - anything other than three digits after it: decimal ("12,5", "12,50").
+ * "1,234" alone is ambiguous and casts no vote. Ties default to ".".
+ */
 export function detectDecimalSeparator(samples: string[]): DecimalSeparator {
   let commaVotes = 0;
   let dotVotes = 0;
+  const vote = (sep: DecimalSeparator, weight: number) => {
+    if (sep === ",") commaVotes += weight;
+    else dotVotes += weight;
+  };
   for (const raw of samples) {
-    const s = stripCurrency(raw.trim()).replace(SPACE_RE, "");
+    const s = stripCurrency(raw.trim()).replace(SPACE_RE, "").replace(/^[+-]|-$/g, "");
     const lastComma = s.lastIndexOf(",");
     const lastDot = s.lastIndexOf(".");
     if (lastComma >= 0 && lastDot >= 0) {
-      // Whichever comes last is the decimal separator: 1.234,56 or 1,234.56.
-      if (lastComma > lastDot) commaVotes += 2;
-      else dotVotes += 2;
-    } else if (lastComma >= 0) {
-      // "12,5" suggests comma decimals; "1,234" is ambiguous (could be thousands).
-      if (s.length - lastComma - 1 !== 3) commaVotes += 1;
-    } else if (lastDot >= 0) {
-      if (s.length - lastDot - 1 !== 3) dotVotes += 1;
+      vote(lastComma > lastDot ? "," : ".", 2);
+      continue;
     }
+    const sep: DecimalSeparator | null = lastComma >= 0 ? "," : lastDot >= 0 ? "." : null;
+    if (!sep) continue;
+    const other: DecimalSeparator = sep === "," ? "." : ",";
+    const parts = s.split(sep);
+    if (parts.length > 2) {
+      vote(other, 2); // repeated separator groups thousands
+      continue;
+    }
+    const [intPart, frac] = parts;
+    if (frac.length !== 3 || intPart === "0" || intPart === "" || intPart.length > 3) vote(sep, 1);
   }
   return commaVotes > dotVotes ? "," : ".";
 }
