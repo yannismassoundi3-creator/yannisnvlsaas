@@ -2,6 +2,9 @@
 
 import type { Route } from "next";
 import { redirect } from "next/navigation";
+import type { Locale } from "@/i18n/config";
+import { billingMessages } from "@/i18n/messages/account-billing";
+import { getRequestLocale } from "@/i18n/request";
 import { track } from "@/lib/analytics/track";
 import { audit } from "@/lib/audit";
 import { requireWorkspace } from "@/lib/auth/workspace";
@@ -12,7 +15,8 @@ import { getStripe, isLiveCheckoutBlocked } from "./stripe";
 
 type Failure = { ok: false; message: string };
 
-const NOT_CONFIGURED = "Payments are not set up on this deployment yet. No payment can be taken.";
+/** Stripe Checkout and the billing portal follow the interface language. */
+const STRIPE_LOCALE: Record<Locale, "en" | "fr"> = { en: "en", fr: "fr" };
 /** Stripe only accepts a trial end at least 48 hours ahead. */
 const MIN_TRIAL_END_MS = 2 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000;
 
@@ -38,11 +42,13 @@ async function ensureCustomer(organizationId: string, organizationName: string, 
  */
 export async function startCheckout(): Promise<Failure> {
   const ws = await requireWorkspace();
-  if (ws.role !== "owner") return { ok: false, message: "Only the account owner can manage billing." };
-  if (!isStripeConfigured() || isLiveCheckoutBlocked()) return { ok: false, message: NOT_CONFIGURED };
-  if (ws.entitlements.access === "pro") return { ok: false, message: "Your Pro subscription is already active." };
-  if (ws.entitlements.access === "grace") return { ok: false, message: "Update your payment method in the billing portal to keep Pro." };
-  if (!(await consumeRateLimit(`checkout:${ws.user.id}`, 10, 3600))) return { ok: false, message: "Too many attempts. Please try again later." };
+  const locale = await getRequestLocale();
+  const t = billingMessages[locale].actions;
+  if (ws.role !== "owner") return { ok: false, message: t.ownerOnly };
+  if (!isStripeConfigured() || isLiveCheckoutBlocked()) return { ok: false, message: t.notConfigured };
+  if (ws.entitlements.access === "pro") return { ok: false, message: t.alreadyPro };
+  if (ws.entitlements.access === "grace") return { ok: false, message: t.grace };
+  if (!(await consumeRateLimit(`checkout:${ws.user.id}`, 10, 3600))) return { ok: false, message: t.tooMany };
 
   const env = serverEnv();
   let url: string | null = null;
@@ -53,6 +59,7 @@ export async function startCheckout(): Promise<Failure> {
     const session = await getStripe().checkout.sessions.create(
       {
         mode: "subscription",
+        locale: STRIPE_LOCALE[locale],
         customer,
         client_reference_id: ws.organization.id,
         line_items: [{ price: env.stripePriceProMonthly, quantity: 1 }],
@@ -70,9 +77,9 @@ export async function startCheckout(): Promise<Failure> {
     url = session.url;
   } catch (error) {
     console.error("[billing] checkout failed", { message: error instanceof Error ? error.message : "unknown" });
-    return { ok: false, message: "We could not open the payment page. Please try again in a moment." };
+    return { ok: false, message: t.checkoutFailed };
   }
-  if (!url) return { ok: false, message: "We could not open the payment page. Please try again in a moment." };
+  if (!url) return { ok: false, message: t.checkoutFailed };
 
   audit("billing.checkout_started", { organizationId: ws.organization.id, actorId: ws.user.id });
   track("checkout_initiated", { organizationId: ws.organization.id, userId: ws.user.id });
@@ -82,19 +89,25 @@ export async function startCheckout(): Promise<Failure> {
 /** Stripe's customer portal: payment method, invoices, cancellation. */
 export async function openBillingPortal(): Promise<Failure> {
   const ws = await requireWorkspace();
-  if (ws.role !== "owner") return { ok: false, message: "Only the account owner can manage billing." };
-  if (!isStripeConfigured()) return { ok: false, message: NOT_CONFIGURED };
-  if (!(await consumeRateLimit(`portal:${ws.user.id}`, 20, 3600))) return { ok: false, message: "Too many attempts. Please try again later." };
+  const locale = await getRequestLocale();
+  const t = billingMessages[locale].actions;
+  if (ws.role !== "owner") return { ok: false, message: t.ownerOnly };
+  if (!isStripeConfigured()) return { ok: false, message: t.notConfigured };
+  if (!(await consumeRateLimit(`portal:${ws.user.id}`, 20, 3600))) return { ok: false, message: t.tooMany };
 
   const { data } = await createAdminClient().from("billing_customers").select("stripe_customer_id").eq("organization_id", ws.organization.id).maybeSingle();
-  if (!data) return { ok: false, message: "There is no billing account yet. Subscribe first." };
+  if (!data) return { ok: false, message: t.noCustomer };
   let url: string;
   try {
-    const session = await getStripe().billingPortal.sessions.create({ customer: data.stripe_customer_id, return_url: `${publicEnv.siteUrl}/app/billing` });
+    const session = await getStripe().billingPortal.sessions.create({
+      customer: data.stripe_customer_id,
+      return_url: `${publicEnv.siteUrl}/app/billing`,
+      locale: STRIPE_LOCALE[locale],
+    });
     url = session.url;
   } catch (error) {
     console.error("[billing] portal failed", { message: error instanceof Error ? error.message : "unknown" });
-    return { ok: false, message: "We could not open the billing portal. Please try again in a moment." };
+    return { ok: false, message: t.portalFailed };
   }
   audit("billing.portal_opened", { organizationId: ws.organization.id, actorId: ws.user.id });
   redirect(url as Route);

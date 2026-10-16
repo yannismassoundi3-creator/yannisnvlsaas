@@ -6,6 +6,8 @@ import { useEffect, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toaster";
+import { useLocale } from "@/i18n/client";
+import { billingMessages } from "@/i18n/messages/account-billing";
 import { openBillingPortal, startCheckout } from "@/lib/billing/actions";
 
 export function SubscribeButton({ label, disabled }: { label: string; disabled?: boolean }) {
@@ -31,6 +33,7 @@ export function SubscribeButton({ label, disabled }: { label: string; disabled?:
 }
 
 export function PortalButton({ disabled }: { disabled?: boolean }) {
+  const t = billingMessages[useLocale()];
   const [pending, startTransition] = useTransition();
   return (
     <Button
@@ -45,7 +48,7 @@ export function PortalButton({ disabled }: { disabled?: boolean }) {
       }
     >
       <ExternalLink aria-hidden />
-      Manage billing
+      {t.manageBilling}
     </Button>
   );
 }
@@ -55,6 +58,7 @@ export function PortalButton({ disabled }: { disabled?: boolean }) {
  * subscription. The page never shows Pro as active before that.
  */
 export function CheckoutConfirmation({ confirmed }: { confirmed: boolean }) {
+  const t = billingMessages[useLocale()];
   const router = useRouter();
   const [timedOut, setTimedOut] = useState(false);
   useEffect(() => {
@@ -76,11 +80,9 @@ export function CheckoutConfirmation({ confirmed }: { confirmed: boolean }) {
     <div role="status" className="flex items-start gap-3 rounded-md border border-info-100 bg-info-50 px-4 py-3 text-sm text-info-700">
       {timedOut ? null : <Spinner className="mt-0.5 size-4" />}
       <div>
-        <p className="font-semibold">{timedOut ? "Still waiting for confirmation" : "Confirming your subscription with Stripe…"}</p>
+        <p className="font-semibold">{timedOut ? t.waitingTitle : t.confirmingTitle}</p>
         <p className="text-ink-2">
-          {timedOut
-            ? "Stripe has not confirmed the payment yet. This can take a few minutes; reload this page later. You will not be charged twice."
-            : "Pro is activated as soon as Stripe confirms the subscription. This usually takes a few seconds."}
+          {timedOut ? t.waitingBody : t.confirmingBody}
         </p>
       </div>
     </div>

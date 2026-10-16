@@ -3,54 +3,63 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { NotConfigured, PageIntro } from "@/components/marketing/prose";
 import { site } from "@/config/site";
+import { localizedPath } from "@/i18n/config";
+import { publicAlternates } from "@/i18n/messages/marketing-common";
+import { marketingPages } from "@/i18n/messages/marketing-pages";
+import { getLocale } from "@/i18n/server";
 
-export const metadata: Metadata = {
-  title: "Contact",
-  description: "How to reach the Narixia team.",
-  alternates: { canonical: "/contact" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  const t = marketingPages[locale].contact;
+  return { title: t.metaTitle, description: t.metaDescription, alternates: publicAlternates("/contact", locale) };
+}
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  const locale = await getLocale();
+  const t = marketingPages[locale].contact;
   const cards = [
     {
       icon: <Mail />,
-      title: "General questions",
+      title: t.general,
       body: site.supportEmail ? (
         <a href={`mailto:${site.supportEmail}`} className="font-medium text-emerald-700 hover:underline">
           {site.supportEmail}
         </a>
       ) : (
-        <NotConfigured>Support email not configured yet</NotConfigured>
+        <NotConfigured>{t.supportMissing}</NotConfigured>
       ),
     },
     {
       icon: <LifeBuoy />,
-      title: "Already a customer?",
+      title: t.customer,
       body: (
         <>
-          Use <strong className="font-medium text-ink">Help &amp; feedback</strong> in the app menu. Your message reaches
-          us with your account context, without sharing financial data.
+          {t.customerUse} <strong className="font-medium text-ink">{t.helpMenu}</strong> {t.customerRest}
         </>
       ),
     },
     {
       icon: <ShieldCheck />,
-      title: "Privacy requests",
+      title: t.privacy,
       body: site.privacyEmail ? (
         <a href={`mailto:${site.privacyEmail}`} className="font-medium text-emerald-700 hover:underline">
           {site.privacyEmail}
         </a>
       ) : (
         <>
-          See the <Link href="/privacy" className="font-medium text-emerald-700 hover:underline">privacy policy</Link>.
+          {t.privacySee}{" "}
+          <Link href={localizedPath("/privacy", locale)} className="font-medium text-emerald-700 hover:underline">
+            {t.privacyLink}
+          </Link>
+          .
         </>
       ),
     },
   ];
   return (
     <>
-      <PageIntro eyebrow="Contact" title="Talk to us">
-        <p>Questions about Narixia, your account or your data. We read every message.</p>
+      <PageIntro eyebrow={t.eyebrow} title={t.title}>
+        <p>{t.intro}</p>
       </PageIntro>
       <div className="mx-auto grid max-w-6xl gap-5 px-4 pb-20 sm:px-6 md:grid-cols-3">
         {cards.map((c) => (

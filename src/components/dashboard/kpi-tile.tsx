@@ -1,7 +1,12 @@
+"use client";
+
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { TermTip } from "@/components/ui/overlay";
+import { useLocale } from "@/i18n/client";
+import type { Locale } from "@/i18n/config";
+import { dashboardMessages } from "@/i18n/messages/dashboard-components";
 import { cn } from "@/lib/utils";
 
 export type KpiDelta = {
@@ -25,6 +30,8 @@ type KpiTileProps = {
   /** "sm" for supporting figures under the headline KPIs. */
   size?: "md" | "sm";
   className?: string;
+  /** Interface language of the comparison line; defaults to the current one. */
+  locale?: Locale;
 };
 
 /**
@@ -32,7 +39,7 @@ type KpiTileProps = {
  * direction is clearly better (e.g. contribution margin up); otherwise they
  * stay neutral, and the arrow plus text always carry the meaning.
  */
-export function KpiTile({ label, value, definition, delta, deltaContext, status, footnote, size = "md", className }: KpiTileProps) {
+export function KpiTile({ label, value, definition, delta, deltaContext, status, footnote, size = "md", className, locale }: KpiTileProps) {
   return (
     <div className={cn("flex min-w-0 flex-col bg-surface", size === "md" ? "gap-1.5 px-5 py-4" : "gap-1 px-4 py-3", className)}>
       <div className="flex items-center gap-1.5">
@@ -40,7 +47,7 @@ export function KpiTile({ label, value, definition, delta, deltaContext, status,
         {definition ? <TermTip term={definition.term}>{definition.text}</TermTip> : null}
       </div>
       <div className={cn("font-semibold tracking-tight text-ink tabular", size === "md" ? "text-[1.625rem] leading-8" : "text-lg leading-7")}>{value}</div>
-      {delta ? <DeltaLine delta={delta} context={deltaContext} /> : null}
+      {delta ? <DeltaLine delta={delta} context={deltaContext} locale={locale} /> : null}
       {footnote || status ? (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
           {footnote ? <span>{footnote}</span> : null}
@@ -51,9 +58,11 @@ export function KpiTile({ label, value, definition, delta, deltaContext, status,
   );
 }
 
-export function DeltaLine({ delta, context }: { delta: KpiDelta; context?: string }) {
+export function DeltaLine({ delta, context, locale: localeProp }: { delta: KpiDelta; context?: string; locale?: Locale }) {
+  const contextLocale = useLocale();
+  const t = dashboardMessages[localeProp ?? contextLocale].kpiTile;
   if (delta.value === null) {
-    return <p className="text-xs text-ink-3">No comparison available</p>;
+    return <p className="text-xs text-ink-3">{t.noComparison}</p>;
   }
   const direction = delta.value > 0 ? "up" : delta.value < 0 ? "down" : "flat";
   const good = delta.polarity !== null && direction !== "flat" ? direction === delta.polarity : null;
@@ -69,7 +78,7 @@ export function DeltaLine({ delta, context }: { delta: KpiDelta; context?: strin
         )}
       >
         <Icon className="size-3.5" aria-hidden />
-        <span className="sr-only">{direction === "up" ? "Up" : direction === "down" ? "Down" : "Unchanged"}</span>
+        <span className="sr-only">{direction === "up" ? t.up : direction === "down" ? t.down : t.unchanged}</span>
         {delta.text}
       </span>
       {context ? <span className="text-ink-3">{context}</span> : null}

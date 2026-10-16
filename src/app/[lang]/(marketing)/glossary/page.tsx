@@ -1,43 +1,53 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageIntro } from "@/components/marketing/prose";
-import { DEFINITIONS, type DefinitionKey } from "@/lib/finance/metrics";
+import { localizedPath } from "@/i18n/config";
+import { publicAlternates } from "@/i18n/messages/marketing-common";
+import { marketingPages } from "@/i18n/messages/marketing-pages";
+import { getLocale } from "@/i18n/server";
+import { definitionsFor, type DefinitionKey } from "@/lib/finance/metrics";
 
-export const metadata: Metadata = {
-  title: "E-commerce profitability glossary",
-  description:
-    "Plain-language definitions of gross sales, net sales, gross profit, contribution margin, ROAS, break-even ROAS, net profit and cash flow, as used in Narixia.",
-  alternates: { canonical: "/glossary" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  const t = marketingPages[locale].glossary;
+  return { title: t.metaTitle, description: t.metaDescription, alternates: publicAlternates("/glossary", locale) };
+}
 
-const GROUPS: { title: string; keys: DefinitionKey[] }[] = [
-  { title: "Revenue", keys: ["grossSales", "discounts", "refunds", "netSales", "shippingCharged", "netRevenue", "orders", "averageOrderValue", "refundRate"] },
-  { title: "Costs", keys: ["cogs", "shippingCosts", "transactionFees", "adSpend", "otherVariableCosts", "fixedCosts"] },
-  { title: "Margins", keys: ["grossProfit", "contributionMargin", "contributionMarginRate", "operatingProfit"] },
-  { title: "Advertising", keys: ["roas", "blendedRoas", "breakEvenRoas", "roi"] },
-  { title: "What Narixia does not calculate", keys: ["netProfit", "cashFlow"] },
+type GroupId = keyof (typeof marketingPages)["en"]["glossary"]["groups"];
+
+const GROUPS: { group: GroupId; keys: DefinitionKey[] }[] = [
+  { group: "revenue", keys: ["grossSales", "discounts", "refunds", "netSales", "shippingCharged", "netRevenue", "orders", "averageOrderValue", "refundRate"] },
+  { group: "costs", keys: ["cogs", "shippingCosts", "transactionFees", "adSpend", "otherVariableCosts", "fixedCosts"] },
+  { group: "margins", keys: ["grossProfit", "contributionMargin", "contributionMarginRate", "operatingProfit"] },
+  { group: "advertising", keys: ["roas", "blendedRoas", "breakEvenRoas", "roi"] },
+  { group: "notCalculated", keys: ["netProfit", "cashFlow"] },
 ];
 
 function slug(key: string) {
   return key.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
 }
 
-export default function GlossaryPage() {
+/** Section anchors come from the English titles so links keep working in every language. */
+function sectionId(group: GroupId) {
+  return slug(marketingPages.en.glossary.groups[group].replace(/\s+/g, ""));
+}
+
+export default async function GlossaryPage() {
+  const locale = await getLocale();
+  const t = marketingPages[locale].glossary;
+  const definitions = definitionsFor(locale);
   return (
     <>
-      <PageIntro eyebrow="Glossary" title="Profitability terms, defined">
-        <p>
-          The exact definitions Narixia uses in every dashboard, report and export. Amounts always exclude VAT and sales
-          tax.
-        </p>
+      <PageIntro eyebrow={t.eyebrow} title={t.title}>
+        <p>{t.intro}</p>
       </PageIntro>
       <div className="mx-auto grid max-w-6xl gap-10 px-4 pb-20 sm:px-6 lg:grid-cols-[200px_1fr]">
-        <nav aria-label="Glossary sections" className="hidden lg:block">
+        <nav aria-label={t.sections} className="hidden lg:block">
           <ul className="sticky top-24 space-y-2 text-sm">
             {GROUPS.map((g) => (
-              <li key={g.title}>
-                <a href={`#${slug(g.title.replace(/\s+/g, ""))}`} className="text-ink-3 hover:text-ink">
-                  {g.title}
+              <li key={g.group}>
+                <a href={`#${sectionId(g.group)}`} className="text-ink-3 hover:text-ink">
+                  {t.groups[g.group]}
                 </a>
               </li>
             ))}
@@ -45,11 +55,11 @@ export default function GlossaryPage() {
         </nav>
         <div className="space-y-14">
           {GROUPS.map((g) => (
-            <section key={g.title} id={slug(g.title.replace(/\s+/g, ""))} className="scroll-mt-24">
-              <h2 className="text-2xl font-semibold tracking-tight text-ink">{g.title}</h2>
+            <section key={g.group} id={sectionId(g.group)} className="scroll-mt-24">
+              <h2 className="text-2xl font-semibold tracking-tight text-ink">{t.groups[g.group]}</h2>
               <dl className="mt-5 divide-y divide-line border-y border-line">
                 {g.keys.map((key) => {
-                  const d = DEFINITIONS[key];
+                  const d = definitions[key];
                   return (
                     <div key={key} id={slug(key)} className="grid scroll-mt-24 gap-2 py-5 md:grid-cols-[220px_1fr] md:gap-8">
                       <dt className="font-semibold text-ink">{d.term}</dt>
@@ -64,9 +74,9 @@ export default function GlossaryPage() {
             </section>
           ))}
           <p className="text-sm text-ink-3">
-            Want to try the formulas?{" "}
-            <Link href="/tools/profit-margin-calculator" className="font-medium text-emerald-700 hover:underline">
-              Open the profit margin calculator
+            {t.tryFormulas}{" "}
+            <Link href={localizedPath("/tools/profit-margin-calculator", locale)} className="font-medium text-emerald-700 hover:underline">
+              {t.openCalculator}
             </Link>
             .
           </p>

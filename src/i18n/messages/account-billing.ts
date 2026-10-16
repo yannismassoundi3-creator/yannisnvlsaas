@@ -100,7 +100,7 @@ export const billingMessages = defineMessages({
       graceBody: (date: string | null) =>
         `Vous conservez un accès complet jusqu'au ${date ?? "terme du délai de grâce"} pendant que Stripe retente le paiement. Mettez à jour votre moyen de paiement pour éviter toute interruption.`,
       trialTitle: (daysLeft: number | null) =>
-        `Essai gratuit : ${daysLeft === 0 ? "se termine aujourd'hui" : `${plural("fr", daysLeft ?? 0, "jour restant", "jours restants").replace(/^/, `${daysLeft} `)}`}`,
+        `Essai gratuit : ${daysLeft === 0 ? "se termine aujourd'hui" : `${daysLeft} ${plural("fr", daysLeft ?? 0, "jour restant", "jours restants")}`}`,
       trialBody: (date: string | null) =>
         `L'essai gratuit se termine le ${date ?? "—"}. Rien n'est prélevé automatiquement : après l'essai, les tableaux de bord et les imports sont suspendus jusqu'à votre abonnement, et vos données sont conservées.`,
       pausedTitle: "Accès suspendu",

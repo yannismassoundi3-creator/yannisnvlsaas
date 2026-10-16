@@ -1,5 +1,10 @@
+"use client";
+
 import { AlertTriangle, ArrowRight, Info } from "lucide-react";
 import Link from "next/link";
+import { useLocale } from "@/i18n/client";
+import type { Locale } from "@/i18n/config";
+import { dashboardMessages } from "@/i18n/messages/dashboard-components";
 import type { Insight } from "@/lib/finance/insights";
 import { cn } from "@/lib/utils";
 
@@ -9,9 +14,13 @@ type Props = {
   showActions?: boolean;
   limit?: number;
   className?: string;
+  /** Interface language of the hidden severity labels; defaults to the current one. */
+  locale?: Locale;
 };
 
-export function InsightList({ insights, showActions = true, limit, className }: Props) {
+export function InsightList({ insights, showActions = true, limit, className, locale: localeProp }: Props) {
+  const contextLocale = useLocale();
+  const t = dashboardMessages[localeProp ?? contextLocale].insightList;
   const visible = limit ? insights.slice(0, limit) : insights;
   return (
     <ul className={cn("divide-y divide-line", className)}>
@@ -24,7 +33,7 @@ export function InsightList({ insights, showActions = true, limit, className }: 
             )}
           >
             {insight.severity === "attention" ? <AlertTriangle className="size-3.5" aria-hidden /> : <Info className="size-3.5" aria-hidden />}
-            <span className="sr-only">{insight.severity === "attention" ? "Needs attention" : "Information"}</span>
+            <span className="sr-only">{insight.severity === "attention" ? t.attention : t.info}</span>
           </span>
           <div className="min-w-0 flex-1 space-y-1.5">
             <p className="font-medium text-ink">{insight.title}</p>

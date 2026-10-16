@@ -1,9 +1,13 @@
+"use client";
+
 import Link from "next/link";
 import type { Route } from "next";
 import { Badge } from "@/components/ui/badge";
+import { useLocale } from "@/i18n/client";
+import type { Locale } from "@/i18n/config";
+import { createFormat } from "@/i18n/format";
+import { dashboardMessages } from "@/i18n/messages/dashboard-components";
 import type { ProductRow } from "@/lib/analytics/reference";
-import { formatPercent } from "@/lib/finance/format";
-import { formatMoney } from "@/lib/finance/money";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -13,6 +17,8 @@ type Props = {
   linkProducts?: boolean;
   limit?: number;
   className?: string;
+  /** Interface language; defaults to the current one. */
+  locale?: Locale;
 };
 
 /**
@@ -20,7 +26,11 @@ type Props = {
  * margins extend right in emerald, losses extend left in brick. Direction and
  * the signed value carry the meaning too, so colour is never the only cue.
  */
-export function ProductMarginBars({ rows, currency, linkProducts = false, limit = 8, className }: Props) {
+export function ProductMarginBars({ rows, currency, linkProducts = false, limit = 8, className, locale: localeProp }: Props) {
+  const contextLocale = useLocale();
+  const locale = localeProp ?? contextLocale;
+  const t = dashboardMessages[locale].productMarginBars;
+  const f = createFormat(locale);
   const sorted = [...rows]
     .sort((a, b) => (b.contributionMargin ?? -Infinity) - (a.contributionMargin ?? -Infinity) || b.netRevenue - a.netRevenue)
     .slice(0, limit);
@@ -30,19 +40,19 @@ export function ProductMarginBars({ rows, currency, linkProducts = false, limit 
   return (
     <div className={cn("rounded-lg border border-line bg-surface shadow-xs", className)}>
       <div className="px-5 pt-4 pb-1">
-        <h2 className="text-md font-semibold tracking-tight text-ink">Contribution margin by product</h2>
-        <p className="text-sm text-ink-3">After product costs, allocated shipping and fees, and linked campaigns.</p>
+        <h2 className="text-md font-semibold tracking-tight text-ink">{t.title}</h2>
+        <p className="text-sm text-ink-3">{t.description}</p>
       </div>
       <table className="w-full table-fixed text-sm">
-        <caption className="sr-only">Contribution margin by product</caption>
+        <caption className="sr-only">{t.title}</caption>
         <thead>
           <tr className="text-xs whitespace-nowrap text-ink-3">
-            <th scope="col" className="w-[38%] px-5 py-2 text-left font-medium">Product</th>
+            <th scope="col" className="w-[38%] px-5 py-2 text-left font-medium">{t.product}</th>
             <th scope="col" className="hidden w-[30%] px-3 py-2 font-medium sm:table-cell">
-              <span className="sr-only">Bar</span>
+              <span className="sr-only">{t.bar}</span>
             </th>
-            <th scope="col" className="w-[18%] px-3 py-2 text-right font-medium">Margin</th>
-            <th scope="col" className="w-[14%] py-2 pr-5 pl-3 text-right font-medium">Margin %</th>
+            <th scope="col" className="w-[18%] px-3 py-2 text-right font-medium">{t.margin}</th>
+            <th scope="col" className="w-[14%] py-2 pr-5 pl-3 text-right font-medium">{t.marginRate}</th>
           </tr>
         </thead>
         <tbody>
@@ -63,7 +73,7 @@ export function ProductMarginBars({ rows, currency, linkProducts = false, limit 
                 </th>
                 <td className="hidden px-3 py-2.5 sm:table-cell">
                   {cm === null ? (
-                    <Badge tone="caution">Cost missing</Badge>
+                    <Badge tone="caution">{t.costMissing}</Badge>
                   ) : (
                     <div className="relative h-2.5 w-full" aria-hidden>
                       {hasNegative ? <span className="absolute inset-y-[-3px] left-1/2 w-px bg-chart-axis" /> : null}
@@ -79,9 +89,9 @@ export function ProductMarginBars({ rows, currency, linkProducts = false, limit 
                   )}
                 </td>
                 <td className={cn("px-3 py-2.5 text-right whitespace-nowrap tabular", cm !== null && cm < 0 ? "text-negative-700" : "text-ink")}>
-                  {cm === null ? <span className="text-ink-3">—</span> : formatMoney(cm, currency, { signDisplay: "exceptZero" })}
+                  {cm === null ? <span className="text-ink-3">—</span> : f.money(cm, currency, { signDisplay: "exceptZero" })}
                 </td>
-                <td className="py-2.5 pr-5 pl-3 text-right text-ink-2 tabular">{formatPercent(r.contributionMarginRate)}</td>
+                <td className="py-2.5 pr-5 pl-3 text-right text-ink-2 tabular">{f.percent(r.contributionMarginRate)}</td>
               </tr>
             );
           })}
