@@ -55,6 +55,13 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   typedRoutes: true,
+  // pdfkit reads its font metrics from its own package directory at runtime.
+  serverExternalPackages: ["pdfkit"],
+  // Fonts embedded in PDF reports and social images.
+  outputFileTracingIncludes: {
+    "/api/reports/**": ["./assets/fonts/**"],
+    "/opengraph-image": ["./assets/fonts/**"],
+  },
   turbopack: {
     rules: {
       "*.css": {
