@@ -2,43 +2,46 @@ import { Check, Minus } from "lucide-react";
 import type { Metadata } from "next";
 import { PricingCards } from "@/components/marketing/pricing-cards";
 import { PageIntro, Prose } from "@/components/marketing/prose";
-import { PAYMENT_GRACE_DAYS, PLANS, TRIAL_DAYS } from "@/config/plans";
-import { formatCount } from "@/lib/finance/format";
-import { formatMoney } from "@/lib/finance/money";
+import { PAYMENT_GRACE_DAYS, PLANS, planCopy, TRIAL_DAYS } from "@/config/plans";
+import { createFormat } from "@/i18n/format";
+import { publicAlternates } from "@/i18n/messages/marketing-common";
+import { marketingPages } from "@/i18n/messages/marketing-pages";
+import { getFormat, getLocale } from "@/i18n/server";
 
-export const metadata: Metadata = {
-  title: "Pricing",
-  description: `Start with a ${TRIAL_DAYS}-day free trial, no payment card required. Narixia Pro is ${formatMoney(PLANS.pro.priceMinor, PLANS.pro.currency)} per month.`,
-  alternates: { canonical: "/pricing" },
-};
-
-function years(days: number) {
-  return days >= 365 ? `${Math.round(days / 365)} years` : `${days} days`;
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  const m = marketingPages[locale].pricing;
+  const price = createFormat(locale).money(PLANS.pro.priceMinor, PLANS.pro.currency);
+  return { title: m.metaTitle, description: m.metaDescription(TRIAL_DAYS, price), alternates: publicAlternates("/pricing", locale) };
 }
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const locale = await getLocale();
+  const f = await getFormat();
+  const m = marketingPages[locale].pricing;
+  const r = m.rows;
   const t = PLANS.trial.limits;
   const p = PLANS.pro.limits;
   const rows: { label: string; trial: string | boolean; pro: string | boolean }[] = [
-    { label: "Stores", trial: String(t.stores), pro: String(p.stores) },
-    { label: "Rows per CSV import", trial: formatCount(t.importRowsPerFile), pro: formatCount(p.importRowsPerFile) },
-    { label: "Imported rows per month", trial: formatCount(t.importRowsPerMonth), pro: formatCount(p.importRowsPerMonth) },
-    { label: "History in dashboards and reports", trial: `Last ${years(t.historyDays)}`, pro: `Last ${years(p.historyDays)}` },
-    { label: "Profit dashboard and insights", trial: true, pro: true },
-    { label: "Products and advertising views", trial: true, pro: true },
-    { label: "Profitability calculator", trial: true, pro: true },
-    { label: "Manual entry and corrections", trial: true, pro: true },
-    { label: "Downloadable reports (CSV and PDF)", trial: t.exports, pro: p.exports },
-    { label: "CSV exports of products, orders and costs", trial: t.exports, pro: p.exports },
-    { label: "Product and campaign filters", trial: t.advancedFilters, pro: p.advancedFilters },
-    { label: "Full account data export (GDPR)", trial: true, pro: true },
+    { label: r.stores, trial: String(t.stores), pro: String(p.stores) },
+    { label: r.rowsPerImport, trial: f.count(t.importRowsPerFile), pro: f.count(p.importRowsPerFile) },
+    { label: r.rowsPerMonth, trial: f.count(t.importRowsPerMonth), pro: f.count(p.importRowsPerMonth) },
+    { label: r.history, trial: m.history(t.historyDays), pro: m.history(p.historyDays) },
+    { label: r.dashboard, trial: true, pro: true },
+    { label: r.views, trial: true, pro: true },
+    { label: r.calculator, trial: true, pro: true },
+    { label: r.manual, trial: true, pro: true },
+    { label: r.reports, trial: t.exports, pro: p.exports },
+    { label: r.exports, trial: t.exports, pro: p.exports },
+    { label: r.filters, trial: t.advancedFilters, pro: p.advancedFilters },
+    { label: r.gdpr, trial: true, pro: true },
   ];
   const cell = (v: string | boolean) =>
     typeof v === "boolean" ? (
       v ? (
-        <Check className="mx-auto size-4 text-emerald-600" aria-label="Included" />
+        <Check className="mx-auto size-4 text-emerald-600" aria-label={m.included} />
       ) : (
-        <Minus className="mx-auto size-4 text-ink-4" aria-label="Not included" />
+        <Minus className="mx-auto size-4 text-ink-4" aria-label={m.notIncluded} />
       )
     ) : (
       <span className="tabular">{v}</span>
@@ -46,20 +49,20 @@ export default function PricingPage() {
 
   return (
     <>
-      <PageIntro eyebrow="Pricing" title="Pricing that fits a small store">
-        <p>Try the core product free for {TRIAL_DAYS} days. No payment card, no automatic charge.</p>
+      <PageIntro eyebrow={m.eyebrow} title={m.title}>
+        <p>{m.intro(TRIAL_DAYS)}</p>
       </PageIntro>
       <div className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
-        <PricingCards />
+        <PricingCards locale={locale} />
 
         <div className="mt-16 max-w-4xl overflow-x-auto rounded-lg border border-line bg-surface shadow-xs">
           <table className="w-full min-w-[520px] text-sm">
-            <caption className="px-5 pt-4 pb-2 text-left text-md font-semibold text-ink">Compare plans</caption>
+            <caption className="px-5 pt-4 pb-2 text-left text-md font-semibold text-ink">{m.compare}</caption>
             <thead>
               <tr className="border-b border-line text-xs text-ink-3">
-                <th scope="col" className="px-5 py-2.5 text-left font-medium">Feature</th>
-                <th scope="col" className="w-36 px-3 py-2.5 text-center font-medium">Free trial</th>
-                <th scope="col" className="w-36 px-3 py-2.5 text-center font-medium">Pro</th>
+                <th scope="col" className="px-5 py-2.5 text-left font-medium">{m.feature}</th>
+                <th scope="col" className="w-36 px-3 py-2.5 text-center font-medium">{planCopy("trial", locale).name}</th>
+                <th scope="col" className="w-36 px-3 py-2.5 text-center font-medium">{planCopy("pro", locale).name}</th>
               </tr>
             </thead>
             <tbody>
@@ -77,36 +80,19 @@ export default function PricingPage() {
         </div>
 
         <Prose className="mt-16">
-          <h2>Billing questions</h2>
-          <h3>What happens when my trial ends?</h3>
-          <p>
-            Nothing is charged. Your data stays in place and you can still sign in to export it, change your settings or
-            subscribe. Dashboards, imports and reports are paused until you subscribe to Pro.
-          </p>
-          <h3>Can I subscribe during my trial?</h3>
-          <p>
-            Yes. If more than two days of your trial remain, your first payment is taken when the trial ends; otherwise
-            billing starts immediately. The checkout page shows the exact date before you confirm.
-          </p>
-          <h3>How do I cancel?</h3>
-          <p>
-            From the billing page, open the billing portal and cancel. Your subscription stays active until the end of
-            the period you have paid for, then does not renew.
-          </p>
-          <h3>What if a payment fails?</h3>
-          <p>
-            We keep your access for {PAYMENT_GRACE_DAYS} days while the payment provider retries the payment and you
-            update your payment method. You are notified in the app.
-          </p>
-          <h3>Do prices include VAT?</h3>
-          <p>
-            Prices are shown excluding VAT. Depending on your country and whether you provide a VAT number, VAT may be
-            added at checkout. Your invoice shows the breakdown.
-          </p>
-          <h3>Who processes payments?</h3>
-          <p>
-            Payments are processed by Stripe. Narixia never receives or stores your full card details.
-          </p>
+          <h2>{m.billingTitle}</h2>
+          <h3>{m.faq.trialEndsQ}</h3>
+          <p>{m.faq.trialEndsA}</p>
+          <h3>{m.faq.duringTrialQ}</h3>
+          <p>{m.faq.duringTrialA}</p>
+          <h3>{m.faq.cancelQ}</h3>
+          <p>{m.faq.cancelA}</p>
+          <h3>{m.faq.failedQ}</h3>
+          <p>{m.faq.failedA(PAYMENT_GRACE_DAYS)}</p>
+          <h3>{m.faq.vatQ}</h3>
+          <p>{m.faq.vatA}</p>
+          <h3>{m.faq.processorQ}</h3>
+          <p>{m.faq.processorA}</p>
         </Prose>
       </div>
     </>

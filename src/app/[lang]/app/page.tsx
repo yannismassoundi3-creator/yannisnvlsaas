@@ -17,34 +17,41 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Alert, EmptyState, Skeleton } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
+import type { Locale } from "@/i18n/config";
+import { overviewMessages } from "@/i18n/messages/dashboard-overview";
+import { getFormat, getLocale } from "@/i18n/server";
 import { rangeQuery } from "@/lib/analytics/range";
 import { requireStore, type ReadyWorkspace, type Store } from "@/lib/auth/workspace";
 import { getOverviewData, getStoreDataStatus, reportPeriod, ReportsPausedError, type ReportPeriod } from "@/lib/data/reports";
-import { formatDate, formatRange } from "@/lib/dates";
 import { buildAdvertisingKpis, buildPrimaryKpis, buildSecondaryKpis } from "@/lib/finance/kpis";
-import { formatMoney } from "@/lib/finance/money";
 
-export const metadata: Metadata = { title: "Overview" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return { title: overviewMessages[locale].title };
+}
 
 type SearchParams = Awaited<PageProps<"/[lang]/app">["searchParams"]>;
 
-export default function OverviewPage({ searchParams }: PageProps<"/[lang]/app">) {
+export default async function OverviewPage({ searchParams }: PageProps<"/[lang]/app">) {
+  const locale = await getLocale();
   return (
-    <Suspense fallback={<OverviewSkeleton />}>
+    <Suspense fallback={<OverviewSkeleton locale={locale} />}>
       <Overview searchParams={searchParams} />
     </Suspense>
   );
 }
 
-function Header({ store, period }: { store: Store; period: ReportPeriod }) {
+async function Header({ store, period }: { store: Store; period: ReportPeriod }) {
+  const t = overviewMessages[await getLocale()];
+  const f = await getFormat();
   return (
     <PageHeader
       eyebrow={store.name}
-      title="Overview"
+      title={t.title}
       description={
         <span className="tabular">
-          {formatRange(period.range)}
-          {period.comparison ? <span className="text-ink-3">, compared with {formatRange(period.comparison)}</span> : null}
+          {f.range(period.range)}
+          {period.comparison ? <span className="text-ink-3">{t.comparedWith(f.range(period.comparison))}</span> : null}
         </span>
       }
       actions={
@@ -60,23 +67,25 @@ function Header({ store, period }: { store: Store; period: ReportPeriod }) {
   );
 }
 
-function HistoryNotices({ ws, period }: { ws: ReadyWorkspace; period: ReportPeriod }) {
+async function HistoryNotices({ ws, period }: { ws: ReadyWorkspace; period: ReportPeriod }) {
+  const t = overviewMessages[await getLocale()];
+  const f = await getFormat();
   const upgrade =
     ws.entitlements.plan === "trial" ? (
       <Link href="/app/billing" className="text-sm font-medium whitespace-nowrap underline-offset-2 hover:underline">
-        See Pro
+        {t.seePro}
       </Link>
     ) : null;
   return (
     <>
       {period.clampedToHistory ? (
-        <Alert tone="info" title={`Showing data from ${formatDate(period.historyStart)}`} action={upgrade}>
-          Your plan includes the last {ws.entitlements.limits.historyDays} days of history, so the selected period starts on that date.
+        <Alert tone="info" title={t.clampedTitle(f.date(period.historyStart))} action={upgrade}>
+          {t.clampedBody(ws.entitlements.limits.historyDays)}
         </Alert>
       ) : null}
       {!period.comparison && !period.clampedToHistory ? (
-        <Alert tone="info" title="No comparison for this period" action={upgrade}>
-          The previous {period.days} days fall outside the history your plan includes, so changes are not shown.
+        <Alert tone="info" title={t.noComparisonTitle} action={upgrade}>
+          {t.noComparisonBody(period.days)}
         </Alert>
       ) : null}
     </>
@@ -84,7 +93,8 @@ function HistoryNotices({ ws, period }: { ws: ReadyWorkspace; period: ReportPeri
 }
 
 async function Overview({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const [ws, params] = await Promise.all([requireStore(), searchParams]);
+  const [ws, params, locale, f] = await Promise.all([requireStore(), searchParams, getLocale(), getFormat()]);
+  const t = overviewMessages[locale];
   const store = ws.activeStore;
   const period = reportPeriod(store, ws.entitlements, params);
   const header = <Header store={store} period={period} />;
@@ -100,7 +110,7 @@ async function Overview({ searchParams }: { searchParams: Promise<SearchParams> 
 
   let status, data;
   try {
-    [status, data] = await Promise.all([getStoreDataStatus(store), getOverviewData(store, period.range, period.comparison)]);
+    [status, data] = await Promise.all([getStoreDataStatus(store), getOverviewData(store, period.range, period.comparison, locale)]);
   } catch (error) {
     if (error instanceof ReportsPausedError) {
       return (
@@ -118,18 +128,18 @@ async function Overview({ searchParams }: { searchParams: Promise<SearchParams> 
   if (status.orders === 0 && status.adSpendDays === 0 && status.expenses === 0) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow={store.name} title="Overview" description="Your profitability dashboard fills in as soon as your first data arrives." />
+        <PageHeader eyebrow={store.name} title={t.title} description={t.emptyDescription} />
         <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
           <SetupChecklist status={status} />
           <Card>
             <EmptyState
               icon={<Upload aria-hidden />}
-              title="No sales data yet"
-              description="Start with an order export: the dashboard, product margins and insights are built from it. Want to look around first? The sample store shows every view with fictional data."
+              title={t.noSalesTitle}
+              description={t.noSalesBody}
               actions={
                 <>
                   <Button asChild>
-                    <Link href={"/app/imports/new?kind=orders" as Route}>Import orders</Link>
+                    <Link href={"/app/imports/new?kind=orders" as Route}>{t.importOrders}</Link>
                   </Button>
                   {!store.is_demo ? <SampleStoreButton demoStoreId={demoStore?.id ?? null} /> : null}
                 </>
@@ -142,10 +152,10 @@ async function Overview({ searchParams }: { searchParams: Promise<SearchParams> 
   }
 
   const { metrics, previous } = data;
-  const context = period.comparison ? `vs previous ${period.days === 1 ? "day" : `${period.days} days`}` : undefined;
-  const primary = buildPrimaryKpis(metrics, previous, store.currency);
-  const secondary = buildSecondaryKpis(metrics, previous, store.currency);
-  const notices = dataNotices(metrics, store);
+  const context = period.comparison ? t.deltaContext(period.days) : undefined;
+  const primary = buildPrimaryKpis(metrics, previous, store.currency, locale);
+  const secondary = buildSecondaryKpis(metrics, previous, store.currency, locale);
+  const notices = dataNotices(metrics, store, locale);
   // Cost-data insights repeat the data-quality notices shown above them.
   const insights = notices.length > 0 ? data.insights.filter((i) => i.id !== "missing_costs" && i.id !== "estimated_values") : data.insights;
   const productNames = Object.fromEntries(data.products.map((p) => [p.productId, p.name]));
@@ -153,7 +163,7 @@ async function Overview({ searchParams }: { searchParams: Promise<SearchParams> 
   const hasAds = metrics.adSpend > 0 || (previous?.adSpend ?? 0) > 0 || data.campaigns.length > 0;
   const setupIncomplete = status.orders === 0 || status.productsWithoutCost > 0 || !status.feeRuleSet || !status.shippingRuleSet || status.adSpendDays === 0;
   const unallocated = data.unallocated;
-  const money = (v: number) => formatMoney(v, store.currency);
+  const money = (v: number) => f.money(v, store.currency);
 
   return (
     <div className="space-y-6">
@@ -163,27 +173,27 @@ async function Overview({ searchParams }: { searchParams: Promise<SearchParams> 
       {metrics.orders === 0 ? (
         <Alert
           tone="info"
-          title="No orders in this period"
+          title={t.noOrdersTitle}
           action={
             status.firstOrderDate && status.lastOrderDate ? (
               <Link
                 href={`/app?from=${status.firstOrderDate > period.historyStart ? status.firstOrderDate : period.historyStart}&to=${status.lastOrderDate}` as Route}
                 className="text-sm font-medium whitespace-nowrap underline-offset-2 hover:underline"
               >
-                Show all recorded orders
+                {t.showAllOrders}
               </Link>
             ) : null
           }
         >
           {status.firstOrderDate && status.lastOrderDate
-            ? `Your recorded orders run from ${formatDate(status.firstOrderDate)} to ${formatDate(status.lastOrderDate)}.`
-            : "Costs and advertising for the period are still shown below."}
+            ? t.ordersRange(f.date(status.firstOrderDate), f.date(status.lastOrderDate))
+            : t.noOrdersFallback}
         </Alert>
       ) : null}
 
       <section aria-labelledby="kpi-heading" className="space-y-3">
         <h2 id="kpi-heading" className="sr-only">
-          Key figures
+          {t.keyFigures}
         </h2>
         <KpiGrid>
           {primary.map((k) => (
@@ -197,22 +207,18 @@ async function Overview({ searchParams }: { searchParams: Promise<SearchParams> 
         </KpiGrid>
       </section>
 
-      <DataNotices notices={notices} />
+      <DataNotices notices={notices} locale={locale} />
 
       <RevenueMarginChart points={data.series.points} granularity={data.series.granularity} currency={store.currency} height={300} />
 
       <div className="grid items-start gap-6 xl:grid-cols-2">
         <Card aria-labelledby="insights-heading" className="min-w-0">
-          <CardHeader id="insights-heading" title="What changed" description="Rule-based observations, each backed by the figures listed." />
+          <CardHeader id="insights-heading" title={t.whatChanged} description={t.whatChangedDescription} />
           {insights.length > 0 ? (
             <InsightList insights={insights} limit={4} className="mt-2" />
           ) : (
             <CardBody>
-              <p className="text-sm text-ink-3">
-                Nothing stands out in this period
-                {previous ? " compared with the previous one" : ""}. Insights appear when margins, refunds, discounts or advertising move noticeably, or when cost
-                data is incomplete.
-              </p>
+              <p className="text-sm text-ink-3">{t.nothingStandsOut(previous !== null)}</p>
             </CardBody>
           )}
         </Card>
@@ -223,10 +229,10 @@ async function Overview({ searchParams }: { searchParams: Promise<SearchParams> 
         <section aria-labelledby="products-heading" className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 id="products-heading" className="text-lg font-semibold tracking-tight text-ink">
-              Products
+              {t.products}
             </h2>
             <Link href={`/app/products?${keep}` as Route} className="inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:underline">
-              All products
+              {t.allProducts}
               <ArrowRight className="size-3.5" aria-hidden />
             </Link>
           </div>
@@ -235,21 +241,21 @@ async function Overview({ searchParams }: { searchParams: Promise<SearchParams> 
           ) : (
             <Card>
               <CardBody>
-                <p className="text-sm text-ink-3">No product sales in this period.</p>
+                <p className="text-sm text-ink-3">{t.noProductSales}</p>
               </CardBody>
             </Card>
           )}
           {unallocated.adSpend > 0 || unallocated.refunds > 0 || unallocated.variableExpenses > 0 ? (
             <p className="px-1 text-xs text-ink-3">
-              Kept at store level, not assigned to products:{" "}
+              {t.unallocatedIntro}
               {[
-                unallocated.adSpend > 0 ? `${money(unallocated.adSpend)} ad spend from campaigns not linked to a product` : null,
-                unallocated.refunds > 0 ? `${money(unallocated.refunds)} refunds not linked to an order line` : null,
-                unallocated.variableExpenses > 0 ? `${money(unallocated.variableExpenses)} other variable costs` : null,
+                unallocated.adSpend > 0 ? t.unallocatedAds(money(unallocated.adSpend)) : null,
+                unallocated.refunds > 0 ? t.unallocatedRefunds(money(unallocated.refunds)) : null,
+                unallocated.variableExpenses > 0 ? t.unallocatedVariable(money(unallocated.variableExpenses)) : null,
               ]
                 .filter(Boolean)
                 .join("; ")}
-              . Narixia does not spread these across products, because any split would be arbitrary.
+              {t.unallocatedOutro}
             </p>
           ) : null}
         </section>
@@ -257,23 +263,23 @@ async function Overview({ searchParams }: { searchParams: Promise<SearchParams> 
         <section aria-labelledby="ads-heading" className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 id="ads-heading" className="text-lg font-semibold tracking-tight text-ink">
-              Advertising
+              {t.advertising}
             </h2>
             <Link href={`/app/advertising?${keep}` as Route} className="inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:underline">
-              Advertising details
+              {t.advertisingDetails}
               <ArrowRight className="size-3.5" aria-hidden />
             </Link>
           </div>
           {hasAds ? (
             <>
               <KpiGrid columns={2}>
-                {buildAdvertisingKpis(metrics, previous, store.currency).map((k) => (
+                {buildAdvertisingKpis(metrics, previous, store.currency, locale).map((k) => (
                   <KpiTile key={k.key} size="sm" label={k.label} value={k.value} definition={k.definition} delta={k.delta} deltaContext={context} status={k.status} footnote={k.footnote} />
                 ))}
               </KpiGrid>
               {data.campaigns.length > 0 ? (
                 <Card>
-                  <CardHeader title="Top campaigns by spend" description="Platform figures use each platform's own attribution and can overlap." as="h3" />
+                  <CardHeader title={t.topCampaigns} description={t.topCampaignsDescription} as="h3" />
                   <div className="mt-3">
                     <CampaignTable campaigns={data.campaigns.slice(0, 5)} currency={store.currency} breakEvenRoas={metrics.breakEvenRoas} productNames={productNames} compact />
                   </div>
@@ -283,9 +289,9 @@ async function Overview({ searchParams }: { searchParams: Promise<SearchParams> 
           ) : (
             <Card>
               <CardBody className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-ink-3">No advertising spend recorded for this period. Add it to see blended and break-even ROAS.</p>
+                <p className="text-sm text-ink-3">{t.noAdSpend}</p>
                 <Button variant="secondary" size="sm" asChild>
-                  <Link href={"/app/imports/new?kind=ad_spend" as Route}>Add ad spend</Link>
+                  <Link href={"/app/imports/new?kind=ad_spend" as Route}>{t.addAdSpend}</Link>
                 </Button>
               </CardBody>
             </Card>
@@ -298,9 +304,9 @@ async function Overview({ searchParams }: { searchParams: Promise<SearchParams> 
   );
 }
 
-function OverviewSkeleton() {
+function OverviewSkeleton({ locale }: { locale: Locale }) {
   return (
-    <div className="space-y-6" aria-busy="true" aria-label="Loading overview">
+    <div className="space-y-6" aria-busy="true" aria-label={overviewMessages[locale].loading}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
           <Skeleton className="h-4 w-28" />

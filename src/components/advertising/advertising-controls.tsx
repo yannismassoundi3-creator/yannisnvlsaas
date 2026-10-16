@@ -8,8 +8,10 @@ import { describedBy, Field } from "@/components/ui/field";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { toast } from "@/components/ui/toaster";
 import { linkCampaignProduct, saveAdSpend } from "@/lib/advertising/actions";
-import { PLATFORM_LABELS, type Platform } from "@/lib/domain/types";
+import { PLATFORM_LABELS, platformLabel, type Platform } from "@/lib/domain/types";
 import { currencySymbol } from "@/lib/finance/currency";
+import { useLocale } from "@/i18n/client";
+import { advertisingMessages } from "@/i18n/messages/catalog-advertising";
 
 /** Product a campaign promotes. Changing it moves the campaign's spend into that product's margin. */
 export function CampaignLinkSelect({
@@ -25,6 +27,7 @@ export function CampaignLinkSelect({
   products: { id: string; name: string; sku: string | null }[];
   disabled: boolean;
 }) {
+  const t = advertisingMessages[useLocale()];
   const [value, setValue] = useState(productId ?? "");
   const [pending, startTransition] = useTransition();
   const known = products.some((p) => p.id === productId);
@@ -34,7 +37,7 @@ export function CampaignLinkSelect({
       className="w-52"
       value={value}
       disabled={disabled || pending}
-      aria-label={`Product promoted by ${campaignName}`}
+      aria-label={t.productPromotedBy(campaignName)}
       onChange={(e) => {
         const next = e.target.value;
         const previous = value;
@@ -44,12 +47,12 @@ export function CampaignLinkSelect({
           if (!r.ok) {
             setValue(previous);
             toast.error(r.message);
-          } else toast.success(next ? "Campaign linked: its spend now counts in that product's margin." : "Campaign unlinked: its spend stays at store level.");
+          } else toast.success(next ? t.campaignLinked : t.campaignUnlinked);
         });
       }}
     >
-      <option value="">Several products / store-wide</option>
-      {productId && !known ? <option value={productId}>Archived product</option> : null}
+      <option value="">{t.storeWide}</option>
+      {productId && !known ? <option value={productId}>{t.archivedProduct}</option> : null}
       {products.map((p) => (
         <option key={p.id} value={p.id}>
           {p.name}
@@ -84,6 +87,8 @@ export function AddSpendDialog({
   disabled: boolean;
 }) {
   const id = useId();
+  const locale = useLocale();
+  const t = advertisingMessages[locale];
   const [open, setOpen] = useState(false);
   const initial: SpendValues = {
     campaignId: campaigns[0]?.id ?? "new",
@@ -118,10 +123,10 @@ export function AddSpendDialog({
       <DialogTrigger asChild>
         <Button variant="secondary" disabled={disabled}>
           <Plus aria-hidden />
-          Add spend
+          {t.addSpend}
         </Button>
       </DialogTrigger>
-      <DialogContent title="Add a day of ad spend" description="For campaigns you track by hand. For many days at once, import a report from your ad platform.">
+      <DialogContent title={t.addSpendTitle} description={t.addSpendDescription}>
         <form
           noValidate
           className="space-y-4"
@@ -135,41 +140,41 @@ export function AddSpendDialog({
                 return;
               }
               setOpen(false);
-              toast.success(r.replaced ? "Spend replaced for that day." : "Spend added.");
+              toast.success(r.replaced ? t.spendReplaced : t.spendAdded);
             });
           }}
         >
-          <Field htmlFor={`${id}-campaign`} label="Campaign" error={errors.campaignId}>
+          <Field htmlFor={`${id}-campaign`} label={t.campaign} error={errors.campaignId}>
             <NativeSelect id={`${id}-campaign`} value={values.campaignId} onChange={set("campaignId")}>
               {campaigns.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name} · {PLATFORM_LABELS[c.platform as Platform] ?? c.platform}
+                  {c.name} · {platformLabel(c.platform as Platform, locale) ?? c.platform}
                 </option>
               ))}
-              <option value="new">New campaign…</option>
+              <option value="new">{t.newCampaign}</option>
             </NativeSelect>
           </Field>
           {values.campaignId === "new" ? (
             <div className="grid gap-4 sm:grid-cols-[10rem_1fr]">
-              <Field htmlFor={`${id}-platform`} label="Platform">
+              <Field htmlFor={`${id}-platform`} label={t.platform}>
                 <NativeSelect id={`${id}-platform`} value={values.newPlatform} onChange={set("newPlatform")}>
-                  {Object.entries(PLATFORM_LABELS).map(([value, label]) => (
+                  {(Object.keys(PLATFORM_LABELS) as Platform[]).map((value) => (
                     <option key={value} value={value}>
-                      {label}
+                      {platformLabel(value, locale)}
                     </option>
                   ))}
                 </NativeSelect>
               </Field>
-              <Field htmlFor={`${id}-name`} label="Campaign name" error={errors.newName}>
+              <Field htmlFor={`${id}-name`} label={t.campaignName} error={errors.newName}>
                 <Input id={`${id}-name`} value={values.newName} onChange={set("newName")} aria-invalid={errors.newName ? true : undefined} aria-describedby={describedBy(`${id}-name`, { error: errors.newName })} />
               </Field>
             </div>
           ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field htmlFor={`${id}-date`} label="Day" error={errors.date}>
+            <Field htmlFor={`${id}-date`} label={t.day} error={errors.date}>
               <Input id={`${id}-date`} type="date" value={values.date} max={defaultDate} onChange={set("date")} aria-invalid={errors.date ? true : undefined} />
             </Field>
-            <Field htmlFor={`${id}-spend`} label="Spend" hint="Excluding VAT." error={errors.spend}>
+            <Field htmlFor={`${id}-spend`} label={t.spend} hint={t.excludingVat} error={errors.spend}>
               <Input
                 id={`${id}-spend`}
                 inputMode="decimal"
@@ -182,23 +187,23 @@ export function AddSpendDialog({
             </Field>
           </div>
           <details className="rounded-md border border-line px-3 py-2">
-            <summary className="cursor-pointer text-sm font-medium text-ink-2">Platform figures (optional)</summary>
+            <summary className="cursor-pointer text-sm font-medium text-ink-2">{t.platformFigures}</summary>
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
-              <Field htmlFor={`${id}-impr`} label="Impressions" error={errors.impressions}>
+              <Field htmlFor={`${id}-impr`} label={t.impressions} error={errors.impressions}>
                 <Input id={`${id}-impr`} inputMode="numeric" value={values.impressions} onChange={set("impressions")} />
               </Field>
-              <Field htmlFor={`${id}-clicks`} label="Clicks" error={errors.clicks}>
+              <Field htmlFor={`${id}-clicks`} label={t.clicks} error={errors.clicks}>
                 <Input id={`${id}-clicks`} inputMode="numeric" value={values.clicks} onChange={set("clicks")} />
               </Field>
-              <Field htmlFor={`${id}-conv`} label="Conversions" error={errors.conversions}>
+              <Field htmlFor={`${id}-conv`} label={t.conversions} error={errors.conversions}>
                 <Input id={`${id}-conv`} inputMode="numeric" value={values.conversions} onChange={set("conversions")} />
               </Field>
-              <Field htmlFor={`${id}-value`} label="Conversion value" hint="As reported by the platform." error={errors.conversionValue}>
+              <Field htmlFor={`${id}-value`} label={t.conversionValue} hint={t.conversionValueHint} error={errors.conversionValue}>
                 <Input id={`${id}-value`} inputMode="decimal" leading={symbol} value={values.conversionValue} onChange={set("conversionValue")} />
               </Field>
             </div>
           </details>
-          <p className="text-xs text-ink-3">If spend is already recorded for this campaign and day, it is replaced.</p>
+          <p className="text-xs text-ink-3">{t.replaceNote}</p>
           {formError ? (
             <p role="alert" className="text-sm font-medium text-negative-700">
               {formError}
@@ -206,7 +211,7 @@ export function AddSpendDialog({
           ) : null}
           <div className="flex justify-end">
             <Button type="submit" loading={pending}>
-              Save spend
+              {t.saveSpend}
             </Button>
           </div>
         </form>

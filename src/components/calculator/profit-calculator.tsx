@@ -60,17 +60,24 @@ function parseForm(f: FormState, locale: Locale): { input: CalculatorInput | nul
     return undefined;
   };
   const c = f.currency;
-  const sellingPrice = take("sellingPrice", parseUserAmount(f.sellingPrice, c));
-  const quantity = take("quantity", parseUserInteger(f.quantity, { max: 10_000_000 }));
-  const orders = take("orders", parseUserInteger(f.orders, { optional: true, min: 1, max: 10_000_000 }));
-  const unitCost = take("unitCost", parseUserUnitCost(f.unitCost, { optional: true }));
-  const discount = f.discountMode === "percent" ? take("discount", parseUserPercentToBps(f.discount, { optional: true })) : take("discount", parseUserAmount(f.discount, c, { optional: true }));
-  const refunds = f.refundMode === "percent" ? take("refunds", parseUserPercentToBps(f.refunds, { optional: true })) : take("refunds", parseUserAmount(f.refunds, c, { optional: true }));
-  const feePercent = take("feePercent", parseUserPercentToBps(f.feePercent, { optional: true }));
-  const feeFixed = take("feeFixed", parseUserAmount(f.feeFixed, c, { optional: true }));
-  const shipping = take("shipping", parseUserAmount(f.shipping, c, { optional: true }));
-  const advertising = take("advertising", parseUserAmount(f.advertising, c, { optional: true }));
-  const other = take("other", parseUserAmount(f.other, c, { optional: true }));
+  const lo = { locale };
+  const sellingPrice = take("sellingPrice", parseUserAmount(f.sellingPrice, c, lo));
+  const quantity = take("quantity", parseUserInteger(f.quantity, { max: 10_000_000, ...lo }));
+  const orders = take("orders", parseUserInteger(f.orders, { optional: true, min: 1, max: 10_000_000, ...lo }));
+  const unitCost = take("unitCost", parseUserUnitCost(f.unitCost, { optional: true, ...lo }));
+  const discount =
+    f.discountMode === "percent"
+      ? take("discount", parseUserPercentToBps(f.discount, { optional: true, ...lo }))
+      : take("discount", parseUserAmount(f.discount, c, { optional: true, ...lo }));
+  const refunds =
+    f.refundMode === "percent"
+      ? take("refunds", parseUserPercentToBps(f.refunds, { optional: true, ...lo }))
+      : take("refunds", parseUserAmount(f.refunds, c, { optional: true, ...lo }));
+  const feePercent = take("feePercent", parseUserPercentToBps(f.feePercent, { optional: true, ...lo }));
+  const feeFixed = take("feeFixed", parseUserAmount(f.feeFixed, c, { optional: true, ...lo }));
+  const shipping = take("shipping", parseUserAmount(f.shipping, c, { optional: true, ...lo }));
+  const advertising = take("advertising", parseUserAmount(f.advertising, c, { optional: true, ...lo }));
+  const other = take("other", parseUserAmount(f.other, c, { optional: true, ...lo }));
 
   if (Object.keys(errors).length > 0 || sellingPrice == null || quantity == null) return { input: null, errors };
 

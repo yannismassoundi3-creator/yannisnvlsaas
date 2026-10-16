@@ -7,7 +7,7 @@ import type { ReadyWorkspace, Store } from "@/lib/auth/workspace";
 import { type CsvCell } from "@/lib/csv";
 import { fetchDailyTotals, fetchProductBreakdown, getOverviewData, type OverviewData, type ReportPeriod } from "@/lib/data/reports";
 import { moneyCell, rateCell } from "@/lib/exports";
-import { buildInsights, type Insight } from "@/lib/finance/insights";
+import { buildInsights, type Insight, type InsightInput } from "@/lib/finance/insights";
 import { createClient } from "@/lib/supabase/server";
 import type { PdfReportInput, ReportKind } from "./pdf";
 
@@ -17,7 +17,7 @@ export const REPORT_KINDS: ReportKind[] = ["summary", "products", "advertising"]
 export async function buildPdfInput(ws: ReadyWorkspace, store: Store, period: ReportPeriod, kind: ReportKind, locale: Locale = "en"): Promise<PdfReportInput> {
   const data = await getOverviewData(store, period.range, period.comparison);
   const f = createFormat(locale);
-  const notes = dataNotices(data.metrics, store).map((n) => `${n.title}. ${n.body}`);
+  const notes = dataNotices(data.metrics, store, locale).map((n) => `${n.title}. ${n.body}`);
   if (data.unallocated.adSpend > 0) {
     notes.push(reportFiles[locale].unallocatedNote(f.money(data.unallocated.adSpend, store.currency)));
   }
@@ -48,7 +48,7 @@ export async function buildPdfInput(ws: ReadyWorkspace, store: Store, period: Re
  */
 async function localizedInsights(store: Store, period: ReportPeriod, data: OverviewData, locale: Locale): Promise<Insight[]> {
   const previousProducts = period.comparison ? await fetchProductBreakdown(await createClient(), store.id, period.comparison) : null;
-  const input = {
+  const input: InsightInput = {
     currency: store.currency,
     current: data.metrics,
     previous: data.previous,

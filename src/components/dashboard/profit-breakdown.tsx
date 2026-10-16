@@ -1,9 +1,13 @@
+"use client";
+
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { TermTip } from "@/components/ui/overlay";
-import { formatPercent } from "@/lib/finance/format";
-import { DEFINITIONS, type DefinitionKey, type Metrics } from "@/lib/finance/metrics";
-import { formatMoney } from "@/lib/finance/money";
+import { useLocale } from "@/i18n/client";
+import type { Locale } from "@/i18n/config";
+import { createFormat } from "@/i18n/format";
+import { dashboardMessages } from "@/i18n/messages/dashboard-components";
+import { definitionsFor, type DefinitionKey, type Metrics } from "@/lib/finance/metrics";
 import { cn } from "@/lib/utils";
 
 type Row = {
@@ -20,10 +24,12 @@ type Row = {
   share?: boolean;
 };
 
-function completenessBadge(state: Metrics["completeness"]["cogs"]): Row["badge"] {
-  if (state === "partial") return { tone: "caution", label: "Incomplete" };
-  if (state === "missing") return { tone: "caution", label: "Missing" };
-  if (state === "estimated") return { tone: "info", label: "Includes estimates" };
+type Messages = (typeof dashboardMessages)[Locale]["profitBreakdown"];
+
+function completenessBadge(state: Metrics["completeness"]["cogs"], t: Messages): Row["badge"] {
+  if (state === "partial") return { tone: "caution", label: t.badge.incomplete };
+  if (state === "missing") return { tone: "caution", label: t.badge.missing };
+  if (state === "estimated") return { tone: "info", label: t.badge.estimated };
   return null;
 }
 
@@ -31,24 +37,43 @@ function completenessBadge(state: Metrics["completeness"]["cogs"]): Row["badge"]
  * Profit statement from gross sales to contribution margin, with each line's
  * share of net revenue. A table first; the inline bars only support it.
  */
-export function ProfitBreakdown({ metrics, currency, className, title = "Profit breakdown" }: { metrics: Metrics; currency: string; className?: string; title?: ReactNode }) {
+export function ProfitBreakdown({
+  metrics,
+  currency,
+  className,
+  title,
+  locale: localeProp,
+}: {
+  metrics: Metrics;
+  currency: string;
+  className?: string;
+  title?: ReactNode;
+  /** Interface language; defaults to the current one. */
+  locale?: Locale;
+}) {
+  const contextLocale = useLocale();
+  const locale = localeProp ?? contextLocale;
+  const t = dashboardMessages[locale].profitBreakdown;
+  const f = createFormat(locale);
+  const definitions = definitionsFor(locale);
+  const L = t.rows;
   const m = metrics;
   const rows: Row[] = [
-    { key: "grossSales", label: "Gross sales", amount: m.grossSales, sign: "+", definition: "grossSales", kind: "line" },
-    { key: "discounts", label: "Discounts", amount: -m.discounts, sign: "−", definition: "discounts", kind: "line" },
-    { key: "refunds", label: "Refunds", amount: -m.refunds, sign: "−", definition: "refunds", kind: "line" },
-    { key: "netSales", label: "Net sales", amount: m.netSales, sign: "=", definition: "netSales", kind: "subtotal" },
-    { key: "shippingCharged", label: "Shipping charged", amount: m.shippingCharged, sign: "+", definition: "shippingCharged", kind: "line" },
-    { key: "netRevenue", label: "Net revenue", amount: m.netRevenue, sign: "=", definition: "netRevenue", kind: "subtotal", share: true },
-    { key: "cogs", label: "Cost of goods sold", amount: -m.cogs, sign: "−", definition: "cogs", kind: "line", share: true, bar: true, badge: completenessBadge(m.completeness.cogs) },
-    { key: "grossProfit", label: "Gross profit", amount: m.grossProfit, sign: "=", definition: "grossProfit", kind: "subtotal", share: true },
-    { key: "shippingCosts", label: "Shipping & fulfilment", amount: -m.shippingCosts, sign: "−", definition: "shippingCosts", kind: "line", share: true, bar: true, badge: completenessBadge(m.completeness.shipping) },
-    { key: "transactionFees", label: "Payment fees", amount: -m.transactionFees, sign: "−", definition: "transactionFees", kind: "line", share: true, bar: true, badge: completenessBadge(m.completeness.fees) },
-    { key: "adSpend", label: "Advertising", amount: -m.adSpend, sign: "−", definition: "adSpend", kind: "line", share: true, bar: true },
-    { key: "otherVariableCosts", label: "Other variable costs", amount: -m.otherVariableCosts, sign: "−", definition: "otherVariableCosts", kind: "line", share: true, bar: true },
-    { key: "contributionMargin", label: "Contribution margin", amount: m.contributionMargin, sign: "=", definition: "contributionMargin", kind: "total", share: true },
-    { key: "fixedCosts", label: "Fixed costs", amount: -m.fixedCosts, sign: "−", definition: "fixedCosts", kind: "muted", share: true },
-    { key: "operatingProfit", label: "Operating profit (estimate)", amount: m.operatingProfit, sign: "=", definition: "operatingProfit", kind: "muted", share: true },
+    { key: "grossSales", label: L.grossSales, amount: m.grossSales, sign: "+", definition: "grossSales", kind: "line" },
+    { key: "discounts", label: L.discounts, amount: -m.discounts, sign: "−", definition: "discounts", kind: "line" },
+    { key: "refunds", label: L.refunds, amount: -m.refunds, sign: "−", definition: "refunds", kind: "line" },
+    { key: "netSales", label: L.netSales, amount: m.netSales, sign: "=", definition: "netSales", kind: "subtotal" },
+    { key: "shippingCharged", label: L.shippingCharged, amount: m.shippingCharged, sign: "+", definition: "shippingCharged", kind: "line" },
+    { key: "netRevenue", label: L.netRevenue, amount: m.netRevenue, sign: "=", definition: "netRevenue", kind: "subtotal", share: true },
+    { key: "cogs", label: L.cogs, amount: -m.cogs, sign: "−", definition: "cogs", kind: "line", share: true, bar: true, badge: completenessBadge(m.completeness.cogs, t) },
+    { key: "grossProfit", label: L.grossProfit, amount: m.grossProfit, sign: "=", definition: "grossProfit", kind: "subtotal", share: true },
+    { key: "shippingCosts", label: L.shippingCosts, amount: -m.shippingCosts, sign: "−", definition: "shippingCosts", kind: "line", share: true, bar: true, badge: completenessBadge(m.completeness.shipping, t) },
+    { key: "transactionFees", label: L.transactionFees, amount: -m.transactionFees, sign: "−", definition: "transactionFees", kind: "line", share: true, bar: true, badge: completenessBadge(m.completeness.fees, t) },
+    { key: "adSpend", label: L.adSpend, amount: -m.adSpend, sign: "−", definition: "adSpend", kind: "line", share: true, bar: true },
+    { key: "otherVariableCosts", label: L.otherVariableCosts, amount: -m.otherVariableCosts, sign: "−", definition: "otherVariableCosts", kind: "line", share: true, bar: true },
+    { key: "contributionMargin", label: L.contributionMargin, amount: m.contributionMargin, sign: "=", definition: "contributionMargin", kind: "total", share: true },
+    { key: "fixedCosts", label: L.fixedCosts, amount: -m.fixedCosts, sign: "−", definition: "fixedCosts", kind: "muted", share: true },
+    { key: "operatingProfit", label: L.operatingProfit, amount: m.operatingProfit, sign: "=", definition: "operatingProfit", kind: "muted", share: true },
   ];
 
   // Cost lines show their size as a share of net revenue; results (rows with "=") keep their sign.
@@ -57,21 +82,21 @@ export function ProfitBreakdown({ metrics, currency, className, title = "Profit 
   return (
     <div className={cn("rounded-lg border border-line bg-surface shadow-xs", className)}>
       <div className="flex items-baseline justify-between gap-4 px-5 pt-4 pb-2">
-        <h2 className="text-md font-semibold tracking-tight text-ink">{title}</h2>
-        <span className="text-xs text-ink-3">Amounts exclude VAT / sales tax</span>
+        <h2 className="text-md font-semibold tracking-tight text-ink">{title ?? t.title}</h2>
+        <span className="text-xs text-ink-3">{t.exclVat}</span>
       </div>
       <table className="w-full text-sm">
-        <caption className="sr-only">Profit breakdown from gross sales to operating profit</caption>
+        <caption className="sr-only">{t.caption}</caption>
         <thead className="sr-only">
           <tr>
-            <th scope="col">Line</th>
-            <th scope="col">Amount</th>
-            <th scope="col">Share of net revenue</th>
+            <th scope="col">{t.line}</th>
+            <th scope="col">{t.amount}</th>
+            <th scope="col">{t.share}</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => {
-            const def = row.definition ? DEFINITIONS[row.definition] : null;
+            const def = row.definition ? definitions[row.definition] : null;
             const pct = share(row);
             return (
               <tr
@@ -112,7 +137,7 @@ export function ProfitBreakdown({ metrics, currency, className, title = "Profit 
                     row.kind === "muted" ? "text-ink-3" : "text-ink",
                   )}
                 >
-                  {formatMoney(row.amount, currency)}
+                  {f.money(row.amount, currency)}
                 </td>
                 <td className="w-14 py-2 pr-3 sm:w-[38%] sm:pr-5">
                   <div className="flex items-center justify-end gap-3">
@@ -124,7 +149,7 @@ export function ProfitBreakdown({ metrics, currency, className, title = "Profit 
                       <span className="hidden flex-1 sm:block" />
                     )}
                     <span className={cn("w-11 shrink-0 text-right text-xs tabular sm:w-14", row.kind === "total" ? "font-semibold text-ink" : "text-ink-3")}>
-                      {row.share ? formatPercent(pct) : ""}
+                      {row.share ? f.percent(pct) : ""}
                     </span>
                   </div>
                 </td>
@@ -134,8 +159,7 @@ export function ProfitBreakdown({ metrics, currency, className, title = "Profit 
         </tbody>
       </table>
       <p className="border-t border-line px-5 py-3 text-xs text-ink-3">
-        Percentages are shares of net revenue (net sales plus shipping charged). Contribution margin is not net profit: fixed costs, taxes on profit,
-        interest and depreciation are not included above it.
+        {t.footnote}
       </p>
     </div>
   );

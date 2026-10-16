@@ -4,22 +4,27 @@ import { Suspense } from "react";
 import { ImportWizard } from "@/components/imports/import-wizard";
 import { Skeleton } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
+import { importPages } from "@/i18n/messages/imports-pages";
+import { getLocale } from "@/i18n/server";
 import { requireStore } from "@/lib/auth/workspace";
 import { isImportKind } from "@/lib/imports/schema";
 
-export const metadata: Metadata = { title: "New import" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: importPages[await getLocale()].new.title };
+}
 
-export default function NewImportPage({ searchParams }: PageProps<"/[lang]/app/imports/new">) {
+export default async function NewImportPage({ searchParams }: PageProps<"/[lang]/app/imports/new">) {
+  const t = importPages[await getLocale()];
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow={
           <Link href="/app/imports" className="hover:underline">
-            Imports
+            {t.history.title}
           </Link>
         }
-        title="New import"
-        description="Nothing is saved until you have reviewed the result and confirmed."
+        title={t.new.title}
+        description={t.new.description}
       />
       <Suspense fallback={<Skeleton className="h-96 rounded-lg" />}>
         <Wizard searchParams={searchParams} />

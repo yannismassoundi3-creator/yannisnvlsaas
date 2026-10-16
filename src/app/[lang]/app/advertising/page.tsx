@@ -19,15 +19,18 @@ import { rangeQuery } from "@/lib/analytics/range";
 import { bucketDailyValues } from "@/lib/analytics/series";
 import { requireStore } from "@/lib/auth/workspace";
 import { getAdvertisingData, listCampaignOptions, reportPeriod, ReportsPausedError } from "@/lib/data/reports";
-import { addDays, formatRange } from "@/lib/dates";
-import { PLATFORM_LABELS, type Platform } from "@/lib/domain/types";
-import { formatCount, formatMultiple } from "@/lib/finance/format";
+import { addDays } from "@/lib/dates";
+import { platformLabel, type Platform } from "@/lib/domain/types";
 import { buildAdvertisingKpis } from "@/lib/finance/kpis";
-import { DEFINITIONS } from "@/lib/finance/metrics";
-import { formatMoney } from "@/lib/finance/money";
+import { definitionsFor } from "@/lib/finance/metrics";
 import { cn } from "@/lib/utils";
+import { advertisingMessages } from "@/i18n/messages/catalog-advertising";
+import { catalogCommon } from "@/i18n/messages/catalog-common";
+import { getFormat, getLocale } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Advertising" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: advertisingMessages[await getLocale()].metaTitle };
+}
 
 const PLATFORM_ORDER: Platform[] = ["meta", "google", "tiktok", "pinterest", "microsoft", "other"];
 
@@ -40,7 +43,11 @@ export default function AdvertisingPage({ searchParams }: PageProps<"/[lang]/app
 }
 
 async function Advertising({ searchParams }: { searchParams: PageProps<"/[lang]/app/advertising">["searchParams"] }) {
-  const [ws, sp] = await Promise.all([requireStore(), searchParams]);
+  const [ws, sp, locale, f] = await Promise.all([requireStore(), searchParams, getLocale(), getFormat()]);
+  const t = advertisingMessages[locale];
+  const c = catalogCommon[locale];
+  const definitions = definitionsFor(locale);
+  const label = (p: string) => platformLabel(p as Platform, locale) ?? p;
   const store = ws.activeStore;
   const period = reportPeriod(store, ws.entitlements, sp);
   const keep = rangeQuery(period);
@@ -54,8 +61,8 @@ async function Advertising({ searchParams }: { searchParams: PageProps<"/[lang]/
   const header = (
     <PageHeader
       eyebrow={store.name}
-      title="Advertising"
-      description={`Spend, attribution and what advertising leaves of your margin, ${formatRange(period.range)}.`}
+      title={t.title}
+      description={t.description(f.range(period.range))}
       actions={
         <>
           <DateRangePicker
@@ -71,14 +78,14 @@ async function Advertising({ searchParams }: { searchParams: PageProps<"/[lang]/
             <Button variant="secondary" asChild>
               <a href={`/api/exports/campaigns?${keep}`}>
                 <Download aria-hidden />
-                Export CSV
+                {c.exportCsv}
               </a>
             </Button>
           ) : (
             <Button variant="secondary" asChild>
-              <Link href="/app/billing" title="CSV exports are part of Pro">
+              <Link href="/app/billing" title={c.exportsPro}>
                 <Lock aria-hidden />
-                Export CSV
+                {c.exportCsv}
                 <Badge tone="outline">Pro</Badge>
               </Link>
             </Button>
@@ -92,7 +99,7 @@ async function Advertising({ searchParams }: { searchParams: PageProps<"/[lang]/
     return (
       <div className="space-y-6">
         {header}
-        <AnalyticsPaused what="Advertising analytics" />
+        <AnalyticsPaused what={t.analytics} />
       </div>
     );
   }
@@ -105,7 +112,7 @@ async function Advertising({ searchParams }: { searchParams: PageProps<"/[lang]/
       return (
         <div className="space-y-6">
           {header}
-          <AnalyticsPaused what="Advertising analytics" />
+          <AnalyticsPaused what={t.analytics} />
         </div>
       );
     }
@@ -113,7 +120,7 @@ async function Advertising({ searchParams }: { searchParams: PageProps<"/[lang]/
   }
 
   const { metrics, previous } = data;
-  const money = (v: number) => formatMoney(v, store.currency);
+  const money = (v: number) => f.money(v, store.currency);
   const platformsWithData = PLATFORM_ORDER.filter((p) => data.daily.some((d) => d.platform === p) || data.campaigns.some((c) => c.platform === p));
   const daily = platform ? data.daily.filter((d) => d.platform === platform) : data.daily;
   const chartPlatforms = platform ? [platform] : platformsWithData;
@@ -125,7 +132,7 @@ async function Advertising({ searchParams }: { searchParams: PageProps<"/[lang]/
   }
   const series = bucketDailyValues([...byDay.entries()].map(([day, values]) => ({ day, values })), chartPlatforms, period.range);
   const campaigns = platform ? data.campaigns.filter((c) => c.platform === platform) : data.campaigns;
-  const context = period.comparison ? `vs previous ${period.days} days` : undefined;
+  const context = period.comparison ? t.vsPrevious(period.days) : undefined;
   const hasAnyAds = campaignOptions.length > 0 || data.daily.length > 0;
   const linkedSpend = data.campaigns.filter((c) => c.productId).reduce((a, c) => a + c.spend, 0);
 
@@ -136,11 +143,11 @@ async function Advertising({ searchParams }: { searchParams: PageProps<"/[lang]/
         <Card>
           <EmptyState
             icon={<Megaphone aria-hidden />}
-            title="No advertising data yet"
-            description="Export a report with one row per campaign and day from Meta Ads Manager, Google Ads or TikTok Ads, and import it. Narixia then shows what advertising leaves of your margin."
+            title={t.emptyTitle}
+            description={t.emptyBody}
             actions={
               <Button asChild>
-                <Link href={"/app/imports/new?kind=ad_spend" as Route}>Import ad spend</Link>
+                <Link href={"/app/imports/new?kind=ad_spend" as Route}>{t.importAdSpend}</Link>
               </Button>
             }
           />
@@ -154,15 +161,15 @@ async function Advertising({ searchParams }: { searchParams: PageProps<"/[lang]/
       {header}
 
       <KpiGrid>
-        {buildAdvertisingKpis(metrics, previous, store.currency).map((k) => (
+        {buildAdvertisingKpis(metrics, previous, store.currency, locale).map((k) => (
           <KpiTile key={k.key} label={k.label} value={k.value} definition={k.definition} delta={k.delta} deltaContext={context} status={k.status} footnote={k.footnote} />
         ))}
       </KpiGrid>
 
-      <div className="flex flex-wrap items-center gap-1" role="navigation" aria-label="Platform filter">
+      <div className="flex flex-wrap items-center gap-1" role="navigation" aria-label={t.platformFilter}>
         {[null, ...platformsWithData].map((p) => {
           const active = p === platform;
-          const label = p ? PLATFORM_LABELS[p] : "All platforms";
+          const text = p ? label(p) : t.allPlatforms;
           if (p && !advanced) return null;
           return (
             <Link
@@ -171,77 +178,74 @@ async function Advertising({ searchParams }: { searchParams: PageProps<"/[lang]/
               aria-current={active ? "page" : undefined}
               className={cn("rounded-md px-2.5 py-1.5 text-sm font-medium", active ? "bg-navy-800 text-white" : "text-ink-2 hover:bg-hover")}
             >
-              {label}
+              {text}
             </Link>
           );
         })}
         {!advanced && platformsWithData.length > 1 ? (
-          <Link href="/app/billing" className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-ink-3 hover:bg-hover" title="Platform filters are part of Pro">
-            Filter by platform
+          <Link href="/app/billing" className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-ink-3 hover:bg-hover" title={t.platformFiltersPro}>
+            {t.filterByPlatform}
             <Badge tone="outline">Pro</Badge>
           </Link>
         ) : null}
-        {platform ? <span className="ml-2 text-xs text-ink-3">The figures above always cover all platforms.</span> : null}
+        {platform ? <span className="ml-2 text-xs text-ink-3">{t.figuresCoverAll}</span> : null}
       </div>
 
       <div className="grid items-start gap-6 xl:grid-cols-[1.5fr_1fr]">
         <BarSeriesChart
-          title={platform ? `${PLATFORM_LABELS[platform]} spend` : "Ad spend by platform"}
-          description={`${series.granularity === "day" ? "Daily" : series.granularity === "week" ? "Weekly" : "Monthly"} spend, excluding VAT.`}
-          series={chartPlatforms.map((p) => ({ key: p, label: PLATFORM_LABELS[p], color: CHART.series[PLATFORM_ORDER.indexOf(p)] }))}
+          title={platform ? t.platformSpend(label(platform)) : t.spendByPlatform}
+          description={t.spendChartDescription(series.granularity)}
+          series={chartPlatforms.map((p) => ({ key: p, label: label(p), color: CHART.series[PLATFORM_ORDER.indexOf(p)] }))}
           points={series.points}
           granularity={series.granularity}
           valueKind="money"
           currency={store.currency}
         />
         <Card className="min-w-0">
-          <CardHeader title="Reading these numbers" as="h2" />
+          <CardHeader title={t.reading} as="h2" />
           <CardBody className="space-y-3 text-sm text-ink-2">
             <p>
-              <span className="font-medium text-ink">Platform ROAS</span> is what each platform attributes to its own ads. Platforms count with their own rules and the same sale
-              can be claimed twice.
+              <span className="font-medium text-ink">{t.platformRoas}</span>
+              {t.platformRoasText}
             </p>
             <p>
-              <span className="font-medium text-ink">Blended ROAS</span> ({formatMultiple(metrics.blendedRoas)}) divides all net revenue by all ad spend. It needs no attribution,
-              but includes sales that would have happened without ads.
+              <span className="font-medium text-ink">{t.blendedRoas}</span>
+              {t.blendedRoasText(f.multiple(metrics.blendedRoas))}
             </p>
             <p>
-              <span className="font-medium text-ink">Break-even ROAS</span> ({formatMultiple(metrics.breakEvenRoas)}) is where advertising uses up the whole margin left after
-              product, shipping and payment costs. Campaigns below it cost more margin than the revenue they are credited with brings.
+              <span className="font-medium text-ink">{t.breakEvenRoas}</span>
+              {t.breakEvenRoasText(f.multiple(metrics.breakEvenRoas))}
             </p>
-            <p className="text-ink-3">
-              {money(linkedSpend)} of {money(metrics.adSpend)} spend is from campaigns linked to a single product and counts in that product&rsquo;s margin. The rest stays at
-              store level.
-            </p>
+            <p className="text-ink-3">{t.linkedShare(money(linkedSpend), money(metrics.adSpend))}</p>
           </CardBody>
         </Card>
       </div>
 
       <Card>
         <CardHeader
-          title="Campaigns"
-          description="Link a campaign to the product it promotes to include its spend in that product's margin. Campaigns for several products stay store-wide."
+          title={t.campaigns}
+          description={t.campaignsDescription}
         />
         {campaigns.length === 0 ? (
           <CardBody>
-            <p className="text-sm text-ink-3">No campaign spent in this period{platform ? ` on ${PLATFORM_LABELS[platform]}` : ""}.</p>
+            <p className="text-sm text-ink-3">{t.noCampaign(platform ? label(platform) : null)}</p>
           </CardBody>
         ) : (
           <TableContainer className="mt-3">
             <Table>
-              <caption className="sr-only">Campaigns, {formatRange(period.range)}</caption>
+              <caption className="sr-only">{t.campaignsCaption(f.range(period.range))}</caption>
               <THead>
                 <TR>
-                  <TH>Campaign</TH>
-                  <TH>Promotes</TH>
-                  <TH numeric>Spend</TH>
-                  <TH numeric>Clicks</TH>
-                  <TH numeric>Conversions</TH>
-                  <TH numeric>Conversion value</TH>
+                  <TH>{t.colCampaign}</TH>
+                  <TH>{t.colPromotes}</TH>
+                  <TH numeric>{t.colSpend}</TH>
+                  <TH numeric>{t.colClicks}</TH>
+                  <TH numeric>{t.colConversions}</TH>
+                  <TH numeric>{t.colConversionValue}</TH>
                   <TH numeric>
                     <span className="inline-flex items-center gap-1">
-                      Platform ROAS
-                      <TermTip term={DEFINITIONS.roas.term}>{DEFINITIONS.roas.short}</TermTip>
+                      {t.colPlatformRoas}
+                      <TermTip term={definitions.roas.term}>{definitions.roas.short}</TermTip>
                     </span>
                   </TH>
                 </TR>
@@ -253,24 +257,24 @@ async function Advertising({ searchParams }: { searchParams: PageProps<"/[lang]/
                     <TR key={c.campaignId} className="hover:bg-hover/50">
                       <TD className="max-w-72">
                         <div className="truncate font-medium text-ink">{c.name}</div>
-                        <div className="text-xs text-ink-3">{PLATFORM_LABELS[c.platform as Platform] ?? c.platform}</div>
+                        <div className="text-xs text-ink-3">{label(c.platform)}</div>
                       </TD>
                       <TD>
                         <CampaignLinkSelect campaignId={c.campaignId} campaignName={c.name} productId={c.productId} products={data.products} disabled={!canWrite} />
                       </TD>
                       <TD numeric>{money(c.spend)}</TD>
-                      <TD numeric>{formatCount(c.clicks)}</TD>
-                      <TD numeric>{formatCount(c.conversions)}</TD>
+                      <TD numeric>{f.count(c.clicks)}</TD>
+                      <TD numeric>{f.count(c.conversions)}</TD>
                       <TD numeric>{money(c.conversionValue)}</TD>
                       <TD numeric>
                         <span className="inline-flex items-center justify-end gap-2">
                           {below ? (
                             <Badge tone="caution">
                               <AlertTriangle aria-hidden />
-                              Below break-even
+                              {t.belowBreakEven}
                             </Badge>
                           ) : null}
-                          <span className="font-medium">{formatMultiple(c.platformRoas)}</span>
+                          <span className="font-medium">{f.multiple(c.platformRoas)}</span>
                         </span>
                       </TD>
                     </TR>
