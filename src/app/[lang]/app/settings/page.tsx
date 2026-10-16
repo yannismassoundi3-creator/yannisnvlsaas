@@ -7,25 +7,26 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Alert, Skeleton } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
+import { settingsPage } from "@/i18n/messages/account-settings";
+import { getLocale } from "@/i18n/server";
 import { requireWorkspace } from "@/lib/auth/workspace";
 import { currencyName } from "@/lib/finance/currency";
-import { PLATFORM_NAMES, type PlatformId } from "@/lib/onboarding/constants";
+import { INTL_LOCALE } from "@/i18n/config";
+import { platformName, type PlatformId } from "@/lib/onboarding/constants";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Settings" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: settingsPage[await getLocale()].metaTitle };
+}
 
 type Section = "profile" | "store" | "stores" | "data";
-const SECTIONS: { id: Section; label: string }[] = [
-  { id: "store", label: "Store and costs" },
-  { id: "stores", label: "Stores" },
-  { id: "profile", label: "Profile and sign-in" },
-  { id: "data", label: "Data and privacy" },
-];
+const SECTIONS: Section[] = ["store", "stores", "profile", "data"];
 
-export default function SettingsPage({ searchParams }: PageProps<"/[lang]/app/settings">) {
+export default async function SettingsPage({ searchParams }: PageProps<"/[lang]/app/settings">) {
+  const t = settingsPage[await getLocale()];
   return (
     <div className="space-y-6">
-      <PageHeader title="Settings" description="Store rules used in your reports, your stores, your account and your data." />
+      <PageHeader title={t.title} description={t.description} />
       <Suspense fallback={<Skeleton className="h-96 rounded-lg" />}>
         <Settings searchParams={searchParams} />
       </Suspense>
@@ -34,9 +35,10 @@ export default function SettingsPage({ searchParams }: PageProps<"/[lang]/app/se
 }
 
 async function Settings({ searchParams }: { searchParams: PageProps<"/[lang]/app/settings">["searchParams"] }) {
-  const [ws, sp] = await Promise.all([requireWorkspace(), searchParams]);
+  const [ws, sp, locale] = await Promise.all([requireWorkspace(), searchParams, getLocale()]);
+  const t = settingsPage[locale];
   const raw = Array.isArray(sp.section) ? sp.section[0] : sp.section;
-  const section: Section = raw === "costs" ? "store" : (SECTIONS.find((s) => s.id === raw)?.id ?? (ws.activeStore ? "store" : "profile"));
+  const section: Section = raw === "costs" ? "store" : (SECTIONS.find((s) => s === raw) ?? (ws.activeStore ? "store" : "profile"));
   const store = ws.activeStore;
   const canWrite = ws.entitlements.canWrite;
   const realStores = ws.stores.filter((s) => !s.is_demo);
@@ -45,25 +47,25 @@ async function Settings({ searchParams }: { searchParams: PageProps<"/[lang]/app
 
   return (
     <div className="grid gap-6 lg:grid-cols-[13rem_1fr]">
-      <nav aria-label="Settings sections" className="flex gap-1 overflow-x-auto lg:flex-col">
+      <nav aria-label={t.sectionsNav} className="flex gap-1 overflow-x-auto lg:flex-col">
         {SECTIONS.map((s) => (
           <Link
-            key={s.id}
-            href={`/app/settings?section=${s.id}` as Route}
-            aria-current={s.id === section ? "page" : undefined}
+            key={s}
+            href={`/app/settings?section=${s}` as Route}
+            aria-current={s === section ? "page" : undefined}
             className={cn(
               "shrink-0 rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap",
-              s.id === section ? "bg-surface text-ink shadow-xs ring-1 ring-line" : "text-ink-2 hover:bg-hover",
+              s === section ? "bg-surface text-ink shadow-xs ring-1 ring-line" : "text-ink-2 hover:bg-hover",
             )}
           >
-            {s.label}
+            {t.sections[s]}
           </Link>
         ))}
       </nav>
 
       <div className="min-w-0 space-y-6">
         {!canWrite && section !== "data" ? (
-          <Alert tone="caution">Changes are paused because your trial or subscription has ended. You can still export or delete your data.</Alert>
+          <Alert tone="caution">{t.paused}</Alert>
         ) : null}
 
         {section === "store" ? (
@@ -71,8 +73,8 @@ async function Settings({ searchParams }: { searchParams: PageProps<"/[lang]/app
             <Card>
               <CardHeader
                 title={store.name}
-                description={store.is_demo ? "Settings of the sample store. Its figures are fictional." : `${PLATFORM_NAMES[store.platform as PlatformId] ?? store.platform} store`}
-                actions={store.is_demo ? <Badge tone="demo">Demo data</Badge> : null}
+                description={store.is_demo ? t.sampleStoreSettings : t.platformStore(platformName(store.platform as PlatformId, locale) ?? store.platform)}
+                actions={store.is_demo ? <Badge tone="demo">{t.demoData}</Badge> : null}
               />
               <CardBody>
                 <StoreSettingsForm
@@ -91,18 +93,18 @@ async function Settings({ searchParams }: { searchParams: PageProps<"/[lang]/app
               </CardBody>
             </Card>
           ) : (
-            <Alert tone="info">You have no store yet.</Alert>
+            <Alert tone="info">{t.noStore}</Alert>
           )
         ) : null}
 
         {section === "stores" ? (
           <Card>
             <CardHeader
-              title="Stores"
-              description={`${realStores.length} of ${ws.entitlements.limits.stores} ${ws.entitlements.limits.stores === 1 ? "store" : "stores"} on your plan. The sample store does not count.`}
+              title={t.storesTitle}
+              description={t.storesCount(realStores.length, ws.entitlements.limits.stores)}
               actions={
                 ws.role !== "member" ? (
-                  <AddStoreDialog disabled={!canWrite || atLimit} reason={atLimit ? (ws.entitlements.plan === "pro" ? "Store limit reached" : "The trial includes one store; Pro includes three") : undefined} />
+                  <AddStoreDialog disabled={!canWrite || atLimit} reason={atLimit ? (ws.entitlements.plan === "pro" ? t.limitReached : t.trialLimit) : undefined} />
                 ) : null
               }
             />
@@ -112,11 +114,11 @@ async function Settings({ searchParams }: { searchParams: PageProps<"/[lang]/app
                   <div className="min-w-0">
                     <p className="flex items-center gap-2 font-medium text-ink">
                       {s.name}
-                      {s.is_demo ? <Badge tone="demo">Demo</Badge> : null}
-                      {s.id === store?.id ? <Badge tone="outline">Viewing</Badge> : null}
+                      {s.is_demo ? <Badge tone="demo">{t.demoBadge}</Badge> : null}
+                      {s.id === store?.id ? <Badge tone="outline">{t.viewing}</Badge> : null}
                     </p>
                     <p className="text-xs text-ink-3">
-                      {s.currency} · {currencyName(s.currency)} · {s.timezone.replaceAll("_", " ")}
+                      {s.currency} · {currencyName(s.currency, INTL_LOCALE[locale])} · {s.timezone.replaceAll("_", " ")}
                     </p>
                   </div>
                   {ws.role !== "member" && (s.is_demo || realStores.length > 1) ? <DeleteStoreButton storeId={s.id} storeName={s.name} isDemo={s.is_demo} /> : null}
@@ -125,18 +127,18 @@ async function Settings({ searchParams }: { searchParams: PageProps<"/[lang]/app
             </ul>
             <CardBody className="border-t border-line">
               {demoStore ? (
-                <p className="text-sm text-ink-3">The sample store contains fictional data to explore every view. It is labelled everywhere it appears.</p>
+                <p className="text-sm text-ink-3">{t.sampleExists}</p>
               ) : (
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm text-ink-3">Explore every view with a labelled sample store of fictional data.</p>
+                  <p className="text-sm text-ink-3">{t.sampleOffer}</p>
                   {canWrite ? <SampleStoreButton demoStoreId={null} /> : null}
                 </div>
               )}
               {atLimit && ws.entitlements.plan !== "pro" ? (
                 <p className="mt-3 text-sm text-ink-3">
-                  The trial includes one store.{" "}
+                  {t.trialOneStore}{" "}
                   <Link href="/app/billing" className="font-medium text-emerald-700 hover:underline">
-                    Pro includes three
+                    {t.proThree}
                   </Link>
                   .
                 </p>
@@ -147,7 +149,7 @@ async function Settings({ searchParams }: { searchParams: PageProps<"/[lang]/app
 
         {section === "profile" ? (
           <Card>
-            <CardHeader title="Profile and sign-in" description={`Signed in as ${ws.user.email ?? "unknown"} · ${ws.organization.name} (${ws.role})`} />
+            <CardHeader title={t.sections.profile} description={t.signedInAs(ws.user.email, ws.organization.name, t.roles[ws.role] ?? ws.role)} />
             <CardBody>
               <ProfileForms fullName={ws.user.fullName} email={ws.user.email} />
             </CardBody>
@@ -156,7 +158,7 @@ async function Settings({ searchParams }: { searchParams: PageProps<"/[lang]/app
 
         {section === "data" ? (
           <Card>
-            <CardHeader title="Data and privacy" description="Your data belongs to you. Narixia uses it only to provide the service; see the privacy policy for details." />
+            <CardHeader title={t.sections.data} description={t.dataDescription} />
             <CardBody>
               <DataControls isOwner={ws.role === "owner"} />
             </CardBody>

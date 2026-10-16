@@ -57,7 +57,6 @@ export function SiteHeader() {
           </ul>
         </nav>
         <div className="ml-auto hidden items-center gap-2 md:flex">
-          <LanguageSwitcher locale={locale} className="mr-2 hidden lg:flex" />
           <Button asChild variant="ghost">
             <Link href="/sign-in">{t.signIn}</Link>
           </Button>

@@ -11,14 +11,16 @@ import { Checkbox } from "@/components/ui/controls";
 import { Alert } from "@/components/ui/feedback";
 import { NativeSelect } from "@/components/ui/input";
 import { Table, TableContainer, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { EXPENSE_CATEGORIES, PLATFORM_LABELS, type ExpenseCategory, type Platform } from "@/lib/domain/types";
+import { useFormat, useLocale } from "@/i18n/client";
+import { importUi } from "@/i18n/messages/imports-ui";
+import { EXPENSE_CATEGORIES, expenseCategoryLabel, PLATFORM_LABELS, platformLabel, type ExpenseCategory, type Platform } from "@/lib/domain/types";
 import { detectDecimalSeparator } from "@/lib/finance/decimal";
 import { cancelImport, createImportJob, finalizeImport, stageImportRows } from "@/lib/imports/actions";
 import { detectDateOrder } from "@/lib/imports/dates";
-import { autoMap, detectSource, extractMapped, missingRequired, SOURCE_LABELS, type ColumnMapping, type DetectedSource } from "@/lib/imports/mapping";
+import { autoMap, detectSource, extractMapped, missingRequired, sourceLabel, type ColumnMapping, type DetectedSource } from "@/lib/imports/mapping";
 import { normalizeRows, normalizeText, type NormalizedRow, type RawRow } from "@/lib/imports/normalize";
 import { readCsvFile, type ParsedCsv } from "@/lib/imports/parse-file";
-import { DEFAULT_OPTIONS, IMPORT_KINDS, IMPORT_LIMITS, KIND_ORDER, type ImportKind, type ImportOptions } from "@/lib/imports/schema";
+import { DEFAULT_OPTIONS, fieldCopy, fieldLabels, IMPORT_KINDS, IMPORT_LIMITS, kindCopy, KIND_ORDER, type ImportKind, type ImportOptions } from "@/lib/imports/schema";
 import { cn } from "@/lib/utils";
 
 type StoreInfo = { name: string; currency: string; timezone: string; pricesIncludeTax: boolean; isDemo: boolean };
@@ -31,13 +33,7 @@ type Props = {
 };
 
 type Step = "kind" | "file" | "columns" | "options" | "review";
-const STEPS: { id: Step; label: string }[] = [
-  { id: "kind", label: "Data type" },
-  { id: "file", label: "File" },
-  { id: "columns", label: "Columns" },
-  { id: "options", label: "Options" },
-  { id: "review", label: "Check and upload" },
-];
+const STEPS: Step[] = ["kind", "file", "columns", "options", "review"];
 
 const DATE_FIELDS: Record<ImportKind, string[]> = { orders: ["ordered_at", "refunded_at"], products: [], ad_spend: ["date"], expenses: ["date"] };
 const AMOUNT_FIELDS: Record<ImportKind, string[]> = {
@@ -83,13 +79,16 @@ function buildChunks(kind: ImportKind, rows: RawRow[]): RawRow[][] {
 
 export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
   const router = useRouter();
+  const locale = useLocale();
+  const t = importUi[locale].wizard;
+  const f = useFormat();
   const [step, setStep] = useState<Step>(initialKind ? "file" : "kind");
   const [kind, setKind] = useState<ImportKind>(initialKind ?? "orders");
   const [csv, setCsv] = useState<ParsedCsv | null>(null);
   const [file, setFile] = useState<{ name: string; size: number } | null>(null);
   const [source, setSource] = useState<DetectedSource>(null);
   const [mapping, setMapping] = useState<ColumnMapping>({});
-  const [options, setOptions] = useState<ImportOptions>(DEFAULT_OPTIONS);
+  const [options, setOptions] = useState<ImportOptions>({ ...DEFAULT_OPTIONS, locale });
   const [dateAmbiguous, setDateAmbiguous] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsing, setParsing] = useState(false);
@@ -115,8 +114,8 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
     [csv, mapping],
   );
   const normalized: NormalizedRow[] = useMemo(
-    () => (step === "review" && csv ? normalizeRows(kind, rawRows, options, { currency: store.currency, timezone: store.timezone }) : []),
-    [step, csv, kind, rawRows, options, store.currency, store.timezone],
+    () => (step === "review" && csv ? normalizeRows(kind, rawRows, options, { currency: store.currency, timezone: store.timezone }, locale) : []),
+    [step, csv, kind, rawRows, options, store.currency, store.timezone, locale],
   );
   const counts = useMemo(() => {
     const c = { valid: 0, invalid: 0, skipped: 0, warnings: 0 };
@@ -143,7 +142,7 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
     setParseError(null);
     setParsing(true);
     await new Promise((r) => setTimeout(r, 0));
-    const result = await readCsvFile(selected, kind, maxRows);
+    const result = await readCsvFile(selected, kind, maxRows, locale);
     setParsing(false);
     if (!result.ok) {
       setParseError(result.message);
@@ -172,6 +171,7 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
       duplicates: kind === "products" ? "update" : "skip",
       pricesIncludeTax: store.pricesIncludeTax,
       refundsIncludeTax: true,
+      locale,
     });
     setStep("columns");
   }
@@ -195,7 +195,7 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
       if (!result) result = await stageImportRows(created.jobId, i, chunks[i]).catch(() => null);
       if (!result || !result.ok) {
         setProgress(null);
-        setUploadError(result && !result.ok ? result.message : "The connection was interrupted. Check your connection and try again.");
+        setUploadError(result && !result.ok ? result.message : t.interrupted);
         await cancelImport(created.jobId).catch(() => undefined);
         return;
       }
@@ -205,16 +205,16 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
     const finalized = await finalizeImport(created.jobId).catch(() => null);
     if (!finalized || !finalized.ok) {
       setProgress(null);
-      setUploadError(finalized && !finalized.ok ? finalized.message : "We could not check the import. Please try again.");
+      setUploadError(finalized && !finalized.ok ? finalized.message : t.couldNotCheck);
       return;
     }
     router.push(`/app/imports/${created.jobId}` as Route);
   }
 
-  const missing = missingRequired(kind, mapping);
-  const stepIndex = STEPS.findIndex((s) => s.id === step);
+  const missing = missingRequired(kind, mapping, locale);
+  const stepIndex = STEPS.indexOf(step);
   const reachable = (s: Step) => {
-    const i = STEPS.findIndex((x) => x.id === s);
+    const i = STEPS.indexOf(s);
     if (i <= stepIndex) return true;
     if (s === "file") return true;
     if (!csv) return false;
@@ -224,25 +224,25 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
 
   if (!canWrite) {
     return (
-      <Alert tone="caution" title="Imports are paused">
-        Your trial or subscription has ended. Your data is kept; subscribe to Pro to import again.
+      <Alert tone="caution" title={t.pausedTitle}>
+        {t.pausedBody}
       </Alert>
     );
   }
 
   return (
     <div className="space-y-6">
-      <nav aria-label="Import steps">
+      <nav aria-label={t.stepsLabel}>
         <ol className="flex flex-wrap gap-x-1 gap-y-2 text-sm">
           {STEPS.map((s, i) => {
-            const current = s.id === step;
+            const current = s === step;
             const complete = i < stepIndex;
             return (
-              <li key={s.id} className="flex items-center gap-1">
+              <li key={s} className="flex items-center gap-1">
                 <button
                   type="button"
-                  disabled={!reachable(s.id) || Boolean(progress)}
-                  onClick={() => setStep(s.id)}
+                  disabled={!reachable(s) || Boolean(progress)}
+                  onClick={() => setStep(s)}
                   aria-current={current ? "step" : undefined}
                   className={cn(
                     "flex items-center gap-2 rounded-md px-2.5 py-1.5 font-medium transition-colors disabled:cursor-not-allowed",
@@ -257,7 +257,7 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
                   >
                     {i + 1}
                   </span>
-                  {s.label}
+                  {t.steps[s]}
                 </button>
                 {i < STEPS.length - 1 ? <span aria-hidden className="h-px w-3 bg-line-strong" /> : null}
               </li>
@@ -269,19 +269,18 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
       <section className="rounded-lg border border-line bg-surface shadow-xs" aria-labelledby={`${id}-heading`}>
         <div className="border-b border-line px-5 py-4">
           <h2 id={`${id}-heading`} ref={headingRef} tabIndex={-1} className="text-md font-semibold tracking-tight text-ink focus:outline-none">
-            {step === "kind" && "What are you importing?"}
-            {step === "file" && `Choose your ${def.label.toLowerCase()} file`}
-            {step === "columns" && "Match your columns"}
-            {step === "options" && "Check how values are read"}
-            {step === "review" && "Check and upload"}
+            {step === "kind" && t.headings.kind}
+            {step === "file" && t.headings.file(kindCopy(kind, locale).label)}
+            {step === "columns" && t.headings.columns}
+            {step === "options" && t.headings.options}
+            {step === "review" && t.headings.review}
           </h2>
           {store.isDemo ? (
-            <p className="mt-1 text-sm text-caution-800">
-              You are importing into the sample store. Switch to your own store to import real data.
-            </p>
+            <p className="mt-1 text-sm text-caution-800">{t.demoStore}</p>
           ) : (
             <p className="mt-1 text-sm text-ink-3">
-              Into <span className="font-medium text-ink-2">{store.name}</span> · amounts in {store.currency} · dates in {store.timezone}
+              {t.into} <span className="font-medium text-ink-2">{store.name}</span>
+              {t.storeDetails(store.currency, store.timezone)}
             </p>
           )}
         </div>
@@ -289,9 +288,10 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
         <div className="px-5 py-5">
           {step === "kind" ? (
             <div className="space-y-5">
-              <div role="radiogroup" aria-label="Data type" className="grid gap-3 sm:grid-cols-2">
+              <div role="radiogroup" aria-label={t.dataType} className="grid gap-3 sm:grid-cols-2">
                 {KIND_ORDER.map((k) => {
                   const selected = k === kind;
+                  const copy = kindCopy(k, locale);
                   return (
                     <button
                       key={k}
@@ -308,15 +308,15 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
                         selected ? "border-emerald-600 bg-emerald-50/60 ring-1 ring-emerald-600" : "border-line hover:border-line-strong hover:bg-hover",
                       )}
                     >
-                      <span className="font-medium text-ink">{IMPORT_KINDS[k].label}</span>
-                      <span className="mt-1 block text-sm text-ink-3">{IMPORT_KINDS[k].description}</span>
+                      <span className="font-medium text-ink">{copy.label}</span>
+                      <span className="mt-1 block text-sm text-ink-3">{copy.description}</span>
                     </button>
                   );
                 })}
               </div>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <TemplateButton kind={kind} variant="ghost" />
-                <Button onClick={() => setStep("file")}>Continue</Button>
+                <Button onClick={() => setStep("file")}>{t.continue}</Button>
               </div>
             </div>
           ) : null}
@@ -333,10 +333,8 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
                 }}
               >
                 <FileSpreadsheet className="size-7 text-ink-3" aria-hidden />
-                <span className="font-medium text-ink">{parsing ? "Reading the file…" : "Choose a CSV file or drop it here"}</span>
-                <span className="text-sm text-ink-3">
-                  Up to {maxRows.toLocaleString("en-GB")} rows on your plan · {IMPORT_LIMITS.maxFileBytes / 1024 / 1024} MB maximum
-                </span>
+                <span className="font-medium text-ink">{parsing ? t.reading : t.dropZone}</span>
+                <span className="text-sm text-ink-3">{t.limits(f.count(maxRows), IMPORT_LIMITS.maxFileBytes / 1024 / 1024)}</span>
                 <input
                   id={`${id}-file`}
                   type="file"
@@ -350,18 +348,17 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
                 />
               </label>
               {parseError ? (
-                <Alert tone="negative" title="This file cannot be imported">
+                <Alert tone="negative" title={t.cannotImport}>
                   {parseError}
                 </Alert>
               ) : null}
               <p className="flex items-start gap-2 text-sm text-ink-3">
                 <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
-                The file is read in this browser. Only the columns you match in the next step are sent to Narixia; customer names, emails and addresses in
-                your export are never uploaded.
+                {t.privacy}
               </p>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <Button variant="ghost" onClick={() => setStep("kind")}>
-                  Back
+                  {t.back}
                 </Button>
                 <TemplateButton kind={kind} variant="ghost" />
               </div>
@@ -372,50 +369,46 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-2 text-sm text-ink-2">
                 <Badge tone="outline">{file?.name}</Badge>
-                <span className="tabular">
-                  {csv.rows.length.toLocaleString("en-GB")} rows · {csv.headers.length} columns
-                </span>
-                {source ? <Badge tone="positive">{SOURCE_LABELS[source]} recognised</Badge> : null}
-                {csv.encoding === "windows-1252" ? <Badge tone="info">Windows encoding</Badge> : null}
+                <span className="tabular">{t.fileSummary(f.count(csv.rows.length), csv.headers.length, csv.rows.length)}</span>
+                {source ? <Badge tone="positive">{t.recognised(sourceLabel(source, locale))}</Badge> : null}
+                {csv.encoding === "windows-1252" ? <Badge tone="info">{t.windowsEncoding}</Badge> : null}
               </div>
               {csv.skippedLeadingRows > 0 ? (
-                <Alert tone="info">
-                  The first {csv.skippedLeadingRows} {csv.skippedLeadingRows === 1 ? "line looks like a report title and was" : "lines look like report titles and were"} skipped; column names
-                  were found on line {csv.skippedLeadingRows + 1}.
-                </Alert>
+                <Alert tone="info">{t.skippedLines(csv.skippedLeadingRows)}</Alert>
               ) : null}
               {missing.length > 0 ? (
-                <Alert tone="caution" title="Some required columns are not matched">
-                  Choose a column for: {missing.join(", ")}.
+                <Alert tone="caution" title={t.missingTitle}>
+                  {t.missingBody(missing.join(", "))}
                 </Alert>
               ) : null}
               <TableContainer className="rounded-md border border-line">
                 <Table>
-                  <caption className="sr-only">Column matching</caption>
+                  <caption className="sr-only">{t.mappingCaption}</caption>
                   <THead>
                     <TR>
-                      <TH>Narixia field</TH>
-                      <TH>Column in your file</TH>
-                      <TH>First values</TH>
+                      <TH>{t.narixiaField}</TH>
+                      <TH>{t.fileColumn}</TH>
+                      <TH>{t.firstValues}</TH>
                     </TR>
                   </THead>
                   <TBody>
                     {[...def.fields].sort((a, b) => Number(b.required) - Number(a.required)).map((field) => {
                       const selectId = `${id}-map-${field.key}`;
                       const value = mapping[field.key];
+                      const copy = fieldCopy(kind, field.key, locale);
                       return (
                         <TR key={field.key}>
                           <TD className="max-w-64 py-2.5 align-top">
                             <label htmlFor={selectId} className="font-medium text-ink">
-                              {field.label}
+                              {copy.label}
                               {field.required ? (
                                 <span className="ml-1 text-negative-700" aria-hidden>
                                   *
                                 </span>
                               ) : null}
-                              <span className="sr-only">{field.required ? " (required)" : " (optional)"}</span>
+                              <span className="sr-only">{field.required ? t.required : t.optional}</span>
                             </label>
-                            {field.description ? <p className="mt-0.5 text-xs text-ink-3">{field.description}</p> : null}
+                            {copy.description ? <p className="mt-0.5 text-xs text-ink-3">{copy.description}</p> : null}
                           </TD>
                           <TD className="w-64 py-2.5 align-top">
                             <NativeSelect
@@ -425,7 +418,7 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
                               onChange={(e) => setMapping((m) => ({ ...m, [field.key]: e.target.value === "" ? null : Number(e.target.value) }))}
                               aria-invalid={field.required && (value === null || value === undefined) ? true : undefined}
                             >
-                              <option value="">{field.required ? "Choose a column…" : "Not in this file"}</option>
+                              <option value="">{field.required ? t.chooseColumn : t.notInFile}</option>
                               {csv.headers.map((h, i) => (
                                 <option key={i} value={i}>
                                   {h}
@@ -444,10 +437,10 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
               </TableContainer>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <Button variant="ghost" onClick={() => setStep("file")}>
-                  Choose another file
+                  {t.chooseAnother}
                 </Button>
                 <Button disabled={missing.length > 0} onClick={() => setStep("options")}>
-                  Continue
+                  {t.continue}
                 </Button>
               </div>
             </div>
@@ -459,35 +452,33 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
                 {DATE_FIELDS[kind].length > 0 ? (
                   <div className="space-y-1.5">
                     <label htmlFor={`${id}-date`} className="text-sm font-medium text-ink">
-                      Date format
+                      {t.dateFormat}
                     </label>
                     <NativeSelect id={`${id}-date`} value={options.dateFormat} onChange={(e) => set("dateFormat", e.target.value as ImportOptions["dateFormat"])}>
-                      <option value="ymd">Year-month-day (2026-03-15)</option>
-                      <option value="dmy">Day/month/year (15/03/2026)</option>
-                      <option value="mdy">Month/day/year (03/15/2026)</option>
+                      <option value="ymd">{t.ymd}</option>
+                      <option value="dmy">{t.dmy}</option>
+                      <option value="mdy">{t.mdy}</option>
                     </NativeSelect>
                     <p className={cn("text-xs", dateAmbiguous ? "font-medium text-caution-800" : "text-ink-3")}>
-                      {dateAmbiguous
-                        ? "Every date in this file could be read either way (e.g. 03/04). Make sure this is right."
-                        : `First dates: ${samples(mapping[DATE_FIELDS[kind][0]], 2).join(", ") || "—"}`}
+                      {dateAmbiguous ? t.dateAmbiguous : t.firstDates(samples(mapping[DATE_FIELDS[kind][0]], 2).join(", ") || "—")}
                     </p>
                   </div>
                 ) : null}
                 <div className="space-y-1.5">
                   <label htmlFor={`${id}-decimal`} className="text-sm font-medium text-ink">
-                    Decimal separator
+                    {t.decimalSeparator}
                   </label>
                   <NativeSelect id={`${id}-decimal`} value={options.decimalSeparator} onChange={(e) => set("decimalSeparator", e.target.value as "." | ",")}>
-                    <option value=".">Point (1,234.50)</option>
-                    <option value=",">Comma (1.234,50)</option>
+                    <option value=".">{t.point}</option>
+                    <option value=",">{t.comma}</option>
                   </NativeSelect>
-                  <p className="text-xs text-ink-3">First amounts: {samples(mapping[AMOUNT_FIELDS[kind][0]], 3).join(", ") || "—"}</p>
+                  <p className="text-xs text-ink-3">{t.firstAmounts(samples(mapping[AMOUNT_FIELDS[kind][0]], 3).join(", ") || "—")}</p>
                 </div>
               </div>
 
               {kind !== "expenses" ? (
                 <fieldset className="space-y-2">
-                  <legend className="text-sm font-medium text-ink">When a record already exists in Narixia</legend>
+                  <legend className="text-sm font-medium text-ink">{t.existingLegend}</legend>
                   {(["skip", "update"] as const).map((strategy) => (
                     <label key={strategy} className="flex items-start gap-2.5 text-sm">
                       <input
@@ -499,55 +490,37 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
                         className="mt-0.5 size-4 accent-emerald-600"
                       />
                       <span>
-                        <span className="font-medium text-ink">{strategy === "skip" ? "Skip it" : "Replace it with the file's version"}</span>
+                        <span className="font-medium text-ink">{strategy === "skip" ? t.skipIt : t.replaceIt}</span>
                         <span className="block text-ink-3">
-                          {strategy === "skip"
-                            ? "Safe for re-importing a file you imported before: nothing is counted twice."
-                            : kind === "orders"
-                              ? "Use when orders changed since the last import. Refunds and costs not in the file are kept."
-                              : kind === "products"
-                                ? "Updates names and costs from the file. Values missing in the file are kept."
-                                : "Replaces that day's figures for the campaign."}
+                          {strategy === "skip" ? t.skipHint : kind === "orders" ? t.replaceOrders : kind === "products" ? t.replaceProducts : t.replaceAdSpend}
                         </span>
                       </span>
                     </label>
                   ))}
                 </fieldset>
               ) : (
-                <p className="text-sm text-ink-3">An expense identical to one already recorded (same date, category, amount and description) is skipped.</p>
+                <p className="text-sm text-ink-3">{t.expensesDuplicates}</p>
               )}
 
               {kind === "orders" ? (
                 <fieldset className="space-y-3">
-                  <legend className="text-sm font-medium text-ink">Orders</legend>
-                  <OptionCheck
-                    checked={options.pricesIncludeTax}
-                    onChange={(v) => set("pricesIncludeTax", v)}
-                    label="Prices in this file include VAT / sales tax"
-                    hint="Narixia removes each order's tax so margins are not inflated by tax you pass on. Needs the Taxes column."
-                  />
-                  <OptionCheck
-                    checked={options.refundsIncludeTax}
-                    onChange={(v) => set("refundsIncludeTax", v)}
-                    label="Refunded amounts include tax"
-                    hint="True for Shopify exports, even when prices exclude tax."
-                  />
-                  <OptionCheck checked={options.skipCancelled} onChange={(v) => set("skipCancelled", v)} label="Skip cancelled orders" hint="Rows with a cancellation date are listed as skipped." />
-                  {options.pricesIncludeTax && (mapping.taxes === null || mapping.taxes === undefined) ? (
-                    <Alert tone="caution">No Taxes column is matched, so no tax can be removed. Amounts will be stored as they are.</Alert>
-                  ) : null}
+                  <legend className="text-sm font-medium text-ink">{t.ordersLegend}</legend>
+                  <OptionCheck checked={options.pricesIncludeTax} onChange={(v) => set("pricesIncludeTax", v)} label={t.pricesIncludeTax} hint={t.pricesIncludeTaxHint} />
+                  <OptionCheck checked={options.refundsIncludeTax} onChange={(v) => set("refundsIncludeTax", v)} label={t.refundsIncludeTax} hint={t.refundsIncludeTaxHint} />
+                  <OptionCheck checked={options.skipCancelled} onChange={(v) => set("skipCancelled", v)} label={t.skipCancelled} hint={t.skipCancelledHint} />
+                  {options.pricesIncludeTax && (mapping.taxes === null || mapping.taxes === undefined) ? <Alert tone="caution">{t.noTaxesColumn}</Alert> : null}
                 </fieldset>
               ) : null}
 
               {kind === "ad_spend" && (mapping.platform === null || mapping.platform === undefined) ? (
                 <div className="max-w-sm space-y-1.5">
                   <label htmlFor={`${id}-platform`} className="text-sm font-medium text-ink">
-                    Platform of these campaigns
+                    {t.platform}
                   </label>
                   <NativeSelect id={`${id}-platform`} value={options.defaultPlatform} onChange={(e) => set("defaultPlatform", e.target.value as Platform)}>
-                    {Object.entries(PLATFORM_LABELS).map(([value, label]) => (
+                    {(Object.keys(PLATFORM_LABELS) as Platform[]).map((value) => (
                       <option key={value} value={value}>
-                        {label}
+                        {platformLabel(value, locale)}
                       </option>
                     ))}
                   </NativeSelect>
@@ -559,12 +532,12 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
                   {mapping.category === null || mapping.category === undefined ? (
                     <div className="space-y-1.5">
                       <label htmlFor={`${id}-category`} className="text-sm font-medium text-ink">
-                        Category for these expenses
+                        {t.category}
                       </label>
                       <NativeSelect id={`${id}-category`} value={options.defaultCategory} onChange={(e) => set("defaultCategory", e.target.value as ExpenseCategory)}>
-                        {Object.entries(EXPENSE_CATEGORIES).map(([value, c]) => (
+                        {(Object.keys(EXPENSE_CATEGORIES) as ExpenseCategory[]).map((value) => (
                           <option key={value} value={value}>
-                            {c.label}
+                            {expenseCategoryLabel(value, locale)}
                           </option>
                         ))}
                       </NativeSelect>
@@ -572,27 +545,27 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
                   ) : null}
                   <div className="space-y-1.5">
                     <label htmlFor={`${id}-kind`} className="text-sm font-medium text-ink">
-                      Fixed or variable
+                      {t.fixedOrVariable}
                     </label>
                     <NativeSelect
                       id={`${id}-kind`}
                       value={options.defaultKind ?? ""}
                       onChange={(e) => set("defaultKind", e.target.value === "" ? null : (e.target.value as "fixed" | "variable"))}
                     >
-                      <option value="">Each category&rsquo;s usual type</option>
-                      <option value="variable">Variable (grows with sales)</option>
-                      <option value="fixed">Fixed</option>
+                      <option value="">{t.usualKind}</option>
+                      <option value="variable">{t.variable}</option>
+                      <option value="fixed">{t.fixed}</option>
                     </NativeSelect>
-                    <p className="text-xs text-ink-3">Variable costs reduce contribution margin; fixed costs only the operating estimate.</p>
+                    <p className="text-xs text-ink-3">{t.kindHint}</p>
                   </div>
                 </div>
               ) : null}
 
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <Button variant="ghost" onClick={() => setStep("columns")}>
-                  Back
+                  {t.back}
                 </Button>
-                <Button onClick={() => setStep("review")}>Check the rows</Button>
+                <Button onClick={() => setStep("review")}>{t.checkRows}</Button>
               </div>
             </div>
           ) : null}
@@ -601,40 +574,38 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
             <div className="space-y-5">
               <dl className="grid gap-px overflow-hidden rounded-md border border-line bg-line sm:grid-cols-4">
                 {[
-                  { label: "Rows in file", value: normalized.length, icon: null },
-                  { label: "Ready", value: counts.valid, icon: <CheckCircle2 className="size-4 text-emerald-700" aria-hidden /> },
-                  { label: "With errors", value: counts.invalid, icon: <XCircle className="size-4 text-negative-700" aria-hidden /> },
-                  { label: "Skipped", value: counts.skipped, icon: <Info className="size-4 text-ink-3" aria-hidden /> },
+                  { label: t.rowsInFile, value: normalized.length, icon: null },
+                  { label: t.ready, value: counts.valid, icon: <CheckCircle2 className="size-4 text-emerald-700" aria-hidden /> },
+                  { label: t.withErrors, value: counts.invalid, icon: <XCircle className="size-4 text-negative-700" aria-hidden /> },
+                  { label: t.skipped, value: counts.skipped, icon: <Info className="size-4 text-ink-3" aria-hidden /> },
                 ].map((s) => (
                   <div key={s.label} className="bg-surface px-4 py-3">
                     <dt className="flex items-center gap-1.5 text-xs text-ink-3">
                       {s.icon}
                       {s.label}
                     </dt>
-                    <dd className="mt-0.5 text-lg font-semibold text-ink tabular">{s.value.toLocaleString("en-GB")}</dd>
+                    <dd className="mt-0.5 text-lg font-semibold text-ink tabular">{f.count(s.value)}</dd>
                   </div>
                 ))}
               </dl>
               <p className="text-sm text-ink-3">
-                Duplicates of records already in Narixia are detected after upload. Nothing is imported until you confirm on the next screen.
-                {counts.invalid > 0 ? " Rows with errors are kept aside and listed with the reason; fix them in your file and import it again." : ""}
+                {t.reviewNote}
+                {counts.invalid > 0 ? t.reviewErrorsNote : ""}
               </p>
 
               <PreviewTable kind={kind} rows={normalized} />
 
               {uploadError ? (
-                <Alert tone="negative" title="Upload stopped">
+                <Alert tone="negative" title={t.uploadStopped}>
                   {uploadError}
                 </Alert>
               ) : null}
               {progress ? (
                 <div className="space-y-2" aria-live="polite">
                   <div className="flex justify-between text-sm text-ink-2">
-                    <span>
-                      {progress.phase === "creating" ? "Starting…" : progress.phase === "uploading" ? "Uploading and validating rows…" : "Looking for duplicates…"}
-                    </span>
+                    <span>{progress.phase === "creating" ? t.starting : progress.phase === "uploading" ? t.uploading : t.checking}</span>
                     <span className="tabular">
-                      {progress.done.toLocaleString("en-GB")} / {progress.total.toLocaleString("en-GB")}
+                      {f.count(progress.done)} / {f.count(progress.total)}
                     </span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-sunken">
@@ -645,11 +616,11 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
 
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <Button variant="ghost" onClick={() => setStep("options")} disabled={Boolean(progress)}>
-                  Back
+                  {t.back}
                 </Button>
                 <Button onClick={() => void upload()} loading={Boolean(progress)} disabled={counts.valid === 0}>
                   <Upload aria-hidden />
-                  Upload {counts.valid.toLocaleString("en-GB")} {counts.valid === 1 ? "row" : "rows"} for review
+                  {t.upload(f.count(counts.valid), counts.valid)}
                 </Button>
               </div>
             </div>
@@ -678,26 +649,27 @@ function OptionCheck({ checked, onChange, label, hint }: { checked: boolean; onC
 }
 
 function PreviewTable({ kind, rows }: { kind: ImportKind; rows: NormalizedRow[] }) {
+  const locale = useLocale();
+  const t = importUi[locale].preview;
+  const f = useFormat();
   const problems = rows.filter((r) => r.status !== "valid" || r.warnings.length > 0);
   const shown = (problems.length > 0 ? problems : rows).slice(0, 25);
   const fields = PREVIEW_FIELDS[kind];
-  const labels = Object.fromEntries(IMPORT_KINDS[kind].fields.map((f) => [f.key, f.label]));
+  const labels = fieldLabels(kind, locale);
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-medium text-ink">
-        {problems.length > 0 ? `Rows to look at (${problems.length.toLocaleString("en-GB")}${problems.length > 25 ? ", first 25 shown" : ""})` : "First rows"}
-      </h3>
+      <h3 className="text-sm font-medium text-ink">{problems.length > 0 ? t.rowsToLook(f.count(problems.length), problems.length > 25) : t.firstRows}</h3>
       <TableContainer className="rounded-md border border-line">
         <Table className="text-sm">
-          <caption className="sr-only">Row preview</caption>
+          <caption className="sr-only">{t.caption}</caption>
           <THead>
             <TR>
-              <TH className="w-16">Row</TH>
-              <TH className="w-28">Status</TH>
-              {fields.map((f) => (
-                <TH key={f}>{labels[f]}</TH>
+              <TH className="w-16">{t.row}</TH>
+              <TH className="w-28">{t.status}</TH>
+              {fields.map((key) => (
+                <TH key={key}>{labels[key]}</TH>
               ))}
-              <TH>Notes</TH>
+              <TH>{t.notes}</TH>
             </TR>
           </THead>
           <TBody>
@@ -706,16 +678,16 @@ function PreviewTable({ kind, rows }: { kind: ImportKind; rows: NormalizedRow[] 
                 <TD className="py-2 text-ink-3 tabular">{r.rowNumber}</TD>
                 <TD className="py-2">
                   {r.status === "valid" ? (
-                    <Badge tone={r.warnings.length ? "caution" : "positive"}>{r.warnings.length ? "Ready, see note" : "Ready"}</Badge>
+                    <Badge tone={r.warnings.length ? "caution" : "positive"}>{r.warnings.length ? t.readySeeNote : t.ready}</Badge>
                   ) : r.status === "skipped" ? (
-                    <Badge tone="neutral">Skipped</Badge>
+                    <Badge tone="neutral">{t.skipped}</Badge>
                   ) : (
-                    <Badge tone="negative">Error</Badge>
+                    <Badge tone="negative">{t.error}</Badge>
                   )}
                 </TD>
-                {fields.map((f) => (
-                  <TD key={f} className="max-w-48 truncate py-2 text-ink-2">
-                    {r.raw[f] ?? ""}
+                {fields.map((key) => (
+                  <TD key={key} className="max-w-48 truncate py-2 text-ink-2">
+                    {r.raw[key] ?? ""}
                   </TD>
                 ))}
                 <TD className="min-w-64 py-2 text-xs">

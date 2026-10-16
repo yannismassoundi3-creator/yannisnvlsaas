@@ -159,3 +159,26 @@ describe("bucketDailyValues", () => {
     ]);
   });
 });
+
+describe("localized bucket labels", () => {
+  it("labels days, weeks and months in English by default and in French on request", async () => {
+    const { bucketDescription, bucketLabel } = await import("@/lib/analytics/series");
+    const week = { key: "2026-03-09", from: "2026-03-09", to: "2026-03-15" };
+    expect(bucketLabel(week, "day")).toBe("9 Mar");
+    expect(bucketLabel(week, "day", "fr")).toBe("9 mars");
+    expect(bucketDescription(week, "week")).toBe("9 Mar – 15 Mar");
+    expect(bucketDescription(week, "week", "fr")).toBe("9 mars – 15 mars");
+    expect(bucketLabel({ key: "2026-02-01", from: "2026-02-01" }, "month")).toBe("Feb 26");
+    expect(bucketLabel({ key: "2026-02-01", from: "2026-02-01" }, "month", "fr")).toBe("févr. 26");
+  });
+
+  it("builds French series labels without changing the figures", () => {
+    const range = { from: "2026-10-01", to: "2026-10-02" };
+    const entries: [string, PeriodTotals][] = eachDay(range).map((d) => [d, day({ grossSales: 100, orders: 1 })]);
+    const en = buildTimeSeries(entries, range);
+    const fr = buildTimeSeries(entries, range, "fr");
+    expect(fr.points.map((p) => p.label)).toEqual(["1 oct.", "2 oct."]);
+    const withoutLabel = (points: typeof en.points) => points.map((p) => ({ ...p, label: "" }));
+    expect(withoutLabel(fr.points)).toEqual(withoutLabel(en.points));
+  });
+});

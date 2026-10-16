@@ -10,14 +10,16 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableContainer, TBody, TD, TFoot, TH, THead, TR } from "@/components/ui/table";
 import { requireStore } from "@/lib/auth/workspace";
 import { getOrder } from "@/lib/data/transactions";
-import { formatDateTime } from "@/lib/dates";
-import { formatCount, formatPercent } from "@/lib/finance/format";
-import { applyBasisPoints, formatMoney, formatUnitCost, lineCostMinor } from "@/lib/finance/money";
+import { applyBasisPoints, lineCostMinor } from "@/lib/finance/money";
+import { catalogCommon } from "@/i18n/messages/catalog-common";
+import { transactionsMessages } from "@/i18n/messages/catalog-transactions";
+import { getFormat, getLocale } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Order" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: transactionsMessages[await getLocale()].metaOrderTitle };
+}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const SOURCE: Record<string, string> = { csv: "Imported", manual: "Entered manually", demo: "Sample data", shopify: "Shopify" };
 
 export default function OrderPage({ params }: PageProps<"/[lang]/app/transactions/orders/[id]">) {
   return (
@@ -28,12 +30,14 @@ export default function OrderPage({ params }: PageProps<"/[lang]/app/transaction
 }
 
 async function OrderDetail({ params }: Pick<PageProps<"/[lang]/app/transactions/orders/[id]">, "params">) {
-  const [{ id }, ws] = await Promise.all([params, requireStore()]);
+  const [{ id }, ws, locale, f] = await Promise.all([params, requireStore(), getLocale(), getFormat()]);
+  const t = transactionsMessages[locale];
+  const c = catalogCommon[locale];
   if (!UUID_RE.test(id)) notFound();
   const order = await getOrder(id);
   if (!order) notFound();
   const store = ws.activeStore;
-  const money = (v: number) => formatMoney(v, store.currency);
+  const money = (v: number) => f.money(v, store.currency);
 
   // Same rules as the reports: recorded value, else the store's estimate rule, else missing.
   const lines = order.lines.map((l) => {
@@ -45,18 +49,18 @@ async function OrderDetail({ params }: Pick<PageProps<"/[lang]/app/transactions/
   const cogs = lines.reduce((a, l) => a + (l.cogs ?? 0), 0);
   const shipping =
     order.shippingCostMinor !== null
-      ? { amount: order.shippingCostMinor, label: "Recorded" }
+      ? { amount: order.shippingCostMinor, label: t.recorded }
       : store.default_shipping_cost_minor !== null
-        ? { amount: store.default_shipping_cost_minor, label: "Estimated (default)" }
-        : { amount: null, label: "Missing" };
+        ? { amount: store.default_shipping_cost_minor, label: t.estimatedDefault }
+        : { amount: null, label: t.missing };
   const hasFeeRule = store.fee_rule_bps !== null || store.fee_rule_fixed_minor !== null;
   const amountPaid = Math.max(netSales + order.shippingChargedMinor + order.taxesMinor, 0);
   const fees =
     order.transactionFeesMinor !== null
-      ? { amount: order.transactionFeesMinor, label: "Recorded" }
+      ? { amount: order.transactionFeesMinor, label: t.recorded }
       : hasFeeRule
-        ? { amount: applyBasisPoints(amountPaid, store.fee_rule_bps ?? 0) + (store.fee_rule_fixed_minor ?? 0), label: "Estimated (fee rule)" }
-        : { amount: null, label: "Missing" };
+        ? { amount: applyBasisPoints(amountPaid, store.fee_rule_bps ?? 0) + (store.fee_rule_fixed_minor ?? 0), label: t.estimatedFeeRule }
+        : { amount: null, label: t.missing };
   const refunds = order.refunds.reduce((a, r) => a + r.amountMinor, 0);
   const complete = cogsKnown && shipping.amount !== null && fees.amount !== null;
   const contribution = complete ? netSales + order.shippingChargedMinor - refunds - cogs - (shipping.amount ?? 0) - (fees.amount ?? 0) : null;
@@ -67,18 +71,18 @@ async function OrderDetail({ params }: Pick<PageProps<"/[lang]/app/transactions/
       <PageHeader
         eyebrow={
           <Link href="/app/transactions" className="hover:underline">
-            Transactions & costs
+            {t.title}
           </Link>
         }
-        title={`Order ${order.externalId}`}
+        title={t.orderTitle(order.externalId)}
         description={
           <span>
-            {formatDateTime(order.orderedAt, store.timezone)} · {SOURCE[order.source] ?? order.source}
+            {f.dateTime(order.orderedAt, store.timezone)} · {t.orderSources[order.source] ?? order.source}
             {order.importJobId ? (
               <>
                 {" · "}
                 <Link href={`/app/imports/${order.importJobId}` as Route} className="text-emerald-700 hover:underline">
-                  View import
+                  {t.viewImport}
                 </Link>
               </>
             ) : null}
@@ -89,21 +93,21 @@ async function OrderDetail({ params }: Pick<PageProps<"/[lang]/app/transactions/
 
       <Card>
         <CardHeader
-          title="Lines"
-          description={order.convertedFromTaxInclusive ? "Prices were entered including tax; the order's tax was removed, so amounts below exclude tax." : "Amounts exclude tax."}
+          title={t.lines}
+          description={order.convertedFromTaxInclusive ? t.linesTaxConverted : t.amountsExcludeTax}
         />
         <TableContainer className="mt-3">
           <Table>
-            <caption className="sr-only">Order lines</caption>
+            <caption className="sr-only">{t.linesCaption}</caption>
             <THead>
               <TR>
-                <TH>Product</TH>
-                <TH numeric>Qty</TH>
-                <TH numeric>Gross</TH>
-                <TH numeric>Discount</TH>
-                <TH numeric>Net</TH>
-                <TH numeric>Unit cost used</TH>
-                <TH numeric>COGS</TH>
+                <TH>{t.colProduct}</TH>
+                <TH numeric>{t.colQty}</TH>
+                <TH numeric>{t.colGross}</TH>
+                <TH numeric>{t.colDiscount}</TH>
+                <TH numeric>{t.colNet}</TH>
+                <TH numeric>{t.colUnitCostUsed}</TH>
+                <TH numeric>{t.colCogs}</TH>
               </TR>
             </THead>
             <TBody>
@@ -117,19 +121,19 @@ async function OrderDetail({ params }: Pick<PageProps<"/[lang]/app/transactions/
                     ) : (
                       <span className="font-medium text-ink">{l.name}</span>
                     )}
-                    <div className="text-xs text-ink-3">{l.sku ?? "No SKU"}</div>
+                    <div className="text-xs text-ink-3">{l.sku ?? c.noSku}</div>
                   </TD>
-                  <TD numeric>{formatCount(l.quantity)}</TD>
+                  <TD numeric>{f.count(l.quantity)}</TD>
                   <TD numeric>{money(l.grossMinor)}</TD>
                   <TD numeric>{l.discountMinor ? money(-l.discountMinor) : "—"}</TD>
                   <TD numeric>{money(l.net)}</TD>
                   <TD numeric>
                     {l.costUsed === null ? (
-                      <Badge tone="caution">No cost</Badge>
+                      <Badge tone="caution">{c.noCost}</Badge>
                     ) : (
                       <span className="inline-flex flex-col items-end">
-                        {formatUnitCost(l.costUsed, store.currency)}
-                        <span className="text-xs text-ink-3">{l.unitCostE4 !== null ? "On this order" : "Product's current cost"}</span>
+                        {f.unitCost(l.costUsed, store.currency)}
+                        <span className="text-xs text-ink-3">{l.unitCostE4 !== null ? t.onThisOrder : t.productCurrentCost}</span>
                       </span>
                     )}
                   </TD>
@@ -139,13 +143,13 @@ async function OrderDetail({ params }: Pick<PageProps<"/[lang]/app/transactions/
             </TBody>
             <TFoot>
               <TR>
-                <TD>Total</TD>
-                <TD numeric>{formatCount(lines.reduce((a, l) => a + l.quantity, 0))}</TD>
+                <TD>{t.total}</TD>
+                <TD numeric>{f.count(lines.reduce((a, l) => a + l.quantity, 0))}</TD>
                 <TD numeric>{money(lines.reduce((a, l) => a + l.grossMinor, 0))}</TD>
                 <TD numeric>{money(-lines.reduce((a, l) => a + l.discountMinor, 0))}</TD>
                 <TD numeric>{money(netSales)}</TD>
                 <TD />
-                <TD numeric>{cogsKnown ? money(cogs) : "Incomplete"}</TD>
+                <TD numeric>{cogsKnown ? money(cogs) : c.incomplete}</TD>
               </TR>
             </TFoot>
           </Table>
@@ -154,18 +158,18 @@ async function OrderDetail({ params }: Pick<PageProps<"/[lang]/app/transactions/
 
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Order economics" description="Before advertising, which is measured per campaign and day, not per order." />
+          <CardHeader title={t.economics} description={t.economicsDescription} />
           <table className="mt-2 w-full text-sm">
-            <caption className="sr-only">Order economics</caption>
+            <caption className="sr-only">{t.economics}</caption>
             <tbody>
               {[
-                { label: "Net sales", value: money(netSales) },
-                { label: "Shipping charged", value: money(order.shippingChargedMinor) },
-                { label: "Refunds (all dates)", value: refunds ? money(-refunds) : "—" },
-                { label: "Cost of goods sold", value: cogsKnown ? money(-cogs) : "Incomplete" },
-                { label: `Shipping cost · ${shipping.label}`, value: shipping.amount === null ? "Missing" : money(-shipping.amount) },
-                { label: `Payment fees · ${fees.label}`, value: fees.amount === null ? "Missing" : money(-fees.amount) },
-                { label: "Taxes collected (not revenue)", value: money(order.taxesMinor), muted: true },
+                { label: t.netSales, value: money(netSales) },
+                { label: t.shippingCharged, value: money(order.shippingChargedMinor) },
+                { label: t.refundsAllDates, value: refunds ? money(-refunds) : "—" },
+                { label: t.cogs, value: cogsKnown ? money(-cogs) : c.incomplete },
+                { label: t.shippingCostRow(shipping.label), value: shipping.amount === null ? t.missing : money(-shipping.amount) },
+                { label: t.feesRow(fees.label), value: fees.amount === null ? t.missing : money(-fees.amount) },
+                { label: t.taxesCollected, value: money(order.taxesMinor), muted: true },
               ].map((row) => (
                 <tr key={row.label} className="border-t border-line">
                   <th scope="row" className={`py-2 pl-5 text-left font-normal ${row.muted ? "text-ink-3" : "text-ink"}`}>
@@ -176,15 +180,15 @@ async function OrderDetail({ params }: Pick<PageProps<"/[lang]/app/transactions/
               ))}
               <tr className="border-t border-line bg-emerald-50/60">
                 <th scope="row" className="py-2.5 pl-5 text-left font-semibold text-ink">
-                  Contribution before advertising
+                  {t.contributionBeforeAds}
                 </th>
                 <td className="py-2.5 pr-5 text-right font-semibold tabular">
                   {contribution === null ? (
-                    <span className="font-normal text-ink-3">Incomplete</span>
+                    <span className="font-normal text-ink-3">{c.incomplete}</span>
                   ) : (
                     <>
                       {money(contribution)}
-                      {revenue > 0 ? <span className="ml-2 text-xs font-normal text-ink-3">{formatPercent(contribution / revenue)}</span> : null}
+                      {revenue > 0 ? <span className="ml-2 text-xs font-normal text-ink-3">{f.percent(contribution / revenue)}</span> : null}
                     </>
                   )}
                 </td>
@@ -195,25 +199,25 @@ async function OrderDetail({ params }: Pick<PageProps<"/[lang]/app/transactions/
 
         <div className="space-y-6">
           <Card>
-            <CardHeader title="Actual costs" description="Recorded values replace estimates for this order in every report." />
+            <CardHeader title={t.actualCosts} description={t.actualCostsDescription} />
             <CardBody>
               <OrderCostsForm orderId={order.id} currency={store.currency} shippingCostMinor={order.shippingCostMinor} feesMinor={order.transactionFeesMinor} disabled={!ws.entitlements.canWrite} />
             </CardBody>
           </Card>
           <Card>
-            <CardHeader title="Refunds" description="Counted on the day each refund was made." />
+            <CardHeader title={t.refunds} description={t.refundsDescription} />
             <CardBody>
               {order.refunds.length === 0 ? (
-                <p className="text-sm text-ink-3">No refunds for this order.</p>
+                <p className="text-sm text-ink-3">{t.noRefundsForOrder}</p>
               ) : (
                 <ul className="divide-y divide-line text-sm">
                   {order.refunds.map((r) => (
                     <li key={r.id} className="flex items-center justify-between gap-3 py-2">
                       <span>
-                        {formatDateTime(r.refundedAt, store.timezone)}
+                        {f.dateTime(r.refundedAt, store.timezone)}
                         {r.dateEstimated ? (
                           <Badge tone="info" className="ml-2">
-                            Order date
+                            {t.orderDate}
                           </Badge>
                         ) : null}
                         {r.reason ? <span className="block text-xs text-ink-3">{r.reason}</span> : null}

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { DataNotices, dataNotices } from "@/components/dashboard/data-notices";
 import { KpiTile } from "@/components/dashboard/kpi-tile";
 import { ProfitBreakdown } from "@/components/dashboard/profit-breakdown";
+import { LocaleProvider } from "@/i18n/client";
 import { deriveMetrics, EMPTY_TOTALS } from "@/lib/finance/metrics";
 
 vi.mock("@/lib/products/actions", () => ({ updateProductCost: vi.fn(async () => ({ ok: true, unitCostE4: 68_000 })) }));
@@ -71,6 +72,50 @@ describe("data notices", () => {
   it("stays silent when the data is complete", () => {
     const metrics = deriveMetrics({ ...EMPTY_TOTALS, orders: 1, grossSales: 1_000, productSalesAfterDiscounts: 1_000, cogs: 400, shippingCosts: 300, transactionFees: 30 });
     expect(dataNotices(metrics, store)).toEqual([]);
+  });
+});
+
+describe("dashboard in French", () => {
+  const metrics = deriveMetrics({
+    ...EMPTY_TOTALS,
+    orders: 10,
+    grossSales: 50_000,
+    productSalesAfterDiscounts: 50_000,
+    salesWithoutCost: 5_000,
+    linesWithoutCost: 1,
+    cogs: 20_000,
+    transactionFees: 1_000,
+    transactionFeesEstimated: 1_000,
+  });
+  const plain = (s: string | null) => (s ?? "").replace(/[\u00a0\u202f]/g, " ");
+
+  it("reads the language from the provider in the KPI tile and profit breakdown", () => {
+    render(
+      <LocaleProvider locale="fr">
+        <KpiTile label="Commandes" value="0" delta={{ value: null, text: "", polarity: "up" }} />
+        <KpiTile label="Remises" value="90 €" delta={{ value: 0.2, text: "+20,0 %", polarity: null }} />
+        <ProfitBreakdown metrics={metrics} currency="EUR" />
+      </LocaleProvider>,
+    );
+    expect(screen.getByText("Aucune comparaison disponible")).toBeInTheDocument();
+    expect(screen.getByText("Hausse")).toHaveClass("sr-only");
+    expect(screen.getByRole("heading", { name: "Décomposition du résultat" })).toBeInTheDocument();
+    const row = screen.getByRole("rowheader", { name: /Marge sur coûts variables/ }).closest("tr")!;
+    expect(plain(row.textContent)).toContain("290,00 €");
+    expect(screen.getByText("Incomplet")).toBeInTheDocument();
+    expect(screen.getByText(/La marge sur coûts variables n'est pas le bénéfice net/)).toBeInTheDocument();
+  });
+
+  it("writes data notices in French with French amounts", () => {
+    const store = { currency: "EUR", fee_rule_bps: 150, fee_rule_fixed_minor: 25, default_shipping_cost_minor: 550 };
+    const notices = dataNotices(metrics, store, "fr");
+    expect(notices.map((n) => n.key)).toEqual(["cogs", "estimates"]);
+    render(<DataNotices notices={notices} locale="fr" />);
+    expect(screen.getByText("Certaines ventes n'ont pas de coût produit")).toBeInTheDocument();
+    expect(plain(notices[0].body)).toMatch(/^1 ligne de commande \(50,00 €, 10,0 % des ventes de produits\) n'a pas de coût unitaire/);
+    expect(plain(notices[1].body)).toContain("des frais de paiement estimés à 10,00 € (règle : 1,50 % + 0,25 € par commande)");
+    expect(screen.getByRole("link", { name: "Ajouter les coûts des produits" })).toHaveAttribute("href", "/app/products?filter=missing-cost");
+    expect(screen.getByRole("heading", { name: "Qualité des données" })).toBeInTheDocument();
   });
 });
 
