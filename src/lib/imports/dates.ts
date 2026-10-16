@@ -1,3 +1,5 @@
+import type { Locale } from "@/i18n/config";
+import { importRows } from "@/i18n/messages/imports-rows";
 import { isValidDateString, localDateOf, zonedTimeToUtc } from "@/lib/dates";
 
 /**
@@ -71,11 +73,12 @@ function split(input: string, order: DateOrder): Parts | null {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-function validate(p: Parts): string | null {
+function validate(p: Parts, locale: Locale): string | null {
+  const t = importRows[locale].dates;
   const date = `${p.y}-${pad(p.m)}-${pad(p.d)}`;
-  if (!isValidDateString(date)) return "This date does not exist. Check the day/month order in the import options.";
-  if (p.y < 2000 || p.y > 2100) return "Dates must be between the years 2000 and 2100.";
-  if (p.hh > 23 || p.mi > 59 || p.ss > 59) return "The time is not valid.";
+  if (!isValidDateString(date)) return t.notExist;
+  if (p.y < 2000 || p.y > 2100) return t.yearRange;
+  if (p.hh > 23 || p.mi > 59 || p.ss > 59) return t.badTime;
   return null;
 }
 
@@ -86,11 +89,12 @@ export type DateTimeResult = { ok: true; instant: string; localDate: string; had
  * without one, the time is read in the store's time zone. A date without a
  * time is placed at noon local time, so it stays on the same local day.
  */
-export function parseDateTime(input: string, order: DateOrder, timezone: string): DateTimeResult {
-  if (!input.trim()) return { ok: false, message: "Enter a date." };
+export function parseDateTime(input: string, order: DateOrder, timezone: string, locale: Locale = "en"): DateTimeResult {
+  const t = importRows[locale].dates;
+  if (!input.trim()) return { ok: false, message: t.enterDate };
   const p = split(input, order);
-  if (!p) return { ok: false, message: "Unrecognised date. Use a form such as 2026-03-15 or 15/03/2026 14:30." };
-  const invalid = validate(p);
+  if (!p) return { ok: false, message: t.unrecognisedDateTime };
+  const invalid = validate(p, locale);
   if (invalid) return { ok: false, message: invalid };
   const date = `${p.y}-${pad(p.m)}-${pad(p.d)}`;
   let instant: string;
@@ -105,11 +109,12 @@ export function parseDateTime(input: string, order: DateOrder, timezone: string)
 export type DateResult = { ok: true; date: string } | { ok: false; message: string };
 
 /** A calendar date (ad spend, expenses). A time part, if any, is ignored. */
-export function parseLocalDate(input: string, order: DateOrder): DateResult {
-  if (!input.trim()) return { ok: false, message: "Enter a date." };
+export function parseLocalDate(input: string, order: DateOrder, locale: Locale = "en"): DateResult {
+  const t = importRows[locale].dates;
+  if (!input.trim()) return { ok: false, message: t.enterDate };
   const p = split(input, order);
-  if (!p) return { ok: false, message: "Unrecognised date. Use a form such as 2026-03-15 or 15/03/2026." };
-  const invalid = validate(p);
+  if (!p) return { ok: false, message: t.unrecognisedDate };
+  const invalid = validate(p, locale);
   if (invalid) return { ok: false, message: invalid };
   return { ok: true, date: `${p.y}-${pad(p.m)}-${pad(p.d)}` };
 }

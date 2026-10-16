@@ -12,6 +12,8 @@ import { toast } from "@/components/ui/toaster";
 import { currencySymbol } from "@/lib/finance/currency";
 import { e4ToInputValue, minorToInputValue } from "@/lib/finance/money";
 import { createProduct, updateProduct } from "@/lib/products/actions";
+import { useLocale } from "@/i18n/client";
+import { productsMessages } from "@/i18n/messages/catalog-products";
 
 type Values = { name: string; sku: string; unitCost: string; price: string };
 
@@ -26,6 +28,7 @@ type FormProps = {
 
 export function ProductForm({ currency, initial, productId, onDone, submitLabel, disabled = false }: FormProps) {
   const id = useId();
+  const t = productsMessages[useLocale()];
   const [values, setValues] = useState<Values>({
     name: initial?.name ?? "",
     sku: initial?.sku ?? "",
@@ -53,39 +56,39 @@ export function ProductForm({ currency, initial, productId, onDone, submitLabel,
           }
           setErrors({});
           setFormError(null);
-          toast.success(productId ? "Product saved." : "Product added.");
+          toast.success(productId ? t.productSaved : t.productAdded);
           onDone?.(productId ?? ("productId" in result ? (result as { productId: string }).productId : ""));
         });
       }}
     >
-      <Field htmlFor={`${id}-name`} label="Name" error={errors.name}>
+      <Field htmlFor={`${id}-name`} label={t.name} error={errors.name}>
         <Input id={`${id}-name`} value={values.name} onChange={set("name")} required aria-invalid={errors.name ? true : undefined} aria-describedby={describedBy(`${id}-name`, { error: errors.name })} disabled={disabled} />
       </Field>
-      <Field htmlFor={`${id}-sku`} label="SKU" optional hint="Order lines are matched to products by SKU, or by exact name when there is none." error={errors.sku}>
+      <Field htmlFor={`${id}-sku`} label={t.skuLabel} optional hint={t.skuHint} error={errors.sku}>
         <Input id={`${id}-sku`} value={values.sku} onChange={set("sku")} aria-invalid={errors.sku ? true : undefined} aria-describedby={describedBy(`${id}-sku`, { hint: true, error: errors.sku })} disabled={disabled} />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field htmlFor={`${id}-cost`} label="Unit cost" optional hint="Excluding VAT. Up to four decimals." error={errors.unitCost}>
+        <Field htmlFor={`${id}-cost`} label={t.unitCost} optional hint={t.unitCostHint} error={errors.unitCost}>
           <Input
             id={`${id}-cost`}
             inputMode="decimal"
             leading={symbol}
             value={values.unitCost}
             onChange={set("unitCost")}
-            placeholder="0.00"
+            placeholder={t.amountPlaceholder}
             aria-invalid={errors.unitCost ? true : undefined}
             aria-describedby={describedBy(`${id}-cost`, { hint: true, error: errors.unitCost })}
             disabled={disabled}
           />
         </Field>
-        <Field htmlFor={`${id}-price`} label="Selling price" optional hint="For reference; sales come from orders." error={errors.price}>
+        <Field htmlFor={`${id}-price`} label={t.sellingPrice} optional hint={t.sellingPriceHint} error={errors.price}>
           <Input
             id={`${id}-price`}
             inputMode="decimal"
             leading={symbol}
             value={values.price}
             onChange={set("price")}
-            placeholder="0.00"
+            placeholder={t.amountPlaceholder}
             aria-invalid={errors.price ? true : undefined}
             aria-describedby={describedBy(`${id}-price`, { hint: true, error: errors.price })}
             disabled={disabled}
@@ -109,18 +112,19 @@ export function ProductForm({ currency, initial, productId, onDone, submitLabel,
 export function AddProductDialog({ currency, defaultOpen = false, disabled = false }: { currency: string; defaultOpen?: boolean; disabled?: boolean }) {
   const [open, setOpen] = useState(defaultOpen && !disabled);
   const router = useRouter();
+  const t = productsMessages[useLocale()];
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="secondary" disabled={disabled}>
           <Plus aria-hidden />
-          Add product
+          {t.addProduct}
         </Button>
       </DialogTrigger>
-      <DialogContent title="Add a product" description="For products not yet in your imports. To add many at once, import a product list.">
+      <DialogContent title={t.addProductTitle} description={t.addProductDescription}>
         <ProductForm
           currency={currency}
-          submitLabel="Add product"
+          submitLabel={t.addProduct}
           onDone={(productId) => {
             setOpen(false);
             if (productId) router.push(`/app/products/${productId}` as Route);

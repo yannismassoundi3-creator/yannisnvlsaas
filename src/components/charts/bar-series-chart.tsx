@@ -2,10 +2,11 @@
 
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { TooltipContentProps } from "recharts";
-import { bucketDescription, type BucketPoint, type Granularity } from "@/lib/analytics/series";
+import { useFormat } from "@/i18n/client";
+import { chartMessages } from "@/i18n/messages/dashboard-charts";
+import type { Locale } from "@/i18n/config";
+import { bucketDescription, bucketLabel, type BucketPoint, type Granularity } from "@/lib/analytics/series";
 import { niceScale } from "@/lib/analytics/ticks";
-import { formatCount } from "@/lib/finance/format";
-import { formatMoney } from "@/lib/finance/money";
 import { ChartFrame, LegendKey } from "./chart-frame";
 import { AXIS_TICK, CHART } from "./chart-theme";
 
@@ -30,11 +31,14 @@ type Props = {
  * One axis only; other measures go to the table view instead of a second axis.
  */
 export function BarSeriesChart({ title, description, series, points, granularity, valueKind, currency, extras = [], height = 260, headingLevel }: Props) {
-  const fmt = (v: number, compact = false) => (valueKind === "money" ? formatMoney(v, currency, { compact }) : formatCount(v));
+  const f = useFormat();
+  const locale = f.locale;
+  const t = chartMessages[locale];
+  const fmt = (v: number, compact = false) => (valueKind === "money" ? f.money(v, currency, { compact }) : f.count(v));
   const totals = points.map((p) => series.reduce((sum, s) => sum + (p.values[s.key] ?? 0), 0));
   const scale = niceScale(0, Math.max(0, ...totals), 5);
-  const data = points.map((p) => ({ ...p, ...p.values }));
-  const partialNote = points.some((p) => p.partial) ? ` Lighter bars are partial ${granularity === "week" ? "weeks" : "months"}.` : "";
+  const data = points.map((p) => ({ ...p, ...p.values, label: bucketLabel(p, granularity, locale) }));
+  const partialNote = points.some((p) => p.partial) ? t.lighterBars(granularity === "week" ? "week" : "month") : "";
 
   return (
     <ChartFrame
@@ -45,16 +49,16 @@ export function BarSeriesChart({ title, description, series, points, granularity
       table={{
         caption: title,
         columns: [
-          { key: "period", label: granularity === "day" ? "Date" : "Period" },
+          { key: "period", label: granularity === "day" ? t.date : t.period },
           ...series.map((s) => ({ key: s.key, label: s.label, numeric: true })),
-          ...(series.length > 1 ? [{ key: "total", label: "Total", numeric: true }] : []),
+          ...(series.length > 1 ? [{ key: "total", label: t.total, numeric: true }] : []),
           ...extras.map((e) => ({ key: e.key, label: e.label, numeric: true })),
         ],
         rows: points.map((p, i) => ({
-          period: bucketDescription(p, granularity) + (p.partial ? " (partial)" : ""),
+          period: bucketDescription(p, granularity, locale) + (p.partial ? t.partialSuffix : ""),
           ...Object.fromEntries(series.map((s) => [s.key, fmt(p.values[s.key] ?? 0)])),
           ...(series.length > 1 ? { total: fmt(totals[i]) } : {}),
-          ...Object.fromEntries(extras.map((e) => [e.key, e.kind === "money" ? formatMoney(e.values[i] ?? 0, currency) : formatCount(e.values[i] ?? 0)])),
+          ...Object.fromEntries(extras.map((e) => [e.key, e.kind === "money" ? f.money(e.values[i] ?? 0, currency) : f.count(e.values[i] ?? 0)])),
         })),
       }}
     >
@@ -67,7 +71,7 @@ export function BarSeriesChart({ title, description, series, points, granularity
             <Tooltip
               cursor={{ fill: CHART.cursorFill }}
               isAnimationActive={false}
-              content={(props) => <SeriesTooltip {...props} series={series} granularity={granularity} format={(v) => fmt(v)} />}
+              content={(props) => <SeriesTooltip {...props} series={series} granularity={granularity} locale={locale} format={(v) => fmt(v)} />}
             />
             {series.map((s, si) => (
               <Bar key={s.key} dataKey={s.key} name={s.label} stackId="stack" fill={s.color} maxBarSize={28} isAnimationActive={false} radius={si === series.length - 1 ? [3, 3, 0, 0] : 0}>
@@ -88,16 +92,18 @@ function SeriesTooltip({
   payload,
   series,
   granularity,
+  locale,
   format,
-}: Partial<TooltipContentProps> & { series: ChartSeries[]; granularity: Granularity; format: (v: number) => string }) {
+}: Partial<TooltipContentProps> & { series: ChartSeries[]; granularity: Granularity; locale: Locale; format: (v: number) => string }) {
   if (!active || !payload || payload.length === 0) return null;
+  const t = chartMessages[locale];
   const point = payload[0].payload as BucketPoint<string>;
   const total = series.reduce((sum, s) => sum + (point.values[s.key] ?? 0), 0);
   return (
     <div className="min-w-48 rounded-md border border-line bg-surface px-3 py-2.5 text-sm shadow-lg">
       <p className="mb-1.5 text-xs font-medium text-ink-3">
-        {bucketDescription(point, granularity)}
-        {point.partial ? ` (partial ${granularity})` : ""}
+        {bucketDescription(point, granularity, locale)}
+        {point.partial ? t.partialBucket(granularity) : ""}
       </p>
       <dl className="space-y-1">
         {[...series].reverse().map((s) => (
@@ -111,7 +117,7 @@ function SeriesTooltip({
         ))}
         {series.length > 1 ? (
           <div className="flex items-center justify-between gap-6 border-t border-line pt-1">
-            <dt className="pl-5.5 text-ink-3">Total</dt>
+            <dt className="pl-5.5 text-ink-3">{t.total}</dt>
             <dd className="font-semibold text-ink tabular">{format(total)}</dd>
           </div>
         ) : null}

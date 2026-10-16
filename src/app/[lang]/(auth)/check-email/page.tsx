@@ -4,32 +4,36 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { AuthCard } from "@/components/auth/auth-card";
 import { ResendConfirmation } from "@/components/auth/password-forms";
+import { authPageMessages } from "@/i18n/messages/auth-pages";
+import { getLocale } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Confirm your email", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = authPageMessages[await getLocale()].checkEmail;
+  return { title: t.metaTitle, robots: { index: false } };
+}
 
-export default function CheckEmailPage() {
+export default async function CheckEmailPage() {
+  const m = authPageMessages[await getLocale()];
+  const t = m.checkEmail;
   return (
     <AuthCard
-      title="Confirm your email address"
+      title={t.title}
       description={
         <span className="flex items-start gap-2">
           <MailCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden />
-          Open the link in the email we just sent to activate your account and start your trial. You can open it on any
-          device.
+          {t.description}
         </span>
       }
       footer={
         <Link href="/sign-in" className="font-medium text-emerald-700 hover:underline">
-          Back to sign in
+          {m.backToSignIn}
         </Link>
       }
     >
       <Suspense fallback={null}>
         <ResendConfirmation />
       </Suspense>
-      <p className="mt-5 text-xs text-ink-3">
-        No email after a few minutes? Check your spam folder, or make sure the address is correct.
-      </p>
+      <p className="mt-5 text-xs text-ink-3">{t.noEmail}</p>
     </AuthCard>
   );
 }

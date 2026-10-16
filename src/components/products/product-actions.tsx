@@ -7,9 +7,15 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toaster";
 import { deleteProduct, setProductArchived } from "@/lib/products/actions";
+import { useLocale } from "@/i18n/client";
+import { catalogCommon } from "@/i18n/messages/catalog-common";
+import { productsMessages } from "@/i18n/messages/catalog-products";
 
 export function ProductActions({ productId, archived, canDelete, disabled }: { productId: string; archived: boolean; canDelete: boolean; disabled: boolean }) {
   const router = useRouter();
+  const locale = useLocale();
+  const t = productsMessages[locale];
+  const c = catalogCommon[locale];
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   return (
@@ -22,12 +28,12 @@ export function ProductActions({ productId, archived, canDelete, disabled }: { p
           startTransition(async () => {
             const r = await setProductArchived(productId, !archived);
             if (!r.ok) toast.error(r.message);
-            else toast.success(archived ? "Product restored." : "Product archived. Its sales stay in your reports.");
+            else toast.success(archived ? t.productRestored : t.productArchived);
           })
         }
       >
         {archived ? <ArchiveRestore aria-hidden /> : <Archive aria-hidden />}
-        {archived ? "Restore" : "Archive"}
+        {archived ? t.restore : t.archive}
       </Button>
       {canDelete ? (
         <ConfirmDialog
@@ -36,12 +42,12 @@ export function ProductActions({ productId, archived, canDelete, disabled }: { p
           trigger={
             <Button variant="danger-ghost" disabled={disabled}>
               <Trash2 aria-hidden />
-              Delete
+              {c.delete}
             </Button>
           }
-          title="Delete this product?"
-          description="It has never been sold, so no report changes. This cannot be undone."
-          confirmLabel="Delete product"
+          title={t.deleteTitle}
+          description={t.deleteDescription}
+          confirmLabel={t.deleteConfirm}
           destructive
           pending={pending}
           onConfirm={() =>
@@ -52,7 +58,7 @@ export function ProductActions({ productId, archived, canDelete, disabled }: { p
                 setOpen(false);
                 if (!r.ok) toast.error(r.message);
                 else {
-                  toast.success("Product deleted.");
+                  toast.success(t.productDeleted);
                   router.push("/app/products");
                 }
               }),

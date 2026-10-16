@@ -8,18 +8,21 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { COMMON_CURRENCIES, currencyName } from "@/lib/finance/currency";
-import { otherCurrencies, timezoneOptions } from "@/lib/locale-lists";
+import { useLocale } from "@/i18n/client";
+import { onboardingMessages } from "@/i18n/messages/auth-onboarding";
+import { COMMON_CURRENCIES } from "@/lib/finance/currency";
+import { currencyLabel, otherCurrencies, timezoneLabel, timezoneOptions } from "@/lib/locale-lists";
 import { completeOnboarding, createDemoStore, createWorkspace } from "@/lib/onboarding/actions";
-import { PLATFORM_NAMES, PLATFORMS, type PlatformId } from "@/lib/onboarding/constants";
+import { platformName, PLATFORMS, type PlatformId } from "@/lib/onboarding/constants";
 import { cn } from "@/lib/utils";
-
-const STEPS = ["Store profile", "Currency and reporting", "Add your data", "Explore a sample"] as const;
 
 type Props = { initialStep: 0 | 2; defaultName: string | null };
 
 export function OnboardingFlow({ initialStep, defaultName }: Props) {
   const router = useRouter();
+  const locale = useLocale();
+  const t = onboardingMessages[locale];
+  const STEPS = t.steps;
   const [step, setStep] = useState<number>(initialStep);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -35,24 +38,25 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
     pricesIncludeTax: "" as "" | "yes" | "no",
   });
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((f) => ({ ...f, [key]: value }));
-  const moreCurrencies = useMemo(() => otherCurrencies(), []);
+  const moreCurrencies = useMemo(() => otherCurrencies().map((c) => ({ value: c, label: currencyLabel(c, locale) })), [locale]);
+  const commonCurrencies = useMemo(() => COMMON_CURRENCIES.map((c) => ({ value: c, label: currencyLabel(c, locale) })), [locale]);
   // Always offer UTC and the browser's own zone, which may be missing from the canonical list.
-  const timezones = useMemo(() => timezoneOptions([browserTz]), [browserTz]);
+  const timezones = useMemo(() => timezoneOptions([browserTz]).map((tz) => ({ value: tz, label: timezoneLabel(tz, locale) })), [browserTz, locale]);
 
   function next() {
     setError(null);
     if (step === 0) {
-      if (!form.storeName.trim()) return setFieldErrors({ storeName: "Enter your store's name." });
+      if (!form.storeName.trim()) return setFieldErrors({ storeName: t.validation.storeName });
       setFieldErrors({});
       setStep(1);
     }
   }
 
-  const failed = () => setError("Something went wrong. Please try again.");
+  const failed = () => setError(t.genericError);
 
   function submitWorkspace() {
     setError(null);
-    if (!form.pricesIncludeTax) return setFieldErrors({ pricesIncludeTax: "Tell us whether your prices include tax." });
+    if (!form.pricesIncludeTax) return setFieldErrors({ pricesIncludeTax: t.validation.pricesIncludeTax });
     startTransition(async () => {
       const result = await createWorkspace({ ...form, pricesIncludeTax: form.pricesIncludeTax as "yes" | "no" }).catch(() => null);
       if (!result) return failed();
@@ -80,7 +84,7 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
 
   return (
     <div className="grid gap-8 md:grid-cols-[220px_1fr]">
-      <ol className="flex gap-2 overflow-x-auto md:flex-col md:gap-0" aria-label="Onboarding progress">
+      <ol className="flex gap-2 overflow-x-auto md:flex-col md:gap-0" aria-label={t.progress}>
         {STEPS.map((label, i) => {
           const state = i < step ? "done" : i === step ? "current" : "todo";
           return (
@@ -98,7 +102,7 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
               </span>
               <span className={cn("text-sm whitespace-nowrap", state === "current" ? "font-medium text-ink" : "text-ink-3")}>
                 {label}
-                {i >= 2 ? <span className="ml-1.5 text-xs text-ink-3">Optional</span> : null}
+                {i >= 2 ? <span className="ml-1.5 text-xs text-ink-3">{t.optional}</span> : null}
               </span>
             </li>
           );
@@ -109,19 +113,19 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
         {error ? <Alert tone="negative" className="mb-5">{error}</Alert> : null}
 
         {step === 0 ? (
-          <StepShell title={defaultName ? `Welcome, ${defaultName.split(" ")[0]}. Tell us about your store.` : "Tell us about your store."} description="This creates your workspace. You can change these details later in settings.">
+          <StepShell title={defaultName ? t.profile.welcome(defaultName.split(" ")[0]) : t.profile.title} description={t.profile.description}>
             <div className="space-y-4">
-              <Field htmlFor="storeName" label="Store name" error={fieldErrors.storeName}>
+              <Field htmlFor="storeName" label={t.profile.storeName} error={fieldErrors.storeName}>
                 <Input id="storeName" value={form.storeName} onChange={(e) => set("storeName", e.target.value)} maxLength={120} autoFocus aria-invalid={fieldErrors.storeName ? true : undefined} />
               </Field>
-              <Field htmlFor="organizationName" label="Business name" optional hint="Defaults to the store name.">
+              <Field htmlFor="organizationName" label={t.profile.businessName} optional hint={t.profile.businessNameHint}>
                 <Input id="organizationName" value={form.organizationName} onChange={(e) => set("organizationName", e.target.value)} maxLength={120} />
               </Field>
-              <Field htmlFor="platform" label="Where do you sell?">
+              <Field htmlFor="platform" label={t.profile.platform}>
                 <NativeSelect id="platform" value={form.platform} onChange={(e) => set("platform", e.target.value as PlatformId)}>
                   {PLATFORMS.map((p) => (
                     <option key={p} value={p}>
-                      {PLATFORM_NAMES[p]}
+                      {platformName(p, locale)}
                     </option>
                   ))}
                 </NativeSelect>
@@ -129,7 +133,7 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
             </div>
             <StepActions>
               <Button onClick={next}>
-                Continue
+                {t.profile.continue}
                 <ArrowRight aria-hidden />
               </Button>
             </StepActions>
@@ -137,44 +141,44 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
         ) : null}
 
         {step === 1 ? (
-          <StepShell title="Currency and reporting" description="Narixia reports every amount in your store currency and assigns orders to days in your time zone.">
+          <StepShell title={t.reporting.title} description={t.reporting.description}>
             <div className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field htmlFor="currency" label="Store currency" hint="Cannot be changed later." error={fieldErrors.currency}>
+                <Field htmlFor="currency" label={t.reporting.currency} hint={t.reporting.currencyHint} error={fieldErrors.currency}>
                   <NativeSelect id="currency" value={form.currency} onChange={(e) => set("currency", e.target.value)}>
-                    <optgroup label="Common">
-                      {COMMON_CURRENCIES.map((c) => (
-                        <option key={c} value={c}>
-                          {c} — {currencyName(c)}
+                    <optgroup label={t.reporting.commonCurrencies}>
+                      {commonCurrencies.map((c) => (
+                        <option key={c.value} value={c.value}>
+                          {c.label}
                         </option>
                       ))}
                     </optgroup>
-                    <optgroup label="All currencies">
+                    <optgroup label={t.reporting.allCurrencies}>
                       {moreCurrencies.map((c) => (
-                        <option key={c} value={c}>
-                          {c} — {currencyName(c)}
+                        <option key={c.value} value={c.value}>
+                          {c.label}
                         </option>
                       ))}
                     </optgroup>
                   </NativeSelect>
                 </Field>
-                <Field htmlFor="timezone" label="Reporting time zone" error={fieldErrors.timezone}>
+                <Field htmlFor="timezone" label={t.reporting.timezone} error={fieldErrors.timezone}>
                   <NativeSelect id="timezone" value={form.timezone} onChange={(e) => set("timezone", e.target.value)}>
                     {timezones.map((tz) => (
-                      <option key={tz} value={tz}>
-                        {tz.replaceAll("_", " ")}
+                      <option key={tz.value} value={tz.value}>
+                        {tz.label}
                       </option>
                     ))}
                   </NativeSelect>
                 </Field>
               </div>
               <fieldset>
-                <legend className="text-sm font-medium text-ink">Do your selling prices include VAT or sales tax?</legend>
-                <p className="mt-0.5 text-xs text-ink-3">Narixia removes tax before calculating margins. This applies to data you add from now on.</p>
+                <legend className="text-sm font-medium text-ink">{t.reporting.taxQuestion}</legend>
+                <p className="mt-0.5 text-xs text-ink-3">{t.reporting.taxHelp}</p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   {[
-                    { value: "yes", title: "Yes, prices include tax", text: "Common in the EU and UK. Order totals already contain VAT." },
-                    { value: "no", title: "No, tax is added on top", text: "Common in the US and Canada. Tax is added at checkout." },
+                    { value: "yes", title: t.reporting.taxYes, text: t.reporting.taxYesText },
+                    { value: "no", title: t.reporting.taxNo, text: t.reporting.taxNoText },
                   ].map((o) => (
                     <label
                       key={o.value}
@@ -207,62 +211,62 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
             </div>
             <StepActions>
               <Button variant="ghost" onClick={() => setStep(0)} disabled={pending}>
-                Back
+                {t.reporting.back}
               </Button>
               <Button onClick={submitWorkspace} loading={pending}>
-                Create my workspace
+                {t.reporting.submit}
               </Button>
             </StepActions>
           </StepShell>
         ) : null}
 
         {step === 2 ? (
-          <StepShell title="Add your first data" description="Your 14-day free trial has started. Bring in some data to see your real margins.">
+          <StepShell title={t.data.title} description={t.data.description}>
             <div className="grid gap-3">
               <ChoiceCard
                 icon={<FileSpreadsheet />}
-                title="Import a CSV export"
-                text="Orders, products and costs, ad spend or expenses. Shopify exports are recognised automatically."
-                badge="Recommended"
+                title={t.data.importTitle}
+                text={t.data.importText}
+                badge={t.data.recommended}
                 onClick={() => startTransition(() => completeOnboarding("import"))}
                 disabled={pending}
               />
               <ChoiceCard
                 icon={<PencilLine />}
-                title="Enter products and costs by hand"
-                text="Start with your product catalogue and unit costs. Add orders later."
+                title={t.data.manualTitle}
+                text={t.data.manualText}
                 onClick={() => startTransition(() => completeOnboarding("products"))}
                 disabled={pending}
               />
             </div>
             <StepActions>
               <Button variant="ghost" onClick={() => setStep(3)} disabled={pending}>
-                Skip for now
+                {t.data.skip}
               </Button>
             </StepActions>
           </StepShell>
         ) : null}
 
         {step === 3 ? (
-          <StepShell title="Explore a sample dashboard" description="See Narixia with a complete, fictional store before your own data arrives.">
+          <StepShell title={t.sample.title} description={t.sample.description}>
             <div className="rounded-md border border-line bg-sunken/50 p-4 text-sm text-ink-2">
               <p className="flex items-center gap-2 font-medium text-ink">
-                <Badge tone="demo">Demo data</Badge> How the sample store works
+                <Badge tone="demo">{t.sample.demoBadge}</Badge> {t.sample.howItWorks}
               </p>
               <ul className="mt-2 list-disc space-y-1 pl-5">
-                <li>It is a separate store, labelled as demo data everywhere. Your real store stays empty and untouched.</li>
-                <li>Switch between the sample and your store from the store menu in the sidebar.</li>
-                <li>When your real data is in, delete the sample store from settings in one click.</li>
+                {t.sample.points.map((point) => (
+                  <li key={point}>{point}</li>
+                ))}
               </ul>
             </div>
             <StepActions>
               <Button variant="ghost" onClick={() => startTransition(() => completeOnboarding("dashboard"))} disabled={pending}>
                 <LayoutDashboard aria-hidden />
-                Go to my dashboard
+                {t.sample.dashboard}
               </Button>
               <Button variant="accent" onClick={createSample} loading={pending}>
                 <Sparkles aria-hidden />
-                Create the sample store
+                {t.sample.create}
               </Button>
             </StepActions>
           </StepShell>

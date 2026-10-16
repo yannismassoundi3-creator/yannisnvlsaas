@@ -362,9 +362,145 @@ export type Definition = { term: string; short: string; formula: string };
 
 /**
  * French definitions. Same keys as DEFINITIONS; keep both in sync.
- * TODO(i18n): placeholder until translated.
  */
-const DEFINITIONS_FR: Record<DefinitionKey, Definition> = DEFINITIONS;
+const DEFINITIONS_FR: Record<DefinitionKey, Definition> = {
+  grossSales: {
+    term: "Ventes brutes",
+    short: "Ventes de produits avant remises, remboursements, frais de port et taxes.",
+    formula: "Prix unitaire × quantité, additionnés sur toutes les lignes de commande",
+  },
+  discounts: {
+    term: "Remises",
+    short: "Réductions de prix appliquées aux lignes de commande et aux commandes entières, comme les codes promo.",
+    formula: "Remises sur les lignes + remises sur les commandes",
+  },
+  refunds: {
+    term: "Remboursements",
+    short:
+      "Sommes rendues aux clients. Rattachées à la date du remboursement lorsqu'elle est connue, sinon à la date de la commande d'origine.",
+    formula: "Somme des montants remboursés, hors taxes",
+  },
+  netSales: {
+    term: "Ventes nettes",
+    short: "Ce que vos produits ont rapporté après remises et remboursements, hors frais de port et taxes.",
+    formula: "Ventes brutes − Remises − Remboursements",
+  },
+  shippingCharged: {
+    term: "Frais de port facturés",
+    short: "Frais de livraison payés par les clients, hors taxes.",
+    formula: "Somme des frais de port facturés sur les commandes",
+  },
+  netRevenue: {
+    term: "Chiffre d'affaires net",
+    short: "Ventes nettes plus frais de port payés par les clients. Sert de base aux pourcentages de marge.",
+    formula: "Ventes nettes + Frais de port facturés",
+  },
+  cogs: {
+    term: "Coût des marchandises vendues",
+    short:
+      "Ce que vous ont coûté les produits vendus. Utilise le coût enregistré sur la ligne de commande s'il existe, sinon le coût unitaire actuel du produit.",
+    formula: "Coût unitaire × quantité vendue",
+  },
+  grossProfit: {
+    term: "Marge brute",
+    short: "Chiffre d'affaires net moins le coût des marchandises vendues.",
+    formula: "Chiffre d'affaires net − Coût des marchandises vendues",
+  },
+  shippingCosts: {
+    term: "Coûts d'expédition et de logistique",
+    short: "Ce que vous avez payé pour préparer et expédier les commandes. Les valeurs estimées sont signalées.",
+    formula: "Coûts d'expédition enregistrés + estimations selon votre règle par défaut",
+  },
+  transactionFees: {
+    term: "Frais de paiement",
+    short: "Frais prélevés par les prestataires de paiement. Les valeurs estimées sont signalées.",
+    formula: "Frais enregistrés + estimations selon votre règle de frais (% du montant payé + frais fixe par commande)",
+  },
+  adSpend: {
+    term: "Dépenses publicitaires",
+    short: "Sommes dépensées en campagnes payantes sur la période.",
+    formula: "Somme des dépenses quotidiennes des campagnes",
+  },
+  otherVariableCosts: {
+    term: "Autres coûts variables",
+    short:
+      "Coûts qui augmentent avec les ventes, comme l'emballage ou les commissions des places de marché, enregistrés comme dépenses.",
+    formula: "Somme des dépenses marquées comme variables",
+  },
+  contributionMargin: {
+    term: "Marge sur coûts variables",
+    short:
+      "Ce qui reste du chiffre d'affaires net après le coût des produits et tous les coûts variables, pour couvrir les coûts fixes et dégager un bénéfice. Ce n'est pas le bénéfice net.",
+    formula: "Marge brute − Expédition − Frais de paiement − Publicité − Autres coûts variables",
+  },
+  contributionMarginRate: {
+    term: "Taux de marge sur coûts variables",
+    short: "Marge sur coûts variables rapportée au chiffre d'affaires net.",
+    formula: "Marge sur coûts variables ÷ Chiffre d'affaires net",
+  },
+  fixedCosts: {
+    term: "Coûts fixes",
+    short: "Coûts qui ne varient pas avec le volume des ventes, comme les abonnements logiciels, le loyer ou les salaires.",
+    formula: "Somme des dépenses marquées comme fixes",
+  },
+  operatingProfit: {
+    term: "Résultat d'exploitation (estimation)",
+    short:
+      "Marge sur coûts variables moins les coûts fixes enregistrés dans Narixia. Exclut l'impôt sur les bénéfices, les intérêts, les amortissements et tout coût non saisi ici. Ne remplace pas votre comptabilité.",
+    formula: "Marge sur coûts variables − Coûts fixes",
+  },
+  netProfit: {
+    term: "Bénéfice net",
+    short:
+      "Résultat comptable après tous les coûts, impôts, intérêts et amortissements. Narixia ne calcule pas le bénéfice net : demandez-le à votre expert-comptable.",
+    formula: "Non calculé par Narixia",
+  },
+  cashFlow: {
+    term: "Trésorerie",
+    short:
+      "Argent qui entre et sort réellement de votre compte bancaire au fil du temps. Narixia enregistre les ventes à la date de commande, pas à l'arrivée des versements : il ne mesure donc pas la trésorerie.",
+    formula: "Non calculé par Narixia",
+  },
+  orders: {
+    term: "Commandes",
+    short: "Nombre de commandes passées sur la période.",
+    formula: "Nombre de commandes",
+  },
+  averageOrderValue: {
+    term: "Panier moyen",
+    short: "Valeur moyenne des produits par commande après remises, avant remboursements, frais de port et taxes.",
+    formula: "(Ventes brutes − Remises) ÷ Commandes",
+  },
+  roas: {
+    term: "ROAS (déclaré par la plateforme)",
+    short:
+      "Chiffre d'affaires que la plateforme publicitaire attribue à une campagne pour chaque unité dépensée. Chaque plateforme applique ses propres règles d'attribution et surestime souvent.",
+    formula: "Valeur de conversion de la plateforme ÷ Dépenses publicitaires",
+  },
+  blendedRoas: {
+    term: "ROAS global",
+    short:
+      "Chiffre d'affaires net de toute la boutique pour chaque unité de dépenses publicitaires. Ne dépend pas de l'attribution des plateformes, mais inclut des ventes que la publicité n'a pas générées.",
+    formula: "Chiffre d'affaires net ÷ Dépenses publicitaires totales",
+  },
+  breakEvenRoas: {
+    term: "ROAS de rentabilité",
+    short:
+      "Le ROAS auquel la publicité absorbe toute la marge restant après les coûts des produits, d'expédition, de paiement et les autres coûts variables. En dessous, la publicité coûte plus que la marge qu'elle rapporte.",
+    formula: "1 ÷ (Marge avant publicité ÷ Chiffre d'affaires net)",
+  },
+  roi: {
+    term: "ROI",
+    short:
+      "Le retour sur investissement compare le bénéfice à la somme investie. Contrairement au ROAS, il repose sur le bénéfice et non sur le chiffre d'affaires. Narixia affiche la marge sur coûts variables plutôt qu'un ROI, car les montants investis ne sont pas suivis.",
+    formula: "(Gain − Coût) ÷ Coût",
+  },
+  refundRate: {
+    term: "Taux de remboursement",
+    short: "Remboursements rapportés aux ventes brutes.",
+    formula: "Remboursements ÷ Ventes brutes",
+  },
+};
 
 /** Definitions in the interface language (glossary, tooltips, reports). */
 export function definitionsFor(locale: Locale = "en"): Record<DefinitionKey, Definition> {

@@ -5,27 +5,35 @@ import { Logo } from "@/components/brand/logo";
 import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
 import { Skeleton } from "@/components/ui/feedback";
 import { Button } from "@/components/ui/button";
+import { localizedPath } from "@/i18n/config";
+import { onboardingMessages } from "@/i18n/messages/auth-onboarding";
+import { getLocale } from "@/i18n/server";
 import { signOut } from "@/lib/auth/actions";
 import { getWorkspace } from "@/lib/auth/workspace";
 
-export const metadata: Metadata = { title: "Set up your workspace", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = onboardingMessages[await getLocale()].page;
+  return { title: t.metaTitle, robots: { index: false } };
+}
 
 async function Flow() {
   const ws = await getWorkspace();
   return <OnboardingFlow initialStep={ws.organization ? 2 : 0} defaultName={ws.user.fullName} />;
 }
 
-export default function OnboardingPage() {
+export default async function OnboardingPage() {
+  const locale = await getLocale();
+  const t = onboardingMessages[locale].page;
   return (
     <div className="min-h-dvh">
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4 sm:px-6">
-          <Link href="/" aria-label="Narixia home">
+          <Link href={localizedPath("/", locale)} aria-label={t.home}>
             <Logo />
           </Link>
           <form action={signOut}>
             <Button type="submit" variant="ghost" size="sm">
-              Sign out
+              {t.signOut}
             </Button>
           </form>
         </div>

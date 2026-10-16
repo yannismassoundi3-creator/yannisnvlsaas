@@ -1,3 +1,6 @@
+import type { Locale } from "@/i18n/config";
+import { formatCount } from "@/lib/finance/format";
+
 /**
  * Plans, prices and limits.
  *
@@ -100,3 +103,41 @@ export const PLANS: Record<PlanId, Plan> = {
     ],
   },
 };
+
+export type PlanCopy = { name: string; description: string; highlights: string[] };
+
+/**
+ * Plan name, description and highlights in the interface language. The English
+ * fields on PLANS stay the source for English; French is derived here so the
+ * figures always follow the limits above.
+ */
+export function planCopy(planId: PlanId, locale: Locale = "en"): PlanCopy {
+  const plan = PLANS[planId];
+  if (locale === "en") return { name: plan.name, description: plan.description, highlights: plan.highlights };
+  const rows = (n: number) => formatCount(n, "fr-FR");
+  if (planId === "trial") {
+    return {
+      name: "Essai gratuit",
+      description: `${TRIAL_DAYS} jours du produit principal. Aucune carte bancaire nécessaire pour commencer.`,
+      highlights: [
+        "Une boutique",
+        "Vue d'ensemble, produits et publicité",
+        "Calculateur de rentabilité",
+        `Imports CSV jusqu'à ${rows(plan.limits.importRowsPerFile)} lignes par fichier`,
+        `Historique des ${plan.limits.historyDays} derniers jours`,
+      ],
+    };
+  }
+  return {
+    name: plan.name,
+    description: "Pour les boutiques qui veulent une vision complète, mois après mois.",
+    highlights: [
+      "Jusqu'à trois boutiques",
+      `Imports CSV jusqu'à ${rows(plan.limits.importRowsPerFile)} lignes par fichier`,
+      "Trois ans d'historique",
+      "Rapports de rentabilité par produit (CSV et PDF)",
+      "Exports des produits, commandes et coûts",
+      "Filtres par produit et par campagne",
+    ],
+  };
+}

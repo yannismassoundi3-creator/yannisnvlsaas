@@ -9,10 +9,15 @@ import { Alert } from "@/components/ui/feedback";
 import { Field } from "@/components/ui/field";
 import { NativeSelect, Textarea } from "@/components/ui/input";
 import { toast } from "@/components/ui/toaster";
+import { useLocale } from "@/i18n/client";
+import { shellMenus } from "@/i18n/messages/shell-menus";
+import { localizedPath } from "@/i18n/config";
 import { sendFeedback } from "@/lib/workspace/actions";
 
 export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const pathname = usePathname();
+  const locale = useLocale();
+  const t = shellMenus[locale].feedback;
   const [kind, setKind] = useState<"question" | "bug" | "idea" | "other">("question");
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +28,7 @@ export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenCh
     startTransition(async () => {
       const result = await sendFeedback({ kind, message, page: pathname });
       if (!result.ok) return setError(result.message);
-      toast.success("Thanks — your message has been sent.");
+      toast.success(t.sent);
       setMessage("");
       onOpenChange(false);
     });
@@ -32,34 +37,38 @@ export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        title="Help & feedback"
-        description="Ask a question, report a problem or suggest an improvement. Please do not include passwords or payment details."
+        title={t.title}
+        description={t.description}
         footer={
           <>
             <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={pending}>
-              Cancel
+              {t.cancel}
             </Button>
             <Button onClick={submit} loading={pending}>
-              Send
+              {t.send}
             </Button>
           </>
         }
       >
         <div className="space-y-4">
           {error ? <Alert tone="negative">{error}</Alert> : null}
-          <Field htmlFor="feedback-kind" label="Topic">
+          <Field htmlFor="feedback-kind" label={t.topic}>
             <NativeSelect id="feedback-kind" value={kind} onChange={(e) => setKind(e.target.value as typeof kind)}>
-              <option value="question">A question</option>
-              <option value="bug">Something is not working</option>
-              <option value="idea">An idea</option>
-              <option value="other">Something else</option>
+              <option value="question">{t.kinds.question}</option>
+              <option value="bug">{t.kinds.bug}</option>
+              <option value="idea">{t.kinds.idea}</option>
+              <option value="other">{t.kinds.other}</option>
             </NativeSelect>
           </Field>
-          <Field htmlFor="feedback-message" label="Message">
+          <Field htmlFor="feedback-message" label={t.message}>
             <Textarea id="feedback-message" value={message} onChange={(e) => setMessage(e.target.value)} maxLength={4000} rows={5} />
           </Field>
           <p className="text-xs text-ink-3">
-            Looking for definitions? See the <Link href="/glossary" className="font-medium text-emerald-700 hover:underline">metric glossary</Link>.
+            {t.glossaryBefore}
+            <Link href={localizedPath("/glossary", locale)} className="font-medium text-emerald-700 hover:underline">
+              {t.glossaryLink}
+            </Link>
+            {t.glossaryAfter}
           </p>
         </div>
       </DialogContent>

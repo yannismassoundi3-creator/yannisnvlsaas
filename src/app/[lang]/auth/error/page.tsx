@@ -3,18 +3,21 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
+import { localizedPath, type Locale } from "@/i18n/config";
+import { authPageMessages } from "@/i18n/messages/auth-pages";
+import { getLocale } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Link problem", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = authPageMessages[await getLocale()].linkError;
+  return { title: t.metaTitle, robots: { index: false } };
+}
 
-const MESSAGES: Record<string, { title: string; body: string }> = {
-  expired: { title: "This link has expired", body: "Email links work once and expire after one hour. Request a new one below." },
-  invalid: { title: "This link is not valid", body: "It may have been used already, or copied incompletely. Request a new one below." },
-  missing: { title: "Something is missing from this link", body: "Open the link directly from the email, or request a new one." },
-};
+const REASONS = ["expired", "invalid", "missing"] as const;
 
-async function Message({ searchParams }: { searchParams: Promise<{ reason?: string }> }) {
+async function Message({ searchParams, locale }: { searchParams: Promise<{ reason?: string }>; locale: Locale }) {
   const { reason } = await searchParams;
-  const m = MESSAGES[reason ?? ""] ?? MESSAGES.invalid;
+  const t = authPageMessages[locale].linkError;
+  const m = t[REASONS.find((r) => r === reason) ?? "invalid"];
   return (
     <>
       <h1 className="text-xl font-semibold tracking-tight text-ink">{m.title}</h1>
@@ -23,22 +26,24 @@ async function Message({ searchParams }: { searchParams: Promise<{ reason?: stri
   );
 }
 
-export default function AuthErrorPage(props: PageProps<"/[lang]/auth/error">) {
+export default async function AuthErrorPage(props: PageProps<"/[lang]/auth/error">) {
+  const locale = await getLocale();
+  const t = authPageMessages[locale];
   return (
     <div className="flex min-h-dvh flex-col items-center px-4 pt-16">
-      <Link href="/" aria-label="Narixia home">
+      <Link href={localizedPath("/", locale)} aria-label={t.layout.home}>
         <Logo />
       </Link>
       <div className="mt-10 w-full max-w-[400px] rounded-lg border border-line bg-surface p-7 shadow-sm">
         <Suspense fallback={<div className="h-14" />}>
-          <Message searchParams={props.searchParams as Promise<{ reason?: string }>} />
+          <Message searchParams={props.searchParams as Promise<{ reason?: string }>} locale={locale} />
         </Suspense>
         <div className="mt-6 flex flex-col gap-2">
           <Button asChild>
-            <Link href="/sign-in">Sign in</Link>
+            <Link href="/sign-in">{t.linkError.signIn}</Link>
           </Button>
           <Button asChild variant="secondary">
-            <Link href="/forgot-password">Reset my password</Link>
+            <Link href="/forgot-password">{t.linkError.resetPassword}</Link>
           </Button>
         </div>
       </div>

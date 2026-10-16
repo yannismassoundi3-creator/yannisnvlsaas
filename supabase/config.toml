@@ -246,16 +246,18 @@ otp_expiry = 3600
 
 # Custom templates use the token_hash flow handled by /auth/confirm, which works
 # even when the link is opened on a different device than the one used to sign up.
+# Bodies are French or English from user_metadata.locale (set at sign-up from the
+# interface language); subjects cannot branch, so they are bilingual.
 [auth.email.template.confirmation]
-subject = "Confirm your Narixia account"
+subject = "Confirm your Narixia account / Confirmez votre compte Narixia"
 content_path = "./supabase/templates/confirmation.html"
 
 [auth.email.template.recovery]
-subject = "Reset your Narixia password"
+subject = "Reset your Narixia password / Réinitialisez votre mot de passe Narixia"
 content_path = "./supabase/templates/recovery.html"
 
 [auth.email.template.email_change]
-subject = "Confirm your new email address"
+subject = "Confirm your new email address / Confirmez votre nouvelle adresse e-mail"
 content_path = "./supabase/templates/email_change.html"
 
 # Uncomment to customize notification email template

@@ -3,13 +3,13 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import PDFDocument from "pdfkit";
 import type { CampaignRow } from "@/lib/analytics/reference";
-import { formatDate, formatRange } from "@/lib/dates";
+import type { Locale } from "@/i18n/config";
+import { createFormat } from "@/i18n/format";
+import { pdfMessages } from "@/i18n/messages/account-reports";
 import type { DateRange } from "@/lib/domain/types";
-import { PLATFORM_LABELS, type Platform } from "@/lib/domain/types";
-import { formatCount, formatMultiple, formatPercent, formatPoints } from "@/lib/finance/format";
+import { platformLabel, type Platform } from "@/lib/domain/types";
 import type { Insight } from "@/lib/finance/insights";
-import { DEFINITIONS, type DefinitionKey, type Metrics } from "@/lib/finance/metrics";
-import { formatMoney } from "@/lib/finance/money";
+import { definitionsFor, type DefinitionKey, type Metrics } from "@/lib/finance/metrics";
 
 /**
  * Server-side PDF reports (A4). Built from the same figures as the screens,
@@ -45,6 +45,8 @@ export type PdfReportInput = {
   insights: Insight[];
   notes: string[];
   unallocatedAdSpend: number;
+  /** Language of the report text and number/date formatting (default English). */
+  locale?: Locale;
 };
 
 const C = {
@@ -58,12 +60,6 @@ const C = {
   negative: "#a8402c",
   caution: "#8a5a12",
   cautionTint: "#fbf3e2",
-};
-
-const TITLES: Record<ReportKind, string> = {
-  summary: "Profitability summary",
-  products: "Product profitability",
-  advertising: "Advertising performance",
 };
 
 /** Definitions printed at the end of each report, from the same source as the in-app glossary. */
@@ -96,16 +92,29 @@ async function fonts() {
 }
 
 export async function renderPdfReport(input: PdfReportInput): Promise<Buffer> {
+  const locale = input.locale ?? "en";
+  const t = pdfMessages[locale];
+  const f = createFormat(locale);
+  const reportTitle = t.titles[input.kind];
+  // French typography puts a space before the colon.
+  const colon = locale === "fr" ? " : " : ": ";
   const { regular, semibold } = await fonts();
   const doc = new PDFDocument({
     size: "A4",
     margins: { top: 54, bottom: 64, left: 48, right: 48 },
     bufferPages: true,
-    info: { Title: `${TITLES[input.kind]} — ${input.storeName}`, Author: "Narixia", Subject: formatRange(input.range), Creator: "Narixia" },
+    info: { Title: `${reportTitle} — ${input.storeName}`, Author: "Narixia", Subject: f.range(input.range), Creator: "Narixia" },
   });
   doc.registerFont("Sans", regular);
   doc.registerFont("Bold", semibold);
   doc.font("Sans");
+  // French number formatting uses narrow no-break spaces (1 234,50 €, 12 %),
+  // which the embedded font has no glyph for: print a no-break space instead.
+  const printable = (value: unknown) => (typeof value === "string" ? value.replace(/[   ]/g, " ") : value);
+  const rawText = doc.text.bind(doc) as (...args: unknown[]) => typeof doc;
+  const rawHeight = doc.heightOfString.bind(doc) as (...args: unknown[]) => number;
+  doc.text = ((text: unknown, ...rest: unknown[]) => rawText(printable(text), ...rest)) as typeof doc.text;
+  doc.heightOfString = ((text: unknown, ...rest: unknown[]) => rawHeight(printable(text), ...rest)) as typeof doc.heightOfString;
 
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
@@ -114,7 +123,7 @@ export async function renderPdfReport(input: PdfReportInput): Promise<Buffer> {
   const left = doc.page.margins.left;
   const width = doc.page.width - left - doc.page.margins.right;
   const bottom = () => doc.page.height - doc.page.margins.bottom;
-  const money = (v: number) => formatMoney(v, input.currency);
+  const money = (v: number) => f.money(v, input.currency);
   const ensure = (height: number) => {
     if (doc.y + height > bottom()) doc.addPage();
   };
@@ -123,23 +132,23 @@ export async function renderPdfReport(input: PdfReportInput): Promise<Buffer> {
   doc.rect(left, 40, 10, 10).fill(C.emerald);
   doc.font("Bold").fontSize(11).fillColor(C.ink).text("Narixia", left + 16, 38.5);
   doc.moveDown(1.6);
-  doc.font("Bold").fontSize(20).fillColor(C.ink).text(TITLES[input.kind], left, doc.y, { width });
+  doc.font("Bold").fontSize(20).fillColor(C.ink).text(reportTitle, left, doc.y, { width });
   doc.moveDown(0.2);
   doc
     .font("Sans")
     .fontSize(10)
     .fillColor(C.ink2)
     .text(
-      `${input.storeName} · ${formatRange(input.range)}${input.comparison ? ` · compared with ${formatRange(input.comparison)}` : ""}`,
+      `${input.storeName} · ${f.range(input.range)}${input.comparison ? t.comparedWith(f.range(input.comparison)) : ""}`,
       { width },
     );
-  doc.fillColor(C.ink3).fontSize(8.5).text(`Amounts in ${input.currency}, excluding VAT / sales tax. Generated ${input.generatedAt} (${input.timezone}).`, { width });
+  doc.fillColor(C.ink3).fontSize(8.5).text(t.amountsIn(input.currency, input.generatedAt, input.timezone), { width });
   doc.moveDown(0.8);
 
   if (input.isDemo) {
     const y = doc.y;
     doc.rect(left, y, width, 26).fill(C.cautionTint);
-    doc.font("Bold").fontSize(9).fillColor(C.caution).text("SAMPLE STORE — every figure in this report is fictional demo data.", left + 10, y + 8.5, { width: width - 20 });
+    doc.font("Bold").fontSize(9).fillColor(C.caution).text(t.sampleBanner, left + 10, y + 8.5, { width: width - 20 });
     doc.y = y + 36;
   }
 
@@ -192,40 +201,40 @@ export async function renderPdfReport(input: PdfReportInput): Promise<Buffer> {
   const p = input.previous;
   const change = (current: number | null, previous: number | null | undefined, kind: "relative" | "points" = "relative") => {
     if (current === null || previous === null || previous === undefined) return "—";
-    if (kind === "points") return formatPoints(current - previous);
+    if (kind === "points") return f.points(current - previous);
     if (previous === 0) return "—";
-    return formatPercent((current - previous) / Math.abs(previous), { signDisplay: "exceptZero" });
+    return f.percent((current - previous) / Math.abs(previous), { signDisplay: "exceptZero" });
   };
 
   // ---- Key figures -----------------------------------------------------------
   if (input.kind !== "products") {
-    sectionTitle("Key figures", p ? "Change is relative to the previous period of equal length." : "No comparison: the previous period is outside the plan's history window.");
+    sectionTitle(t.keyFigures, p ? t.keyFiguresCompared : t.keyFiguresNoComparison);
     const rows: [string, string, string, string][] =
       input.kind === "advertising"
         ? [
-            ["Ad spend", money(m.adSpend), p ? money(p.adSpend) : "—", change(m.adSpend, p?.adSpend)],
-            ["Net revenue", money(m.netRevenue), p ? money(p.netRevenue) : "—", change(m.netRevenue, p?.netRevenue)],
-            ["Ad spend share of net revenue", formatPercent(m.adSpendRate), p ? formatPercent(p.adSpendRate) : "—", change(m.adSpendRate, p?.adSpendRate, "points")],
-            ["Blended ROAS (net revenue ÷ ad spend)", formatMultiple(m.blendedRoas), p ? formatMultiple(p.blendedRoas) : "—", "—"],
-            ["Break-even ROAS", formatMultiple(m.breakEvenRoas), p ? formatMultiple(p.breakEvenRoas) : "—", "—"],
-            ["Contribution before advertising", money(m.contributionBeforeAds), p ? money(p.contributionBeforeAds) : "—", change(m.contributionBeforeAds, p?.contributionBeforeAds)],
-            ["Contribution margin", money(m.contributionMargin), p ? money(p.contributionMargin) : "—", change(m.contributionMargin, p?.contributionMargin)],
+            [t.adSpend, money(m.adSpend), p ? money(p.adSpend) : "—", change(m.adSpend, p?.adSpend)],
+            [t.netRevenue, money(m.netRevenue), p ? money(p.netRevenue) : "—", change(m.netRevenue, p?.netRevenue)],
+            [t.adSpendShare, f.percent(m.adSpendRate), p ? f.percent(p.adSpendRate) : "—", change(m.adSpendRate, p?.adSpendRate, "points")],
+            [t.blendedRoas, f.multiple(m.blendedRoas), p ? f.multiple(p.blendedRoas) : "—", "—"],
+            [t.breakEvenRoas, f.multiple(m.breakEvenRoas), p ? f.multiple(p.breakEvenRoas) : "—", "—"],
+            [t.contributionBeforeAds, money(m.contributionBeforeAds), p ? money(p.contributionBeforeAds) : "—", change(m.contributionBeforeAds, p?.contributionBeforeAds)],
+            [t.contributionMargin, money(m.contributionMargin), p ? money(p.contributionMargin) : "—", change(m.contributionMargin, p?.contributionMargin)],
           ]
         : [
-            ["Net revenue", money(m.netRevenue), p ? money(p.netRevenue) : "—", change(m.netRevenue, p?.netRevenue)],
-            ["Contribution margin", money(m.contributionMargin), p ? money(p.contributionMargin) : "—", change(m.contributionMargin, p?.contributionMargin)],
-            ["Contribution margin %", formatPercent(m.contributionMarginRate), p ? formatPercent(p.contributionMarginRate) : "—", change(m.contributionMarginRate, p?.contributionMarginRate, "points")],
-            ["Orders", formatCount(m.orders), p ? formatCount(p.orders) : "—", change(m.orders, p?.orders)],
-            ["Average order value", m.averageOrderValue === null ? "—" : money(m.averageOrderValue), p?.averageOrderValue != null ? money(p.averageOrderValue) : "—", change(m.averageOrderValue, p?.averageOrderValue)],
-            ["Refund rate", formatPercent(m.refundRate), p ? formatPercent(p.refundRate) : "—", change(m.refundRate, p?.refundRate, "points")],
-            ["Ad spend", money(m.adSpend), p ? money(p.adSpend) : "—", change(m.adSpend, p?.adSpend)],
+            [t.netRevenue, money(m.netRevenue), p ? money(p.netRevenue) : "—", change(m.netRevenue, p?.netRevenue)],
+            [t.contributionMargin, money(m.contributionMargin), p ? money(p.contributionMargin) : "—", change(m.contributionMargin, p?.contributionMargin)],
+            [t.contributionMarginRate, f.percent(m.contributionMarginRate), p ? f.percent(p.contributionMarginRate) : "—", change(m.contributionMarginRate, p?.contributionMarginRate, "points")],
+            [t.orders, f.count(m.orders), p ? f.count(p.orders) : "—", change(m.orders, p?.orders)],
+            [t.averageOrderValue, m.averageOrderValue === null ? "—" : money(m.averageOrderValue), p?.averageOrderValue != null ? money(p.averageOrderValue) : "—", change(m.averageOrderValue, p?.averageOrderValue)],
+            [t.refundRate, f.percent(m.refundRate), p ? f.percent(p.refundRate) : "—", change(m.refundRate, p?.refundRate, "points")],
+            [t.adSpend, money(m.adSpend), p ? money(p.adSpend) : "—", change(m.adSpend, p?.adSpend)],
           ];
     table(
       [
-        { header: "Measure", width: width * 0.43 },
-        { header: "This period", width: width * 0.2, align: "right" },
-        { header: "Previous period", width: width * 0.2, align: "right" },
-        { header: "Change", width: width * 0.17, align: "right" },
+        { header: t.colMeasure, width: width * 0.43 },
+        { header: t.colThisPeriod, width: width * 0.2, align: "right" },
+        { header: t.colPreviousPeriod, width: width * 0.2, align: "right" },
+        { header: t.colChange, width: width * 0.17, align: "right" },
       ],
       rows.map((r) => ({ cells: r })),
     );
@@ -233,30 +242,33 @@ export async function renderPdfReport(input: PdfReportInput): Promise<Buffer> {
 
   // ---- Profit breakdown ------------------------------------------------------
   if (input.kind === "summary") {
-    sectionTitle("Profit breakdown", "Shares are of net revenue. Contribution margin is not net profit: fixed costs, taxes on profit, interest and depreciation are excluded above it.");
-    const share = (v: number, signed = false) => (m.netRevenue > 0 ? formatPercent((signed ? v : Math.abs(v)) / m.netRevenue) : "—");
+    sectionTitle(t.breakdown, t.breakdownSubtitle);
+    const share = (v: number, signed = false) => (m.netRevenue > 0 ? f.percent((signed ? v : Math.abs(v)) / m.netRevenue) : "—");
+    const L = t.lines;
+    const incomplete = t.incomplete;
+    const estimates = t.includesEstimates;
     const lines: { label: string; amount: number; total?: boolean; result?: boolean; note?: string }[] = [
-      { label: "Gross sales", amount: m.grossSales },
-      { label: "− Discounts", amount: -m.discounts },
-      { label: "− Refunds", amount: -m.refunds },
-      { label: "= Net sales", amount: m.netSales, total: true },
-      { label: "+ Shipping charged", amount: m.shippingCharged },
-      { label: "= Net revenue", amount: m.netRevenue, total: true },
-      { label: "− Cost of goods sold", amount: -m.cogs, note: m.completeness.cogs === "partial" || m.completeness.cogs === "missing" ? "incomplete" : undefined },
-      { label: "= Gross profit", amount: m.grossProfit, total: true },
-      { label: "− Shipping & fulfilment", amount: -m.shippingCosts, note: m.completeness.shipping === "estimated" ? "includes estimates" : m.completeness.shipping === "partial" || m.completeness.shipping === "missing" ? "incomplete" : undefined },
-      { label: "− Payment fees", amount: -m.transactionFees, note: m.completeness.fees === "estimated" ? "includes estimates" : m.completeness.fees === "partial" || m.completeness.fees === "missing" ? "incomplete" : undefined },
-      { label: "− Advertising", amount: -m.adSpend },
-      { label: "− Other variable costs", amount: -m.otherVariableCosts },
-      { label: "= Contribution margin", amount: m.contributionMargin, result: true },
-      { label: "− Fixed costs recorded", amount: -m.fixedCosts },
-      { label: "= Operating profit (estimate)", amount: m.operatingProfit, total: true },
+      { label: L.grossSales, amount: m.grossSales },
+      { label: L.discounts, amount: -m.discounts },
+      { label: L.refunds, amount: -m.refunds },
+      { label: L.netSales, amount: m.netSales, total: true },
+      { label: L.shippingCharged, amount: m.shippingCharged },
+      { label: L.netRevenue, amount: m.netRevenue, total: true },
+      { label: L.cogs, amount: -m.cogs, note: m.completeness.cogs === "partial" || m.completeness.cogs === "missing" ? incomplete : undefined },
+      { label: L.grossProfit, amount: m.grossProfit, total: true },
+      { label: L.shippingCosts, amount: -m.shippingCosts, note: m.completeness.shipping === "estimated" ? estimates : m.completeness.shipping === "partial" || m.completeness.shipping === "missing" ? incomplete : undefined },
+      { label: L.transactionFees, amount: -m.transactionFees, note: m.completeness.fees === "estimated" ? estimates : m.completeness.fees === "partial" || m.completeness.fees === "missing" ? incomplete : undefined },
+      { label: L.adSpend, amount: -m.adSpend },
+      { label: L.otherVariableCosts, amount: -m.otherVariableCosts },
+      { label: L.contributionMargin, amount: m.contributionMargin, result: true },
+      { label: L.fixedCosts, amount: -m.fixedCosts },
+      { label: L.operatingProfit, amount: m.operatingProfit, total: true },
     ];
     table(
       [
-        { header: "Line", width: width * 0.5 },
-        { header: "Amount", width: width * 0.25, align: "right" },
-        { header: "Share", width: width * 0.25, align: "right" },
+        { header: t.colLine, width: width * 0.5 },
+        { header: t.colAmount, width: width * 0.25, align: "right" },
+        { header: t.colShare, width: width * 0.25, align: "right" },
       ],
       lines.map((l) => ({
         cells: [l.note ? `${l.label} (${l.note})` : l.label, money(l.amount), share(l.amount, l.total || l.result)],
@@ -271,33 +283,33 @@ export async function renderPdfReport(input: PdfReportInput): Promise<Buffer> {
   if (input.kind !== "advertising" && input.products.length > 0) {
     const list = input.kind === "summary" ? input.products.slice(0, 10) : input.products;
     sectionTitle(
-      input.kind === "summary" ? "Top products by net revenue" : "Products",
-      "Contribution margin after product cost, shipping and payment fees allocated by line value, and spend of campaigns linked to the product. A dash means some sold lines have no cost.",
+      input.kind === "summary" ? t.topProducts : t.products,
+      t.productsSubtitle,
     );
     table(
       [
-        { header: "Product", width: width * 0.36 },
-        { header: "Units", width: width * 0.1, align: "right" },
-        { header: "Net revenue", width: width * 0.16, align: "right" },
-        { header: "COGS", width: width * 0.14, align: "right" },
-        { header: "Contribution", width: width * 0.14, align: "right" },
-        { header: "Margin", width: width * 0.1, align: "right" },
+        { header: t.colProduct, width: width * 0.36 },
+        { header: t.colUnits, width: width * 0.1, align: "right" },
+        { header: t.colNetRevenue, width: width * 0.16, align: "right" },
+        { header: t.colCogs, width: width * 0.14, align: "right" },
+        { header: t.colContribution, width: width * 0.14, align: "right" },
+        { header: t.colMargin, width: width * 0.1, align: "right" },
       ],
       list.map((r) => ({
         cells: [
           r.sku ? `${r.name} (${r.sku})` : r.name,
-          formatCount(r.units),
+          f.count(r.units),
           money(r.netRevenue),
-          r.cogs === null ? "incomplete" : money(r.cogs),
+          r.cogs === null ? t.incomplete : money(r.cogs),
           r.contributionMargin === null ? "—" : money(r.contributionMargin),
-          formatPercent(r.contributionMarginRate),
+          f.percent(r.contributionMarginRate),
         ],
         tones: [undefined, undefined, undefined, r.cogs === null ? C.caution : undefined, r.contributionMargin !== null && r.contributionMargin < 0 ? C.negative : undefined, undefined],
       })),
     );
     if (input.kind === "products" && input.unallocatedAdSpend > 0) {
       doc.moveDown(0.4);
-      doc.font("Sans").fontSize(8).fillColor(C.ink3).text(`${money(input.unallocatedAdSpend)} of ad spend comes from campaigns not linked to a single product and stays at store level.`, left, doc.y, { width });
+      doc.font("Sans").fontSize(8).fillColor(C.ink3).text(t.unallocatedAdSpend(money(input.unallocatedAdSpend)), left, doc.y, { width });
     }
   }
 
@@ -305,21 +317,21 @@ export async function renderPdfReport(input: PdfReportInput): Promise<Buffer> {
   if (input.kind !== "products" && input.campaigns.length > 0) {
     const list = input.kind === "summary" ? input.campaigns.slice(0, 8) : input.campaigns;
     sectionTitle(
-      input.kind === "summary" ? "Top campaigns by spend" : "Campaigns",
-      `Platform ROAS uses each platform's own attribution and can count a sale more than once. Break-even ROAS for this period: ${formatMultiple(m.breakEvenRoas)}.`,
+      input.kind === "summary" ? t.topCampaigns : t.campaigns,
+      t.campaignsSubtitle(f.multiple(m.breakEvenRoas)),
     );
     table(
       [
-        { header: "Campaign", width: width * 0.4 },
-        { header: "Platform", width: width * 0.14 },
-        { header: "Spend", width: width * 0.16, align: "right" },
-        { header: "Conv. value", width: width * 0.16, align: "right" },
-        { header: "ROAS", width: width * 0.14, align: "right" },
+        { header: t.colCampaign, width: width * 0.4 },
+        { header: t.colPlatform, width: width * 0.14 },
+        { header: t.colSpend, width: width * 0.16, align: "right" },
+        { header: t.colConvValue, width: width * 0.16, align: "right" },
+        { header: t.colRoas, width: width * 0.14, align: "right" },
       ],
       list.map((c) => {
         const below = m.breakEvenRoas !== null && c.platformRoas !== null && c.platformRoas < m.breakEvenRoas;
         return {
-          cells: [c.name, PLATFORM_LABELS[c.platform as Platform] ?? c.platform, money(c.spend), money(c.conversionValue), `${formatMultiple(c.platformRoas)}${below ? " (below break-even)" : ""}`],
+          cells: [c.name, platformLabel(c.platform as Platform, locale) ?? c.platform, money(c.spend), money(c.conversionValue), `${f.multiple(c.platformRoas)}${below ? t.belowBreakEven : ""}`],
           tones: [undefined, undefined, undefined, undefined, below ? C.caution : undefined],
         };
       }),
@@ -328,17 +340,17 @@ export async function renderPdfReport(input: PdfReportInput): Promise<Buffer> {
 
   // ---- Insights and notes ---------------------------------------------------------
   if (input.kind === "summary" && input.insights.length > 0) {
-    sectionTitle("Observations", "Rule-based: each one lists the figures it is based on and describes changes, not causes.");
+    sectionTitle(t.observations, t.observationsSubtitle);
     for (const insight of input.insights.slice(0, 5)) {
       ensure(40);
       doc.font("Bold").fontSize(9).fillColor(C.ink).text(insight.title, left, doc.y, { width });
       doc.font("Sans").fontSize(8.5).fillColor(C.ink2).text(insight.body, { width });
-      doc.fillColor(C.ink3).fontSize(8).text(insight.evidence.map((e) => `${e.label}: ${e.value}`).join(" · "), { width });
+      doc.fillColor(C.ink3).fontSize(8).text(insight.evidence.map((e) => `${e.label}${colon}${e.value}`).join(" · "), { width });
       doc.moveDown(0.5);
     }
   }
   if (input.notes.length > 0) {
-    sectionTitle("Data quality");
+    sectionTitle(t.dataQuality);
     for (const note of input.notes) {
       ensure(24);
       doc.font("Sans").fontSize(8.5).fillColor(C.ink2).text(`• ${note}`, left, doc.y, { width });
@@ -347,11 +359,12 @@ export async function renderPdfReport(input: PdfReportInput): Promise<Buffer> {
   }
 
   // ---- Definitions ---------------------------------------------------------------
-  sectionTitle("Definitions", "Amounts exclude VAT / sales tax. Narixia does not calculate net profit or cash flow.");
+  sectionTitle(t.definitions, t.definitionsSubtitle);
+  const definitions = definitionsFor(locale);
   for (const key of DEFINITION_KEYS[input.kind]) {
-    const d = DEFINITIONS[key];
+    const d = definitions[key];
     ensure(30);
-    doc.font("Bold").fontSize(8.5).fillColor(C.ink).text(`${d.term}: `, left, doc.y, { width, continued: true });
+    doc.font("Bold").fontSize(8.5).fillColor(C.ink).text(`${d.term}${colon}`, left, doc.y, { width, continued: true });
     doc.font("Sans").fillColor(C.ink2).text(`${d.formula}. ${d.short}`);
     doc.moveDown(0.25);
   }
@@ -365,12 +378,12 @@ export async function renderPdfReport(input: PdfReportInput): Promise<Buffer> {
     const y = doc.page.height - 44;
     doc.font("Sans").fontSize(7.5).fillColor(C.ink3);
     doc.text(
-      `${input.storeName} · ${TITLES[input.kind]} · ${formatDate(input.range.from)} – ${formatDate(input.range.to)}${input.isDemo ? " · SAMPLE DATA" : ""}`,
+      `${input.storeName} · ${reportTitle} · ${f.date(input.range.from)} – ${f.date(input.range.to)}${input.isDemo ? t.sampleData : ""}`,
       left,
       y,
       { width: width * 0.75, lineBreak: false, ellipsis: true },
     );
-    doc.text(`Page ${i - pages.start + 1} of ${pages.count}`, left + width * 0.75, y, { width: width * 0.25, align: "right", lineBreak: false });
+    doc.text(t.page(i - pages.start + 1, pages.count), left + width * 0.75, y, { width: width * 0.25, align: "right", lineBreak: false });
   }
 
   doc.end();

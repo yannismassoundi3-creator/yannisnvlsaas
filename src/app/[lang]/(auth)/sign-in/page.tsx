@@ -3,19 +3,25 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { AuthCard } from "@/components/auth/auth-card";
 import { SignInForm } from "@/components/auth/sign-in-form";
+import { authPageMessages } from "@/i18n/messages/auth-pages";
+import { getLocale } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Sign in", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = authPageMessages[await getLocale()].signIn;
+  return { title: t.metaTitle, robots: { index: false } };
+}
 
-export default function SignInPage() {
+export default async function SignInPage() {
+  const t = authPageMessages[await getLocale()].signIn;
   return (
     <AuthCard
-      title="Sign in to Narixia"
-      description="Welcome back. See how your store is doing."
+      title={t.title}
+      description={t.description}
       footer={
         <>
-          New to Narixia?{" "}
+          {t.newTo}{" "}
           <Link href="/sign-up" className="font-medium text-emerald-700 hover:underline">
-            Start your free trial
+            {t.startTrial}
           </Link>
         </>
       }

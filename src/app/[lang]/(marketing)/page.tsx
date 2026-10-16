@@ -12,34 +12,44 @@ import { PreviewTabs } from "@/components/marketing/preview-tabs";
 import { PricingCards } from "@/components/marketing/pricing-cards";
 import { Button } from "@/components/ui/button";
 import { TRIAL_DAYS } from "@/config/plans";
-import { site } from "@/config/site";
-import { formatRange } from "@/lib/dates";
+import { site, siteCopy } from "@/config/site";
+import { localizedPath, type Locale } from "@/i18n/config";
+import type { Format } from "@/i18n/format";
+import { marketingCommon, publicAlternates } from "@/i18n/messages/marketing-common";
+import { marketingHome } from "@/i18n/messages/marketing-home";
+import { getFormat, getLocale } from "@/i18n/server";
 import { getMarketingDemo, type MarketingDemo } from "@/lib/demo/marketing";
-import { formatMultiple, formatPercent } from "@/lib/finance/format";
 import { buildAdvertisingKpis } from "@/lib/finance/kpis";
-import { formatMoney } from "@/lib/finance/money";
 
-export const metadata: Metadata = {
-  title: { absolute: "Narixia — Know your margins. Grow with confidence." },
-  description: site.description,
-  alternates: { canonical: "/" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return {
+    title: { absolute: marketingHome[locale].metaTitle },
+    description: siteCopy(locale).description,
+    alternates: publicAlternates("/", locale),
+  };
+}
+
+type Props = { demo: MarketingDemo; locale: Locale; f: Format };
 
 export default async function HomePage() {
-  const demo = await getMarketingDemo();
+  const locale = await getLocale();
+  const f = await getFormat();
+  const demo = await getMarketingDemo(locale);
+  const props = { demo, locale, f };
   return (
     <>
-      <Hero demo={demo} />
-      <Problem demo={demo} />
-      <ProductTour demo={demo} />
-      <ProductProfitability demo={demo} />
-      <Advertising demo={demo} />
-      <CsvImport />
-      <HowItWorks />
-      <PricingSection />
-      <FaqSection />
-      <FinalCta />
-      <JsonLd />
+      <Hero {...props} />
+      <Problem {...props} />
+      <ProductTour {...props} />
+      <ProductProfitability {...props} />
+      <Advertising {...props} />
+      <CsvImport locale={locale} />
+      <HowItWorks locale={locale} />
+      <PricingSection locale={locale} />
+      <FaqSection locale={locale} />
+      <FinalCta locale={locale} />
+      <JsonLd locale={locale} />
     </>
   );
 }
@@ -59,36 +69,37 @@ function Section({ id, eyebrow, title, intro, children, className }: { id?: stri
   );
 }
 
-function Hero({ demo }: { demo: MarketingDemo }) {
+function Hero({ demo, locale }: Props) {
+  const t = marketingHome[locale].hero;
   return (
     <section className="relative overflow-hidden">
       <div className="relative mx-auto max-w-6xl px-4 pt-14 pb-16 sm:px-6 sm:pt-20">
         <div className="max-w-3xl">
-          <p className="text-sm font-medium text-emerald-700">Profitability analytics for e-commerce</p>
+          <p className="text-sm font-medium text-emerald-700">{t.eyebrow}</p>
           <h1 className="mt-3 text-[2.5rem] leading-[1.05] font-semibold tracking-tightest text-ink sm:text-6xl">
-            Know your margins.
+            {t.titleLine1}
             <br />
-            Grow with confidence.
+            {t.titleLine2}
           </h1>
           <p className="mt-6 max-w-xl text-lg text-ink-2 sm:text-xl sm:leading-8">
-            One clear view of your sales, product costs, and advertising performance.
+            {t.lead}
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button asChild variant="accent" size="lg">
               <Link href="/sign-up">
-                Start your free trial
+                {t.startTrial}
                 <ArrowRight aria-hidden />
               </Link>
             </Button>
             <Button asChild variant="secondary" size="lg">
-              <Link href="#product">Explore the dashboard</Link>
+              <Link href="#product">{t.explore}</Link>
             </Button>
           </div>
           <ul className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-3">
-            {[`${TRIAL_DAYS}-day free trial`, "No payment card required", "Import Shopify CSV exports"].map((t) => (
-              <li key={t} className="flex items-center gap-1.5">
+            {[t.trialDays(TRIAL_DAYS), t.noCard, t.shopify].map((item) => (
+              <li key={item} className="flex items-center gap-1.5">
                 <Check className="size-4 text-emerald-600" aria-hidden />
-                {t}
+                {item}
               </li>
             ))}
           </ul>
@@ -96,8 +107,8 @@ function Hero({ demo }: { demo: MarketingDemo }) {
         <div className="relative mt-14">
           <div aria-hidden className="pointer-events-none absolute -inset-x-[50vw] top-1/3 -bottom-16 -z-0 border-t border-line bg-sunken/60" />
           <div className="relative">
-            <HeroDashboardPreview demo={demo} />
-            <DemoDataNote className="mt-3 text-center" />
+            <HeroDashboardPreview demo={demo} locale={locale} />
+            <DemoDataNote locale={locale} className="mt-3 text-center" />
           </div>
         </div>
       </div>
@@ -105,37 +116,27 @@ function Hero({ demo }: { demo: MarketingDemo }) {
   );
 }
 
-function Problem({ demo }: { demo: MarketingDemo }) {
+function Problem({ demo, locale, f }: Props) {
+  const t = marketingHome[locale].problem;
   const m = demo.metrics;
   const per100 = (amount: number) => (m.netRevenue > 0 ? (amount / m.netRevenue) * 100 : 0);
   const rows = [
-    { label: "Product costs", value: per100(m.cogs) },
-    { label: "Shipping and fulfilment", value: per100(m.shippingCosts) },
-    { label: "Advertising", value: per100(m.adSpend) },
-    { label: "Payment fees", value: per100(m.transactionFees) },
-    { label: "Other variable costs", value: per100(m.otherVariableCosts) },
+    { label: t.rows.cogs, value: per100(m.cogs) },
+    { label: t.rows.shipping, value: per100(m.shippingCosts) },
+    { label: t.rows.advertising, value: per100(m.adSpend) },
+    { label: t.rows.fees, value: per100(m.transactionFees) },
+    { label: t.rows.other, value: per100(m.otherVariableCosts) },
   ];
   const kept = per100(m.contributionMargin);
-  const currencySymbol = formatMoney(10000, demo.currency, { wholeUnits: true }).replace(/[\d.,\s]/g, "");
+  const hundred = f.money(10000, demo.currency, { wholeUnits: true });
+  const currencySymbol = hundred.replace(/[\d.,\s]/g, "");
+  // English keeps its historical "€12.34" rendering; other languages use the locale's money format ("12,34 €").
+  const amount = (value: number) => (locale === "en" ? `${currencySymbol}${value.toFixed(2)}` : f.money(Math.round(value * 100), demo.currency));
   return (
-    <Section
-      eyebrow="The profitability problem"
-      title="Revenue is not what you keep."
-      intro={
-        <p>
-          Your store platform shows sales. Your ad accounts show return on ad spend. Neither shows what is left once
-          product costs, shipping, payment fees and advertising are paid. Narixia puts them in one place, with every
-          formula written down.
-        </p>
-      }
-    >
+    <Section eyebrow={t.eyebrow} title={t.title} intro={<p>{t.intro}</p>}>
       <div className="grid items-start gap-10 lg:grid-cols-[1fr_1.1fr]">
         <ul className="space-y-5">
-          {[
-            ["Real product margins", "See which products carry the business once costs, fees and returns are counted."],
-            ["Advertising against margin", "Compare platform ROAS with your break-even point instead of a rule of thumb."],
-            ["Honest numbers", "Missing costs and estimates are flagged, never filled in silently."],
-          ].map(([title, text]) => (
+          {t.points.map(({ title, text }) => (
             <li key={title} className="flex gap-3">
               <span className="mt-1 flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
                 <Check className="size-3" aria-hidden />
@@ -149,11 +150,11 @@ function Problem({ demo }: { demo: MarketingDemo }) {
         </ul>
         <figure className="rounded-lg border border-line bg-surface p-6 shadow-xs">
           <figcaption className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className="text-md font-semibold text-ink">Where {currencySymbol}100 of net revenue goes</span>
-            <span className="text-xs text-ink-3">Sample store, {formatRange(demo.range)}</span>
+            <span className="text-md font-semibold text-ink">{t.figureTitle(locale === "en" ? `${currencySymbol}100` : hundred)}</span>
+            <span className="text-xs text-ink-3">{t.sampleRange(f.range(demo.range))}</span>
           </figcaption>
           <table className="mt-5 w-full text-sm">
-            <caption className="sr-only">Share of each cost in net revenue</caption>
+            <caption className="sr-only">{t.tableCaption}</caption>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.label}>
@@ -165,80 +166,73 @@ function Problem({ demo }: { demo: MarketingDemo }) {
                       <span className="block h-full rounded-full bg-chart-1" style={{ width: `${Math.min(r.value, 100)}%` }} />
                     </span>
                   </td>
-                  <td className="w-20 py-1.5 pl-3 text-right text-ink tabular">
-                    {currencySymbol}
-                    {r.value.toFixed(2)}
-                  </td>
+                  <td className="w-20 py-1.5 pl-3 text-right text-ink tabular">{amount(r.value)}</td>
                 </tr>
               ))}
               <tr className="border-t border-line">
                 <th scope="row" className="pt-3 pr-3 text-left font-semibold text-ink">
-                  What you keep
+                  {t.kept}
                 </th>
                 <td className="pt-3">
                   <span aria-hidden className="block h-2 overflow-hidden rounded-full bg-sunken">
                     <span className="block h-full rounded-full bg-chart-2" style={{ width: `${Math.max(Math.min(kept, 100), 0)}%` }} />
                   </span>
                 </td>
-                <td className="w-20 pt-3 pl-3 text-right font-semibold text-ink tabular">
-                  {currencySymbol}
-                  {kept.toFixed(2)}
-                </td>
+                <td className="w-20 pt-3 pl-3 text-right font-semibold text-ink tabular">{amount(kept)}</td>
               </tr>
             </tbody>
           </table>
-          <p className="mt-4 text-xs text-ink-3">
-            &ldquo;What you keep&rdquo; is contribution margin: before fixed costs such as rent, salaries and
-            subscriptions, and before taxes on profit.
-          </p>
-          <DemoDataNote className="mt-3" />
+          <p className="mt-4 text-xs text-ink-3">{t.keptNote}</p>
+          <DemoDataNote locale={locale} className="mt-3" />
         </figure>
       </div>
     </Section>
   );
 }
 
-function ProductTour({ demo }: { demo: MarketingDemo }) {
-  const range = formatRange(demo.range);
-  const adKpis = buildAdvertisingKpis(demo.metrics, demo.previous, demo.currency);
+function ProductTour({ demo, locale, f }: Props) {
+  const t = marketingHome[locale].tour;
+  const vsPrevious = marketingCommon[locale].demo.vsPrevious;
+  const range = f.range(demo.range);
+  const adKpis = buildAdvertisingKpis(demo.metrics, demo.previous, demo.currency, locale);
   const productNames = Object.fromEntries(demo.products.map((p) => [p.productId, p.name]));
   return (
     <Section
       id="product"
-      eyebrow="A look inside"
-      title="A dashboard that explains itself."
-      intro={<p>Switch between the views a merchant uses every week. Every term has a definition one click away.</p>}
+      eyebrow={t.eyebrow}
+      title={t.title}
+      intro={<p>{t.intro}</p>}
       className="border-t border-line"
     >
       <PreviewTabs
         panels={[
           {
             value: "overview",
-            label: "Profit",
+            label: t.profitTab,
             content: (
-              <ProductFrame title="Sample store — Profit breakdown" range={range}>
+              <ProductFrame locale={locale} title={t.profitTitle} range={range}>
                 <ProfitBreakdown metrics={demo.metrics} currency={demo.currency} />
               </ProductFrame>
             ),
           },
           {
             value: "products",
-            label: "Products",
+            label: t.productsTab,
             content: (
-              <ProductFrame title="Sample store — Products" range={range}>
+              <ProductFrame locale={locale} title={t.productsTitle} range={range}>
                 <ProductMarginBars rows={demo.products} currency={demo.currency} limit={10} />
               </ProductFrame>
             ),
           },
           {
             value: "advertising",
-            label: "Advertising",
+            label: t.advertisingTab,
             content: (
-              <ProductFrame title="Sample store — Advertising" range={range}>
+              <ProductFrame locale={locale} title={t.advertisingTitle} range={range}>
                 <div className="space-y-4">
                   <KpiGrid>
                     {adKpis.map((k) => (
-                      <KpiTile key={k.key} label={k.label} value={k.value} definition={k.definition} delta={k.delta} deltaContext="vs previous 30 days" status={k.status} footnote={k.footnote} />
+                      <KpiTile key={k.key} label={k.label} value={k.value} definition={k.definition} delta={k.delta} deltaContext={vsPrevious} status={k.status} footnote={k.footnote} />
                     ))}
                   </KpiGrid>
                   <div className="rounded-lg border border-line bg-surface shadow-xs">
@@ -250,115 +244,79 @@ function ProductTour({ demo }: { demo: MarketingDemo }) {
           },
         ]}
       />
-      <DemoDataNote className="mt-4 text-center" />
+      <DemoDataNote locale={locale} className="mt-4 text-center" />
     </Section>
   );
 }
 
-function ProductProfitability({ demo }: { demo: MarketingDemo }) {
+function ProductProfitability({ demo, locale }: Props) {
+  const t = marketingHome[locale].products;
   const missing = demo.products.filter((p) => p.linesWithoutCost > 0).length;
   return (
-    <Section
-      id="features"
-      eyebrow="Product profitability"
-      title="Know which products actually pay."
-      intro={
-        <p>
-          Each product&rsquo;s contribution margin includes its share of discounts, refunds, shipping and payment fees.
-          Store-wide advertising stays separate unless a campaign promotes a single product, so margins are never
-          distorted by arbitrary allocation.
-        </p>
-      }
-    >
+    <Section id="features" eyebrow={t.eyebrow} title={t.title} intro={<p>{t.intro}</p>}>
       <div className="grid items-start gap-10 lg:grid-cols-[1fr_1.25fr]">
         <ul className="space-y-6">
-          <Feature icon={<Rows3 />} title="Search, sort and filter">
-            Find low-margin products, products without a cost, or best sellers in a few keystrokes.
+          <Feature icon={<Rows3 />} title={t.searchTitle}>
+            {t.searchText}
           </Feature>
-          <Feature icon={<ListChecks />} title="Costs you can correct">
-            Edit unit costs inline and every view updates at once. Costs recorded on individual orders are kept as they were.
+          <Feature icon={<ListChecks />} title={t.costsTitle}>
+            {t.costsText}
           </Feature>
-          <Feature icon={<ShieldCheck />} title="Missing data stays visible">
-            {missing > 0
-              ? `In the sample store, ${missing} product has no cost recorded, so Narixia shows no margin for it rather than guessing.`
-              : "Products without a cost show no margin rather than a guess."}
+          <Feature icon={<ShieldCheck />} title={t.missingTitle}>
+            {missing > 0 ? t.missingSample(missing) : t.missingGeneric}
           </Feature>
         </ul>
         <div>
           <ProductMarginBars rows={demo.products} currency={demo.currency} limit={10} />
-          <DemoDataNote className="mt-3" />
+          <DemoDataNote locale={locale} className="mt-3" />
         </div>
       </div>
     </Section>
   );
 }
 
-function Advertising({ demo }: { demo: MarketingDemo }) {
+function Advertising({ demo, locale, f }: Props) {
+  const t = marketingHome[locale].advertising;
   const m = demo.metrics;
   const productNames = Object.fromEntries(demo.products.map((p) => [p.productId, p.name]));
   return (
-    <Section
-      eyebrow="Advertising performance"
-      title="Judge ads against your margin, not a rule of thumb."
-      intro={
-        <p>
-          Narixia calculates your break-even ROAS from your own costs: the return below which advertising consumes more
-          margin than it brings in. Platform figures are shown as reported, with their attribution caveats.
-        </p>
-      }
-      className="border-t border-line bg-surface"
-    >
+    <Section eyebrow={t.eyebrow} title={t.title} intro={<p>{t.intro}</p>} className="border-t border-line bg-surface">
       <div className="grid gap-6 md:grid-cols-3">
-        <Stat label="Break-even ROAS" value={formatMultiple(m.breakEvenRoas)} note="Sample store, last 30 days" />
-        <Stat label="Blended ROAS" value={formatMultiple(m.blendedRoas)} note="Net revenue ÷ total ad spend" />
-        <Stat label="Ad spend share of revenue" value={formatPercent(m.adSpendRate)} note="Advertising ÷ net revenue" />
+        <Stat label={t.breakEven} value={f.multiple(m.breakEvenRoas)} note={t.breakEvenNote} />
+        <Stat label={t.blended} value={f.multiple(m.blendedRoas)} note={t.blendedNote} />
+        <Stat label={t.adShare} value={f.percent(m.adSpendRate)} note={t.adShareNote} />
       </div>
       <div className="mt-6 rounded-lg border border-line bg-surface shadow-xs">
         <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 pt-4 pb-2">
-          <h3 className="text-md font-semibold tracking-tight text-ink">Campaigns, last 30 days</h3>
-          <span className="text-xs text-ink-3">Break-even ROAS {formatMultiple(m.breakEvenRoas)}</span>
+          <h3 className="text-md font-semibold tracking-tight text-ink">{t.campaigns}</h3>
+          <span className="text-xs text-ink-3">{t.breakEvenInline(f.multiple(m.breakEvenRoas))}</span>
         </div>
         <CampaignTable campaigns={demo.campaigns} currency={demo.currency} breakEvenRoas={m.breakEvenRoas} productNames={productNames} />
       </div>
-      <p className="mt-5 max-w-3xl text-sm text-ink-3">
-        Platform ROAS relies on each platform&rsquo;s attribution and can count the same sale more than once. Blended
-        ROAS avoids attribution but includes sales that ads did not cause. Narixia shows both and explains the
-        difference instead of picking a winner for you.
-      </p>
-      <DemoDataNote className="mt-3" />
+      <p className="mt-5 max-w-3xl text-sm text-ink-3">{t.caveat}</p>
+      <DemoDataNote locale={locale} className="mt-3" />
     </Section>
   );
 }
 
-function CsvImport() {
-  const steps = [
-    { icon: <Upload />, title: "Upload", text: "Drop a CSV export. It is read in your browser." },
-    { icon: <FileSpreadsheet />, title: "Map columns", text: "Shopify columns are recognised automatically." },
-    { icon: <ListChecks />, title: "Validate", text: "Every row is checked. Errors are listed by row." },
-    { icon: <Check />, title: "Confirm", text: "Duplicates are skipped. Imports can be undone." },
-  ];
-  const mapping = [
-    ["Name", "Order ID"],
-    ["Created at", "Order date"],
-    ["Lineitem sku", "SKU"],
-    ["Lineitem quantity", "Quantity"],
-    ["Lineitem price", "Unit price"],
-    ["Discount Amount", "Order discount"],
-    ["Shipping", "Shipping charged"],
-    ["Taxes", "Tax amount"],
-    ["Email", "Not imported"],
+function CsvImport({ locale }: { locale: Locale }) {
+  const t = marketingHome[locale].csv;
+  const icons = [<Upload key="upload" />, <FileSpreadsheet key="map" />, <ListChecks key="validate" />, <Check key="confirm" />];
+  const steps = t.steps.map((s, i) => ({ ...s, icon: icons[i] }));
+  // Shopify column names stay as they appear in the export file.
+  const mapping: [string, string, boolean][] = [
+    ["Name", t.fields.orderId, true],
+    ["Created at", t.fields.orderDate, true],
+    ["Lineitem sku", t.fields.sku, true],
+    ["Lineitem quantity", t.fields.quantity, true],
+    ["Lineitem price", t.fields.unitPrice, true],
+    ["Discount Amount", t.fields.orderDiscount, true],
+    ["Shipping", t.fields.shipping, true],
+    ["Taxes", t.fields.tax, true],
+    ["Email", t.fields.notImported, false],
   ];
   return (
-    <Section
-      eyebrow="CSV import"
-      title="From export to insight in minutes."
-      intro={
-        <p>
-          Import orders, products and costs, expenses and ad spend from CSV files. Narixia validates every row, shows
-          exactly what will be imported, and never discards a row without telling you.
-        </p>
-      }
-    >
+    <Section eyebrow={t.eyebrow} title={t.title} intro={<p>{t.intro}</p>}>
       <div className="grid gap-10 lg:grid-cols-[1fr_1fr]">
         <ol className="relative space-y-0">
           {steps.map((s, i) => (
@@ -368,7 +326,7 @@ function CsvImport() {
                 {s.icon}
               </span>
               <div className="pt-1">
-                <p className="text-xs font-medium text-ink-3 tabular">Step {i + 1}</p>
+                <p className="text-xs font-medium text-ink-3 tabular">{t.step(i + 1)}</p>
                 <p className="font-medium text-ink">{s.title}</p>
                 <p className="mt-0.5 text-base text-ink-2">{s.text}</p>
               </div>
@@ -377,22 +335,22 @@ function CsvImport() {
         </ol>
         <div className="rounded-lg border border-line bg-surface shadow-xs">
           <div className="border-b border-line px-5 py-3.5">
-            <p className="text-md font-semibold text-ink">Column mapping</p>
-            <p className="text-sm text-ink-3">Example: a Shopify orders export</p>
+            <p className="text-md font-semibold text-ink">{t.mappingTitle}</p>
+            <p className="text-sm text-ink-3">{t.mappingSubtitle}</p>
           </div>
           <table className="w-full text-sm">
-            <caption className="sr-only">Example mapping from Shopify columns to Narixia fields</caption>
+            <caption className="sr-only">{t.mappingCaption}</caption>
             <thead>
               <tr className="text-xs text-ink-3">
-                <th scope="col" className="px-5 py-2 text-left font-medium">Your file</th>
-                <th scope="col" className="px-5 py-2 text-left font-medium">Narixia field</th>
+                <th scope="col" className="px-5 py-2 text-left font-medium">{t.yourFile}</th>
+                <th scope="col" className="px-5 py-2 text-left font-medium">{t.narixiaField}</th>
               </tr>
             </thead>
             <tbody>
-              {mapping.map(([from, to]) => (
+              {mapping.map(([from, to, imported]) => (
                 <tr key={from} className="border-t border-line">
                   <td className="px-5 py-2 font-mono text-[12.5px] text-ink-2">{from}</td>
-                  <td className={`px-5 py-2 ${to === "Not imported" ? "text-ink-3" : "text-ink"}`}>
+                  <td className={`px-5 py-2 ${imported ? "text-ink" : "text-ink-3"}`}>
                     <span className="inline-flex items-center gap-2">
                       <ArrowRight className="size-3.5 text-ink-3" aria-hidden />
                       {to}
@@ -402,23 +360,18 @@ function CsvImport() {
               ))}
             </tbody>
           </table>
-          <p className="border-t border-line px-5 py-3 text-xs text-ink-3">
-            Customer names, emails and addresses are never uploaded: unmapped columns stay on your computer.
-          </p>
+          <p className="border-t border-line px-5 py-3 text-xs text-ink-3">{t.privacy}</p>
         </div>
       </div>
     </Section>
   );
 }
 
-function HowItWorks() {
-  const steps = [
-    { icon: <Store />, title: "Create your store profile", text: "Choose your currency and reporting time zone, and whether your prices include VAT." },
-    { icon: <Upload />, title: "Add your data", text: "Import orders, product costs and ad spend from CSV files, or enter them by hand." },
-    { icon: <ListChecks />, title: "Read your real margins", text: "See contribution margin by period and product, and the changes that deserve attention." },
-  ];
+function HowItWorks({ locale }: { locale: Locale }) {
+  const t = marketingHome[locale].how;
+  const steps = t.steps;
   return (
-    <Section eyebrow="How it works" title="Three steps to a clear picture." className="border-t border-line">
+    <Section eyebrow={t.eyebrow} title={t.title} className="border-t border-line">
       <ol className="grid gap-6 md:grid-cols-3">
         {steps.map((s, i) => (
           <li key={s.title} className="relative">
@@ -434,48 +387,43 @@ function HowItWorks() {
   );
 }
 
-function PricingSection() {
+function PricingSection({ locale }: { locale: Locale }) {
+  const t = marketingHome[locale].pricing;
   return (
-    <Section
-      id="pricing"
-      eyebrow="Pricing"
-      title="Simple pricing for small stores."
-      intro={<p>Start with a free trial. Upgrade when Narixia earns its place in your week.</p>}
-      className="border-t border-line bg-surface"
-    >
-      <PricingCards />
+    <Section id="pricing" eyebrow={t.eyebrow} title={t.title} intro={<p>{t.intro}</p>} className="border-t border-line bg-surface">
+      <PricingCards locale={locale} />
       <p className="mt-6 text-sm text-ink-3">
-        <Link href="/pricing" className="font-medium text-emerald-700 hover:underline">
-          Compare plans in detail
+        <Link href={localizedPath("/pricing", locale)} className="font-medium text-emerald-700 hover:underline">
+          {t.compare}
         </Link>
       </p>
     </Section>
   );
 }
 
-function FaqSection() {
+function FaqSection({ locale }: { locale: Locale }) {
+  const t = marketingHome[locale].faq;
   return (
-    <Section id="faq" eyebrow="Questions" title="Frequently asked questions" className="border-t border-line">
-      <Faq />
+    <Section id="faq" eyebrow={t.eyebrow} title={t.title} className="border-t border-line">
+      <Faq locale={locale} />
     </Section>
   );
 }
 
-function FinalCta() {
+function FinalCta({ locale }: { locale: Locale }) {
+  const t = marketingHome[locale].cta;
   return (
     <section className="border-t border-line">
       <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
         <div className="rounded-xl bg-navy-800 px-6 py-14 text-center sm:px-12">
-          <h2 className="text-3xl font-semibold tracking-tighter text-white sm:text-4xl">See what your store really earns.</h2>
-          <p className="mx-auto mt-4 max-w-xl text-lg text-navy-100">
-            Import your first CSV and get a profit breakdown in minutes. {TRIAL_DAYS} days free, no payment card required.
-          </p>
+          <h2 className="text-3xl font-semibold tracking-tighter text-white sm:text-4xl">{t.title}</h2>
+          <p className="mx-auto mt-4 max-w-xl text-lg text-navy-100">{t.text(TRIAL_DAYS)}</p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <Button asChild size="lg" className="bg-white text-ink hover:bg-ivory active:bg-sunken">
-              <Link href="/sign-up">Start your free trial</Link>
+              <Link href="/sign-up">{t.startTrial}</Link>
             </Button>
             <Button asChild size="lg" variant="ghost" className="text-white hover:bg-navy-700 hover:text-white">
-              <Link href="/tools/profit-margin-calculator">Try the margin calculator</Link>
+              <Link href={localizedPath("/tools/profit-margin-calculator", locale)}>{t.calculator}</Link>
             </Button>
           </div>
         </div>
@@ -508,15 +456,16 @@ function Stat({ label, value, note }: { label: string; value: string; note: stri
   );
 }
 
-function JsonLd() {
+function JsonLd({ locale }: { locale: Locale }) {
   const data = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     name: site.name,
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web",
-    description: site.description,
-    url: site.url,
+    description: siteCopy(locale).description,
+    inLanguage: locale,
+    url: locale === "en" ? site.url : `${site.url}${localizedPath("/", locale)}`,
   };
   return (
     <script

@@ -3,6 +3,8 @@
 import { CircleHelp } from "lucide-react";
 import { Popover as PopoverPrimitive, Tooltip as TooltipPrimitive } from "radix-ui";
 import type { ComponentProps, ReactNode } from "react";
+import { useLocale } from "@/i18n/client";
+import { shellUi } from "@/i18n/messages/shell-ui";
 import { cn } from "@/lib/utils";
 
 export const TooltipProvider = TooltipPrimitive.Provider;
@@ -63,6 +65,7 @@ type TermTipProps = {
  * and with the keyboard), unlike a hover-only tooltip.
  */
 export function TermTip({ term, children, className }: TermTipProps) {
+  const t = shellUi[useLocale()];
   return (
     <PopoverPrimitive.Root>
       <PopoverPrimitive.Trigger
@@ -70,7 +73,7 @@ export function TermTip({ term, children, className }: TermTipProps) {
           "inline-flex size-4 items-center justify-center rounded-full text-ink-3 transition-colors hover:text-ink",
           className,
         )}
-        aria-label={`What is ${term}?`}
+        aria-label={t.whatIs(term)}
       >
         <CircleHelp className="size-3.5" aria-hidden />
       </PopoverPrimitive.Trigger>

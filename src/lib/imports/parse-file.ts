@@ -1,4 +1,6 @@
 import Papa from "papaparse";
+import { INTL_LOCALE, type Locale } from "@/i18n/config";
+import { importRows } from "@/i18n/messages/imports-rows";
 import { normalizeHeader } from "./mapping";
 import { IMPORT_KINDS, IMPORT_LIMITS, type ImportKind } from "./schema";
 
@@ -35,32 +37,33 @@ export function detectHeaderRow(data: string[][], kind: ImportKind): number {
 }
 
 /** Unique, non-empty column names: blanks become "Column 3", repeats get a suffix. */
-export function uniqueHeaders(raw: string[]): string[] {
+export function uniqueHeaders(raw: string[], locale: Locale = "en"): string[] {
   const seen = new Map<string, number>();
   return raw.map((cell, i) => {
-    const base = cell.replace(/^﻿/, "").trim() || `Column ${i + 1}`;
+    const base = cell.replace(/^﻿/, "").trim() || importRows[locale].file.column(i + 1);
     const count = (seen.get(base) ?? 0) + 1;
     seen.set(base, count);
     return count === 1 ? base : `${base} (${count})`;
   });
 }
 
-export function parseCsvText(text: string, kind: ImportKind, maxRows: number): ParseResult {
+export function parseCsvText(text: string, kind: ImportKind, maxRows: number, locale: Locale = "en"): ParseResult {
+  const t = importRows[locale].file;
   const clean = text.replace(/^﻿/, "");
   if (/\u0000/.test(clean.slice(0, 10_000))) {
-    return { ok: false, message: "This does not look like a CSV file. Export your data as CSV (comma-separated values) and try again." };
+    return { ok: false, message: t.notCsv };
   }
   const parsed = Papa.parse<string[]>(clean, { skipEmptyLines: false });
   const quoteError = parsed.errors.find((e) => e.type === "Quotes");
   if (quoteError) {
-    return { ok: false, message: `The file has an unclosed quotation mark near row ${(quoteError.row ?? 0) + 1}. Check the file and export it again.` };
+    return { ok: false, message: t.unclosedQuote((quoteError.row ?? 0) + 1) };
   }
   const data = parsed.data;
   const headerIndex = detectHeaderRow(data, kind);
   const headerCells = data[headerIndex] ?? [];
-  if (headerCells.filter((c) => c.trim()).length === 0) return { ok: false, message: "The file is empty." };
+  if (headerCells.filter((c) => c.trim()).length === 0) return { ok: false, message: t.empty };
   if (headerCells.length > IMPORT_LIMITS.maxColumns) {
-    return { ok: false, message: `The file has ${headerCells.length} columns; at most ${IMPORT_LIMITS.maxColumns} are supported.` };
+    return { ok: false, message: t.tooManyColumns(headerCells.length, IMPORT_LIMITS.maxColumns) };
   }
   const rows: ParsedCsv["rows"] = [];
   for (let i = headerIndex + 1; i < data.length; i++) {
@@ -68,17 +71,15 @@ export function parseCsvText(text: string, kind: ImportKind, maxRows: number): P
     if (!cells.some((c) => c.trim() !== "")) continue;
     rows.push({ rowNumber: i + 1, cells });
   }
-  if (rows.length === 0) return { ok: false, message: "The file has column names but no data rows." };
+  if (rows.length === 0) return { ok: false, message: t.noDataRows };
   if (rows.length > maxRows) {
-    return {
-      ok: false,
-      message: `This file has ${rows.length.toLocaleString("en-GB")} rows; your plan allows ${maxRows.toLocaleString("en-GB")} per import. Split the file into smaller files, or upgrade for larger imports.`,
-    };
+    const intl = INTL_LOCALE[locale];
+    return { ok: false, message: t.tooManyRows(rows.length.toLocaleString(intl), maxRows.toLocaleString(intl)) };
   }
   return {
     ok: true,
     csv: {
-      headers: uniqueHeaders(headerCells),
+      headers: uniqueHeaders(headerCells, locale),
       rows,
       delimiter: parsed.meta.delimiter,
       encoding: "utf-8",
@@ -88,10 +89,11 @@ export function parseCsvText(text: string, kind: ImportKind, maxRows: number): P
 }
 
 /** Decodes as UTF-8, falling back to Windows-1252 (common for files saved by Excel). */
-export async function readCsvFile(file: File, kind: ImportKind, maxRows: number): Promise<ParseResult> {
-  if (file.size === 0) return { ok: false, message: "The file is empty." };
+export async function readCsvFile(file: File, kind: ImportKind, maxRows: number, locale: Locale = "en"): Promise<ParseResult> {
+  const t = importRows[locale].file;
+  if (file.size === 0) return { ok: false, message: t.empty };
   if (file.size > IMPORT_LIMITS.maxFileBytes) {
-    return { ok: false, message: `The file is larger than ${IMPORT_LIMITS.maxFileBytes / 1024 / 1024} MB. Split it into smaller files.` };
+    return { ok: false, message: t.tooLarge(IMPORT_LIMITS.maxFileBytes / 1024 / 1024) };
   }
   const buffer = await file.arrayBuffer();
   let text = new TextDecoder("utf-8").decode(buffer);
@@ -100,6 +102,6 @@ export async function readCsvFile(file: File, kind: ImportKind, maxRows: number)
     text = new TextDecoder("windows-1252").decode(buffer);
     encoding = "windows-1252";
   }
-  const result = parseCsvText(text, kind, maxRows);
+  const result = parseCsvText(text, kind, maxRows, locale);
   return result.ok ? { ok: true, csv: { ...result.csv, encoding } } : result;
 }

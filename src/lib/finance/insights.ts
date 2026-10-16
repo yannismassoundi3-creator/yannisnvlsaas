@@ -1,8 +1,9 @@
 import type { Route } from "next";
+import type { Locale } from "@/i18n/config";
+import { createFormat } from "@/i18n/format";
+import { insightMessages } from "@/i18n/messages/dashboard-insights";
 import type { CampaignRow, ProductRow } from "@/lib/analytics/reference";
-import { formatMultiple, formatPercent, formatPoints } from "./format";
 import type { Metrics } from "./metrics";
-import { formatMoney } from "./money";
 
 /**
  * Deterministic, rule-based insights. Every insight is derived from figures
@@ -29,6 +30,8 @@ export type InsightInput = {
   campaigns?: CampaignRow[];
   /** Store fee rule, used to explain estimates. */
   feeRule?: { basisPoints: number | null; fixedMinor: number | null };
+  /** Language of titles, bodies, evidence and action labels. Defaults to English. */
+  locale?: Locale;
 };
 
 /** Thresholds are deliberately conservative to avoid noise on small stores. */
@@ -52,7 +55,13 @@ function relativeChange(current: number, previous: number): number | null {
 
 export function buildInsights(input: InsightInput): Insight[] {
   const { currency, current, previous } = input;
-  const money = (v: number) => formatMoney(v, currency, { wholeUnits: Math.abs(v) >= 100_000 });
+  const locale = input.locale ?? "en";
+  const f = createFormat(locale);
+  const t = insightMessages[locale];
+  const formatPercent = f.percent;
+  const formatMultiple = f.multiple;
+  const formatPoints = f.points;
+  const money = (v: number) => f.money(v, currency, { wholeUnits: Math.abs(v) >= 100_000 });
   const insights: Insight[] = [];
   const T = INSIGHT_THRESHOLDS;
 
@@ -61,11 +70,11 @@ export function buildInsights(input: InsightInput): Insight[] {
     insights.push({
       id: "negative_contribution",
       severity: "attention",
-      title: "Contribution margin is negative for this period",
-      body: `After product costs and variable costs, the period shows ${money(current.contributionMargin)}. Variable costs exceeded what sales left after product costs.`,
+      title: t.negativeContribution.title,
+      body: t.negativeContribution.body(money(current.contributionMargin)),
       evidence: [
-        { label: "Net revenue", value: money(current.netRevenue) },
-        { label: "Product and variable costs", value: money(current.cogs + current.variableCosts) },
+        { label: t.negativeContribution.netRevenue, value: money(current.netRevenue) },
+        { label: t.negativeContribution.costs, value: money(current.cogs + current.variableCosts) },
       ],
     });
   }
@@ -81,13 +90,13 @@ export function buildInsights(input: InsightInput): Insight[] {
     insights.push({
       id: "missing_costs",
       severity: share >= T.missingCostAttentionShare ? "attention" : "info",
-      title: `Cost data is missing for ${formatPercent(share, { digits: 0 })} of product sales`,
-      body: `Contribution margin is overstated until these costs are added${missingProducts.length ? `: ${missingProducts.join(", ")}` : ""}.`,
+      title: t.missingCosts.title(formatPercent(share, { digits: 0 })),
+      body: t.missingCosts.body(t.joinNames(missingProducts)),
       evidence: [
-        { label: "Sales without a unit cost", value: money(current.salesWithoutCost) },
-        { label: "Order lines without a unit cost", value: String(current.linesWithoutCost) },
+        { label: t.missingCosts.salesWithoutCost, value: money(current.salesWithoutCost) },
+        { label: t.missingCosts.linesWithoutCost, value: String(current.linesWithoutCost) },
       ],
-      action: { label: "Add product costs", href: "/app/products?filter=missing-cost" },
+      action: { label: t.missingCosts.action, href: "/app/products?filter=missing-cost" },
     });
   }
 
@@ -106,14 +115,14 @@ export function buildInsights(input: InsightInput): Insight[] {
       insights.push({
         id: "ad_spend_outpacing_revenue",
         severity: "attention",
-        title: "Advertising spend grew faster than net revenue",
-        body: `Ad spend changed by ${formatPercent(adGrowth, { signDisplay: "exceptZero" })} while net revenue changed by ${formatPercent(revenueGrowth, { signDisplay: "exceptZero" })} compared with the previous period. This does not show whether the extra spend drove sales; review campaign results before adjusting budgets.`,
+        title: t.adSpendOutpacing.title,
+        body: t.adSpendOutpacing.body(formatPercent(adGrowth, { signDisplay: "exceptZero" }), formatPercent(revenueGrowth, { signDisplay: "exceptZero" })),
         evidence: [
-          { label: "Ad spend", value: `${money(previous.adSpend)} → ${money(current.adSpend)}` },
-          { label: "Net revenue", value: `${money(previous.netRevenue)} → ${money(current.netRevenue)}` },
-          { label: "Ad spend share of revenue", value: formatPercent(current.adSpendRate) },
+          { label: t.adSpendOutpacing.adSpend, value: `${money(previous.adSpend)} → ${money(current.adSpend)}` },
+          { label: t.adSpendOutpacing.netRevenue, value: `${money(previous.netRevenue)} → ${money(current.netRevenue)}` },
+          { label: t.adSpendOutpacing.share, value: formatPercent(current.adSpendRate) },
         ],
-        action: { label: "Review advertising", href: "/app/advertising" },
+        action: { label: t.adSpendOutpacing.action, href: "/app/advertising" },
       });
     }
 
@@ -127,13 +136,13 @@ export function buildInsights(input: InsightInput): Insight[] {
       insights.push({
         id: "refund_rate_up",
         severity: "attention",
-        title: "Refund rate increased",
-        body: `Refunds were ${formatPercent(current.refundRate)} of gross sales, up from ${formatPercent(previous.refundRate)}. Refunds reduce net sales; product costs of returned items are not reversed automatically.`,
+        title: t.refundRateUp.title,
+        body: t.refundRateUp.body(formatPercent(current.refundRate), formatPercent(previous.refundRate)),
         evidence: [
-          { label: "Refunds", value: `${money(previous.refunds)} → ${money(current.refunds)}` },
-          { label: "Change", value: formatPoints(current.refundRate - previous.refundRate) },
+          { label: t.refundRateUp.refunds, value: `${money(previous.refunds)} → ${money(current.refunds)}` },
+          { label: t.refundRateUp.change, value: formatPoints(current.refundRate - previous.refundRate) },
         ],
-        action: { label: "View refunds", href: "/app/transactions?tab=refunds" },
+        action: { label: t.refundRateUp.action, href: "/app/transactions?tab=refunds" },
       });
     }
 
@@ -146,9 +155,9 @@ export function buildInsights(input: InsightInput): Insight[] {
       insights.push({
         id: "discount_rate_up",
         severity: "info",
-        title: "Discounts take a larger share of sales",
-        body: `Discounts were ${formatPercent(current.discountRate)} of gross sales, up from ${formatPercent(previous.discountRate)}.`,
-        evidence: [{ label: "Discounts", value: `${money(previous.discounts)} → ${money(current.discounts)}` }],
+        title: t.discountRateUp.title,
+        body: t.discountRateUp.body(formatPercent(current.discountRate), formatPercent(previous.discountRate)),
+        evidence: [{ label: t.discountRateUp.discounts, value: `${money(previous.discounts)} → ${money(current.discounts)}` }],
       });
     }
 
@@ -170,23 +179,21 @@ export function buildInsights(input: InsightInput): Insight[] {
         .slice(0, 2);
       for (const { p, prev } of drops) {
         const reasons: string[] = [];
-        if (p.adSpend > prev!.adSpend) reasons.push("linked advertising spend rose");
+        if (p.adSpend > prev!.adSpend) reasons.push(t.productMarginDown.reasonAds);
         const discountShare = (r: ProductRow) => (r.grossSales > 0 ? r.discounts / r.grossSales : 0);
-        if (discountShare(p) > discountShare(prev!) + 0.01) reasons.push("discounts took a larger share");
+        if (discountShare(p) > discountShare(prev!) + 0.01) reasons.push(t.productMarginDown.reasonDiscounts);
         const refundShare = (r: ProductRow) => (r.grossSales > 0 ? r.refunds / r.grossSales : 0);
-        if (refundShare(p) > refundShare(prev!) + 0.01) reasons.push("refunds took a larger share");
+        if (refundShare(p) > refundShare(prev!) + 0.01) reasons.push(t.productMarginDown.reasonRefunds);
         insights.push({
           id: `product_margin_down:${p.productId}`,
           severity: "attention",
-          title: `${p.name}: contribution margin fell from ${formatPercent(prev!.contributionMarginRate)} to ${formatPercent(p.contributionMarginRate)}`,
-          body: reasons.length
-            ? `In the same period, ${reasons.join(" and ")}. These changes coincide with the lower margin; they are not proven causes.`
-            : "Compare its costs, prices and discounts with the previous period to understand the change.",
+          title: t.productMarginDown.title(p.name, formatPercent(prev!.contributionMarginRate), formatPercent(p.contributionMarginRate)),
+          body: reasons.length ? t.productMarginDown.bodyWithReasons(t.joinAnd(reasons)) : t.productMarginDown.bodyNoReasons,
           evidence: [
-            { label: "Net revenue", value: `${money(prev!.netRevenue)} → ${money(p.netRevenue)}` },
-            { label: "Contribution margin", value: `${money(prev!.contributionMargin!)} → ${money(p.contributionMargin!)}` },
+            { label: t.productMarginDown.netRevenue, value: `${money(prev!.netRevenue)} → ${money(p.netRevenue)}` },
+            { label: t.productMarginDown.contributionMargin, value: `${money(prev!.contributionMargin!)} → ${money(p.contributionMargin!)}` },
           ],
-          action: { label: "Open product", href: `/app/products/${p.productId}` as Route },
+          action: { label: t.productMarginDown.action, href: `/app/products/${p.productId}` as Route },
         });
       }
     }
@@ -202,16 +209,13 @@ export function buildInsights(input: InsightInput): Insight[] {
       insights.push({
         id: "campaigns_below_break_even",
         severity: "attention",
-        title:
-          below.length === 1
-            ? `“${below[0].name}” reports ROAS below your break-even point`
-            : `${below.length} campaigns report ROAS below your break-even point`,
-        body: `Your break-even ROAS is ${formatMultiple(current.breakEvenRoas)}: below it, advertising costs more than the margin left after product and variable costs. Platform ROAS uses each platform's own attribution and can over- or under-count sales.`,
+        title: below.length === 1 ? t.campaignsBelowBreakEven.titleOne(below[0].name) : t.campaignsBelowBreakEven.titleMany(below.length),
+        body: t.campaignsBelowBreakEven.body(formatMultiple(current.breakEvenRoas)),
         evidence: [
-          ...below.slice(0, 3).map((c) => ({ label: c.name, value: `${formatMultiple(c.platformRoas)} on ${money(c.spend)}` })),
-          { label: "Spend in these campaigns", value: money(spend) },
+          ...below.slice(0, 3).map((c) => ({ label: c.name, value: t.campaignsBelowBreakEven.campaignValue(formatMultiple(c.platformRoas), money(c.spend)) })),
+          { label: t.campaignsBelowBreakEven.spend, value: money(spend) },
         ],
-        action: { label: "Review campaigns", href: "/app/advertising" },
+        action: { label: t.campaignsBelowBreakEven.action, href: "/app/advertising" },
       });
     }
   }
@@ -225,21 +229,21 @@ export function buildInsights(input: InsightInput): Insight[] {
       const rule = input.feeRule;
       const ruleText =
         rule && (rule.basisPoints !== null || rule.fixedMinor !== null)
-          ? ` (${formatPercent((rule.basisPoints ?? 0) / 10_000, { digits: 2 })}${rule.fixedMinor ? ` + ${formatMoney(rule.fixedMinor, currency)}` : ""} per order)`
+          ? t.estimatedValues.ruleText(formatPercent((rule.basisPoints ?? 0) / 10_000, { digits: 2 }), rule.fixedMinor ? f.money(rule.fixedMinor, currency) : null)
           : "";
-      parts.push(`payment fees${ruleText}`);
+      parts.push(t.estimatedValues.fees(ruleText));
     }
-    if (estimatedShipping) parts.push("shipping costs for orders without a recorded cost");
+    if (estimatedShipping) parts.push(t.estimatedValues.shipping);
     insights.push({
       id: "estimated_values",
       severity: "info",
-      title: "Some costs are estimates",
-      body: `Narixia estimated ${parts.join(" and ")} from your store settings. Import actual amounts to replace the estimates.`,
+      title: t.estimatedValues.title,
+      body: t.estimatedValues.body(t.joinAnd(parts)),
       evidence: [
-        ...(estimatedFees ? [{ label: "Estimated payment fees", value: money(current.transactionFeesEstimated) }] : []),
-        ...(estimatedShipping ? [{ label: "Estimated shipping costs", value: money(current.shippingCostsEstimated) }] : []),
+        ...(estimatedFees ? [{ label: t.estimatedValues.estimatedFees, value: money(current.transactionFeesEstimated) }] : []),
+        ...(estimatedShipping ? [{ label: t.estimatedValues.estimatedShipping, value: money(current.shippingCostsEstimated) }] : []),
       ],
-      action: { label: "Review cost settings", href: "/app/settings?section=costs" },
+      action: { label: t.estimatedValues.action, href: "/app/settings?section=costs" },
     });
   }
 

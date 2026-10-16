@@ -12,21 +12,24 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export type NavItem = { label: string; href: Route; icon: LucideIcon; exact?: boolean };
+/** Key of the item's label in the shell-layout messages (`nav.<key>`). */
+export type NavKey = "overview" | "products" | "advertising" | "transactions" | "imports" | "reports" | "calculator" | "settings" | "billing";
+
+export type NavItem = { key: NavKey; href: Route; icon: LucideIcon; exact?: boolean };
 
 export const PRIMARY_NAV: NavItem[] = [
-  { label: "Overview", href: "/app", icon: LayoutDashboard, exact: true },
-  { label: "Products", href: "/app/products", icon: Package },
-  { label: "Advertising", href: "/app/advertising", icon: Megaphone },
-  { label: "Transactions & costs", href: "/app/transactions", icon: Receipt },
-  { label: "Imports", href: "/app/imports", icon: Upload },
-  { label: "Reports", href: "/app/reports", icon: FileText },
-  { label: "Calculator", href: "/app/calculator", icon: Calculator },
+  { key: "overview", href: "/app", icon: LayoutDashboard, exact: true },
+  { key: "products", href: "/app/products", icon: Package },
+  { key: "advertising", href: "/app/advertising", icon: Megaphone },
+  { key: "transactions", href: "/app/transactions", icon: Receipt },
+  { key: "imports", href: "/app/imports", icon: Upload },
+  { key: "reports", href: "/app/reports", icon: FileText },
+  { key: "calculator", href: "/app/calculator", icon: Calculator },
 ];
 
 export const SECONDARY_NAV: NavItem[] = [
-  { label: "Settings", href: "/app/settings", icon: Settings },
-  { label: "Billing", href: "/app/billing", icon: CreditCard },
+  { key: "settings", href: "/app/settings", icon: Settings },
+  { key: "billing", href: "/app/billing", icon: CreditCard },
 ];
 
 export function isActive(pathname: string, item: NavItem) {

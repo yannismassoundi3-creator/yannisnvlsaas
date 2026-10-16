@@ -1,14 +1,18 @@
+import type { Locale } from "@/i18n/config";
+import { authValidationMessages } from "@/i18n/messages/auth-validation";
+
 /**
  * Password policy. Must match supabase/config.toml (minimum_password_length,
  * password_requirements) and the hosted project's Auth settings.
  */
 export const PASSWORD_MIN_LENGTH = 10;
 
-export function passwordChecks(password: string) {
+export function passwordChecks(password: string, locale: Locale = "en") {
+  const t = authValidationMessages[locale].rules;
   return [
-    { id: "length", label: `At least ${PASSWORD_MIN_LENGTH} characters`, ok: password.length >= PASSWORD_MIN_LENGTH },
-    { id: "letter", label: "At least one letter", ok: /\p{L}/u.test(password) },
-    { id: "digit", label: "At least one number", ok: /\d/.test(password) },
+    { id: "length", label: t.length(PASSWORD_MIN_LENGTH), ok: password.length >= PASSWORD_MIN_LENGTH },
+    { id: "letter", label: t.letter, ok: /\p{L}/u.test(password) },
+    { id: "digit", label: t.digit, ok: /\d/.test(password) },
   ];
 }
 
@@ -21,29 +25,30 @@ export function isEmailValid(email: string) {
 }
 
 /** Maps Supabase Auth error codes to messages that help without revealing account existence. */
-export function authErrorMessage(error: { code?: string; message?: string; status?: number } | null | undefined): string {
+export function authErrorMessage(error: { code?: string; message?: string; status?: number } | null | undefined, locale: Locale = "en"): string {
+  const t = authValidationMessages[locale].errors;
   switch (error?.code) {
     case "invalid_credentials":
-      return "Email or password is incorrect.";
+      return t.invalidCredentials;
     case "email_not_confirmed":
-      return "Please confirm your email address first. Check your inbox for the confirmation link.";
+      return t.emailNotConfirmed;
     case "weak_password":
-      return "Choose a stronger password: at least 10 characters with letters and numbers.";
+      return t.weakPassword;
     case "same_password":
-      return "Your new password must be different from the current one.";
+      return t.samePassword;
     case "over_email_send_rate_limit":
     case "over_request_rate_limit":
-      return "Too many attempts. Please wait a few minutes and try again.";
+      return t.rateLimited;
     case "user_already_exists":
     case "email_exists":
-      return "We could not create an account with this email. Try signing in or resetting your password.";
+      return t.userExists;
     case "otp_expired":
-      return "This link has expired. Request a new one.";
+      return t.otpExpired;
     case "session_not_found":
     case "refresh_token_not_found":
-      return "Your session has ended. Please sign in again.";
+      return t.sessionEnded;
     default:
-      if (error?.status === 429) return "Too many attempts. Please wait a few minutes and try again.";
-      return "Something went wrong. Please try again.";
+      if (error?.status === 429) return t.rateLimited;
+      return t.generic;
   }
 }

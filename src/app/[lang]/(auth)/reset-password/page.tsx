@@ -1,12 +1,18 @@
 import type { Metadata } from "next";
 import { AuthCard } from "@/components/auth/auth-card";
 import { ResetPasswordForm } from "@/components/auth/password-forms";
+import { authPageMessages } from "@/i18n/messages/auth-pages";
+import { getLocale } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Choose a new password", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = authPageMessages[await getLocale()].resetPassword;
+  return { title: t.metaTitle, robots: { index: false } };
+}
 
-export default function ResetPasswordPage() {
+export default async function ResetPasswordPage() {
+  const t = authPageMessages[await getLocale()].resetPassword;
   return (
-    <AuthCard title="Choose a new password" description="You will stay signed in on this device after the change.">
+    <AuthCard title={t.title} description={t.description}>
       <ResetPasswordForm />
     </AuthCard>
   );

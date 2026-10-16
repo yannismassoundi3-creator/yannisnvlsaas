@@ -1,51 +1,54 @@
 import Link from "next/link";
-import type { Route } from "next";
 import { Logo } from "@/components/brand/logo";
-import { site } from "@/config/site";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { site, siteCopy } from "@/config/site";
+import { localizedPath, type Locale } from "@/i18n/config";
+import { marketingCommon } from "@/i18n/messages/marketing-common";
 
-const COLUMNS: { title: string; links: { label: string; href: Route }[] }[] = [
-  {
-    title: "Product",
-    links: [
-      { label: "Features", href: "/#features" as Route },
-      { label: "Pricing", href: "/pricing" },
-      { label: "Margin calculator", href: "/tools/profit-margin-calculator" as Route },
-      { label: "Metric glossary", href: "/glossary" as Route },
-    ],
-  },
-  {
-    title: "Company",
-    links: [
-      { label: "Contact", href: "/contact" as Route },
-      { label: "Legal notice", href: "/legal" as Route },
-    ],
-  },
-  {
-    title: "Legal",
-    links: [
-      { label: "Privacy policy", href: "/privacy" as Route },
-      { label: "Terms of service", href: "/terms" as Route },
-      { label: "Cookies", href: "/privacy#cookies" as Route },
-    ],
-  },
-];
-
-export function SiteFooter() {
+export function SiteFooter({ locale }: { locale: Locale }) {
   const { company } = site;
+  const t = marketingCommon[locale].footer;
+  const columns: { title: string; links: { label: string; href: string }[] }[] = [
+    {
+      title: t.product,
+      links: [
+        { label: t.features, href: "/#features" },
+        { label: t.pricing, href: "/pricing" },
+        { label: t.calculator, href: "/tools/profit-margin-calculator" },
+        { label: t.glossary, href: "/glossary" },
+      ],
+    },
+    {
+      title: t.company,
+      links: [
+        { label: t.contact, href: "/contact" },
+        { label: t.legalNotice, href: "/legal" },
+      ],
+    },
+    {
+      title: t.legal,
+      links: [
+        { label: t.privacy, href: "/privacy" },
+        { label: t.terms, href: "/terms" },
+        { label: t.cookies, href: "/privacy#cookies" },
+      ],
+    },
+  ];
   return (
     <footer className="border-t border-line bg-ivory">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.4fr_repeat(3,1fr)]">
         <div className="space-y-3">
           <Logo />
-          <p className="max-w-xs text-sm text-ink-3">{site.tagline}</p>
+          <p className="max-w-xs text-sm text-ink-3">{siteCopy(locale).tagline}</p>
+          <LanguageSwitcher locale={locale} className="pt-1" />
         </div>
-        {COLUMNS.map((col) => (
+        {columns.map((col) => (
           <nav key={col.title} aria-label={col.title}>
             <h2 className="text-sm font-semibold text-ink">{col.title}</h2>
             <ul className="mt-3 space-y-2">
               {col.links.map((link) => (
                 <li key={link.label}>
-                  <Link href={link.href} className="text-sm text-ink-3 transition-colors hover:text-ink">
+                  <Link href={localizedPath(link.href, locale)} className="text-sm text-ink-3 transition-colors hover:text-ink">
                     {link.label}
                   </Link>
                 </li>
@@ -64,10 +67,10 @@ export function SiteFooter() {
                 {company.registration ? ` · ${company.registration}` : ""}
               </>
             ) : (
-              <>© Narixia. Company details are published in the legal notice.</>
+              <>{t.companyFallback}</>
             )}
           </p>
-          <p>Narixia provides decision support, not accounting, tax or financial advice.</p>
+          <p>{t.disclaimer}</p>
         </div>
       </div>
     </footer>

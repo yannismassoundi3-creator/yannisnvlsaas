@@ -1,14 +1,17 @@
 import { AlertTriangle, Clock, FlaskConical, Lock } from "lucide-react";
 import Link from "next/link";
 import type { ReadyWorkspace, Store } from "@/lib/auth/workspace";
-import { formatDate } from "@/lib/dates";
+import { shellBanners } from "@/i18n/messages/shell-banners";
+import { getFormat, getLocale } from "@/i18n/server";
 import { cn } from "@/lib/utils";
 
 /**
  * Status bar above every application page: trial countdown, payment problems,
  * expired access and the demo-data notice. Always text plus icon, never colour alone.
  */
-export function AccessBanner({ ws }: { ws: ReadyWorkspace & { activeStore: Store | null } }) {
+export async function AccessBanner({ ws }: { ws: ReadyWorkspace & { activeStore: Store | null } }) {
+  const t = shellBanners[await getLocale()];
+  const f = await getFormat();
   const { entitlements: e, activeStore } = ws;
   const realStore = ws.stores.find((s) => !s.is_demo);
   const items: { key: string; tone: "info" | "caution" | "negative" | "demo"; icon: React.ReactNode; text: React.ReactNode; action?: React.ReactNode }[] = [];
@@ -18,13 +21,10 @@ export function AccessBanner({ ws }: { ws: ReadyWorkspace & { activeStore: Store
       key: "trial",
       tone: e.trialDaysLeft <= 3 ? "caution" : "info",
       icon: <Clock aria-hidden />,
-      text:
-        e.trialDaysLeft === 0
-          ? "Your free trial ends today."
-          : `Free trial: ${e.trialDaysLeft} ${e.trialDaysLeft === 1 ? "day" : "days"} left${e.trialEndsAt ? `, until ${formatDate(e.trialEndsAt.slice(0, 10))}` : ""}.`,
+      text: e.trialDaysLeft === 0 ? t.trialEndsToday : t.trialDaysLeft(e.trialDaysLeft, e.trialEndsAt ? f.date(e.trialEndsAt.slice(0, 10)) : null),
       action: (
         <Link href="/app/billing" className="font-medium underline-offset-2 hover:underline">
-          Choose a plan
+          {t.choosePlan}
         </Link>
       ),
     });
@@ -34,10 +34,10 @@ export function AccessBanner({ ws }: { ws: ReadyWorkspace & { activeStore: Store
       key: "grace",
       tone: "caution",
       icon: <AlertTriangle aria-hidden />,
-      text: `Your last payment failed. Update your payment method${e.graceEndsAt ? ` before ${formatDate(e.graceEndsAt.slice(0, 10))}` : ""} to keep full access.`,
+      text: t.paymentFailed(e.graceEndsAt ? f.date(e.graceEndsAt.slice(0, 10)) : null),
       action: (
         <Link href="/app/billing" className="font-medium underline-offset-2 hover:underline">
-          Update payment
+          {t.updatePayment}
         </Link>
       ),
     });
@@ -47,10 +47,10 @@ export function AccessBanner({ ws }: { ws: ReadyWorkspace & { activeStore: Store
       key: "expired",
       tone: "negative",
       icon: <Lock aria-hidden />,
-      text: "Your trial has ended. Your data is safe and can be exported; dashboards and imports are paused.",
+      text: t.trialEnded,
       action: (
         <Link href="/app/billing" className="font-medium underline-offset-2 hover:underline">
-          Subscribe to Pro
+          {t.subscribe}
         </Link>
       ),
     });
@@ -60,10 +60,8 @@ export function AccessBanner({ ws }: { ws: ReadyWorkspace & { activeStore: Store
       key: "demo",
       tone: "demo",
       icon: <FlaskConical aria-hidden />,
-      text: "You are viewing the sample store. Every figure here is fictional demo data.",
-      action: realStore ? (
-        <span className="text-xs">Switch to {realStore.name} from the store menu.</span>
-      ) : null,
+      text: t.demoNotice,
+      action: realStore ? <span className="text-xs">{t.switchToReal(realStore.name)}</span> : null,
     });
   }
 

@@ -1,0 +1,75 @@
+import { defineMessages } from "@/i18n/messages";
+
+/** Application shell: layout, navigation, error and not-found pages. */
+export const shellLayout = defineMessages({
+  en: {
+    metaTitle: "Dashboard",
+    skipToContent: "Skip to content",
+    homeLabel: "Narixia, overview",
+    nav: {
+      label: "Application",
+      overview: "Overview",
+      products: "Products",
+      advertising: "Advertising",
+      transactions: "Transactions & costs",
+      imports: "Imports",
+      reports: "Reports",
+      calculator: "Calculator",
+      settings: "Settings",
+      billing: "Billing",
+    },
+    mobile: {
+      open: "Open navigation",
+      close: "Close navigation",
+      title: "Navigation",
+      description: "Application sections",
+    },
+    error: {
+      title: "This page could not be loaded",
+      body: "Something went wrong on our side. Your data has not been changed. Try again, or go back to the overview.",
+      reference: (digest: string) => `Reference: ${digest}`,
+      retry: "Try again",
+      overview: "Go to overview",
+    },
+    notFound: {
+      title: "Not found",
+      body: "This record does not exist in the selected store. It may have been deleted, or it belongs to another store: switch stores from the sidebar.",
+      overview: "Go to overview",
+    },
+  },
+  fr: {
+    metaTitle: "Tableau de bord",
+    skipToContent: "Aller au contenu",
+    homeLabel: "Narixia, vue d'ensemble",
+    nav: {
+      label: "Application",
+      overview: "Vue d'ensemble",
+      products: "Produits",
+      advertising: "Publicité",
+      transactions: "Transactions et coûts",
+      imports: "Imports",
+      reports: "Rapports",
+      calculator: "Calculateur",
+      settings: "Paramètres",
+      billing: "Facturation",
+    },
+    mobile: {
+      open: "Ouvrir la navigation",
+      close: "Fermer la navigation",
+      title: "Navigation",
+      description: "Sections de l'application",
+    },
+    error: {
+      title: "Impossible de charger cette page",
+      body: "Une erreur s'est produite de notre côté. Vos données n'ont pas été modifiées. Réessayez ou revenez à la vue d'ensemble.",
+      reference: (digest: string) => `Référence : ${digest}`,
+      retry: "Réessayer",
+      overview: "Aller à la vue d'ensemble",
+    },
+    notFound: {
+      title: "Introuvable",
+      body: "Cet élément n'existe pas dans la boutique sélectionnée. Il a peut-être été supprimé, ou il appartient à une autre boutique : changez de boutique depuis la barre latérale.",
+      overview: "Aller à la vue d'ensemble",
+    },
+  },
+});

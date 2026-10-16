@@ -1,3 +1,4 @@
+import { INTL_LOCALE, type Locale } from "@/i18n/config";
 import { addDays, formatShortDate, rangeLength, weekStart } from "@/lib/dates";
 import type { DateRange } from "@/lib/domain/types";
 import { deriveMetrics, EMPTY_TOTALS, type PeriodTotals } from "@/lib/finance/metrics";
@@ -31,7 +32,25 @@ export function granularityFor(range: DateRange): Granularity {
   return "month";
 }
 
-const monthFormatter = new Intl.DateTimeFormat("en-GB", { month: "short", year: "2-digit", timeZone: "UTC" });
+const monthFormatters = new Map<Locale, Intl.DateTimeFormat>();
+
+/** "Mar 26" (English) or "mars 26" (French). */
+function formatMonth(key: string, locale: Locale): string {
+  let formatter = monthFormatters.get(locale);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(INTL_LOCALE[locale], { month: "short", year: "2-digit", timeZone: "UTC" });
+    monthFormatters.set(locale, formatter);
+  }
+  return formatter.format(new Date(`${key.slice(0, 7)}-01T00:00:00Z`));
+}
+
+/** Axis label of a bucket: its day, the first day of its week, or its month. */
+export function bucketLabel(point: Pick<SeriesPoint, "key" | "from">, granularity: Granularity, locale: Locale = "en"): string {
+  const intl = INTL_LOCALE[locale];
+  if (granularity === "day") return formatShortDate(point.key, intl);
+  if (granularity === "week") return formatShortDate(point.from, intl);
+  return formatMonth(point.key, locale);
+}
 
 function bucketKey(date: string, granularity: Granularity): string {
   if (granularity === "day") return date;
@@ -43,7 +62,7 @@ function bucketKey(date: string, granularity: Granularity): string {
  * Groups daily totals into chart buckets. Partial buckets at the edges of the
  * range are clipped to the range so values are never borrowed from outside it.
  */
-export function buildTimeSeries(daily: Map<string, PeriodTotals> | [string, PeriodTotals][], range: DateRange): TimeSeries {
+export function buildTimeSeries(daily: Map<string, PeriodTotals> | [string, PeriodTotals][], range: DateRange, locale: Locale = "en"): TimeSeries {
   const granularity = granularityFor(range);
   const buckets = new Map<string, { from: string; to: string; totals: PeriodTotals }>();
   const entries = daily instanceof Map ? [...daily.entries()] : daily;
@@ -64,12 +83,7 @@ export function buildTimeSeries(daily: Map<string, PeriodTotals> | [string, Peri
 
   const points: SeriesPoint[] = [...buckets.entries()].map(([key, b]) => {
     const m = deriveMetrics(b.totals);
-    const label =
-      granularity === "day"
-        ? formatShortDate(key)
-        : granularity === "week"
-          ? `${formatShortDate(b.from)}`
-          : monthFormatter.format(new Date(`${key}T00:00:00Z`));
+    const label = bucketLabel({ key, from: b.from }, granularity, locale);
     return {
       key,
       from: b.from,
@@ -88,9 +102,10 @@ export function buildTimeSeries(daily: Map<string, PeriodTotals> | [string, Peri
 }
 
 /** Human description of a bucket for tooltips and tables. */
-export function bucketDescription(point: Pick<SeriesPoint, "from" | "to">, granularity: Granularity): string {
-  if (granularity === "day") return formatShortDate(point.from);
-  return point.from === point.to ? formatShortDate(point.from) : `${formatShortDate(point.from)} – ${formatShortDate(point.to)}`;
+export function bucketDescription(point: Pick<SeriesPoint, "from" | "to">, granularity: Granularity, locale: Locale = "en"): string {
+  const intl = INTL_LOCALE[locale];
+  if (granularity === "day") return formatShortDate(point.from, intl);
+  return point.from === point.to ? formatShortDate(point.from, intl) : `${formatShortDate(point.from, intl)} – ${formatShortDate(point.to, intl)}`;
 }
 
 export function endOfBucket(start: string, granularity: Granularity): string {
@@ -106,7 +121,12 @@ export type BucketPoint<K extends string> = { key: string; from: string; to: str
  * Generic version of buildTimeSeries for plain daily values (product sales,
  * ad spend by platform): sums each key per bucket, clipped to the range.
  */
-export function bucketDailyValues<K extends string>(daily: { day: string; values: Partial<Record<K, number>> }[], keys: readonly K[], range: DateRange): { granularity: Granularity; points: BucketPoint<K>[] } {
+export function bucketDailyValues<K extends string>(
+  daily: { day: string; values: Partial<Record<K, number>> }[],
+  keys: readonly K[],
+  range: DateRange,
+  locale: Locale = "en",
+): { granularity: Granularity; points: BucketPoint<K>[] } {
   const granularity = granularityFor(range);
   const buckets = new Map<string, BucketPoint<K>>();
   // Every bucket in the range exists, even without data, so gaps show as zero.
@@ -116,7 +136,7 @@ export function bucketDailyValues<K extends string>(daily: { day: string; values
       const end = endOfBucket(key, granularity);
       const from = key < range.from ? range.from : key;
       const to = end > range.to ? range.to : end;
-      const label = granularity === "day" ? formatShortDate(key) : granularity === "week" ? formatShortDate(from) : monthFormatter.format(new Date(`${key}T00:00:00Z`));
+      const label = bucketLabel({ key, from }, granularity, locale);
       buckets.set(key, { key, from, to, label, partial: from !== key || to !== end, values: Object.fromEntries(keys.map((k) => [k, 0])) as Record<K, number> });
     }
   }

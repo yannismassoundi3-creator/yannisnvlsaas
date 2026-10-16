@@ -5,6 +5,8 @@ import { refresh } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { onboardingMessages } from "@/i18n/messages/auth-onboarding";
+import { getRequestLocale } from "@/i18n/request";
 import { track, trackFirst } from "@/lib/analytics/track";
 import { audit } from "@/lib/audit";
 import { ACTIVE_STORE_COOKIE, getWorkspace, requireUser, requireWorkspace } from "@/lib/auth/workspace";
@@ -19,26 +21,34 @@ import { PLATFORMS } from "./constants";
 
 export type ActionResult = { ok: true } | { ok: false; message: string; fieldErrors?: Record<string, string> };
 
-const workspaceSchema = z.object({
-  storeName: z.string().trim().min(1, "Enter your store's name.").max(120, "Use 120 characters or fewer."),
-  organizationName: z.string().trim().max(120, "Use 120 characters or fewer.").optional().default(""),
-  platform: z.enum(PLATFORMS, { message: "Choose a platform." }),
-  currency: z.string().refine(isValidCurrency, "Choose a valid currency."),
-  timezone: z.string().refine(isValidTimezone, "Choose a valid time zone."),
-  pricesIncludeTax: z.enum(["yes", "no"], { message: "Tell us whether your prices include tax." }),
-});
+type Messages = (typeof onboardingMessages)["en"];
 
-export async function createWorkspace(input: z.input<typeof workspaceSchema>): Promise<ActionResult> {
+function workspaceSchema(v: Messages["validation"]) {
+  return z.object({
+    storeName: z.string().trim().min(1, v.storeName).max(120, v.tooLong),
+    organizationName: z.string().trim().max(120, v.tooLong).optional().default(""),
+    platform: z.enum(PLATFORMS, { message: v.platform }),
+    currency: z.string().refine(isValidCurrency, v.currency),
+    timezone: z.string().refine(isValidTimezone, v.timezone),
+    pricesIncludeTax: z.enum(["yes", "no"], { message: v.pricesIncludeTax }),
+  });
+}
+
+export type WorkspaceInput = z.input<ReturnType<typeof workspaceSchema>>;
+
+export async function createWorkspace(input: WorkspaceInput): Promise<ActionResult> {
   const user = await requireUser();
-  const parsed = workspaceSchema.safeParse(input);
+  const m = onboardingMessages[await getRequestLocale()];
+  const t = m.actions;
+  const parsed = workspaceSchema(m.validation).safeParse(input);
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
     for (const issue of parsed.error.issues) fieldErrors[String(issue.path[0])] ??= issue.message;
-    return { ok: false, message: "Please check the highlighted fields.", fieldErrors };
+    return { ok: false, message: t.checkFields, fieldErrors };
   }
   const v = parsed.data;
   if (!(await consumeRateLimit(`onboarding:${user.id}`, 10, 3600))) {
-    return { ok: false, message: "Too many attempts. Please wait a few minutes." };
+    return { ok: false, message: t.rateLimited };
   }
 
   const supabase = await createClient();
@@ -54,8 +64,8 @@ export async function createWorkspace(input: z.input<typeof workspaceSchema>): P
 
   if (error) {
     if (error.code === "23505") return { ok: true }; // already created (double submit): continue
-    if (error.message?.includes("time zone")) return { ok: false, message: "This time zone is not supported.", fieldErrors: { timezone: "This time zone is not supported." } };
-    return { ok: false, message: "We could not create your workspace. Please try again." };
+    if (error.message?.includes("time zone")) return { ok: false, message: t.timezoneUnsupported, fieldErrors: { timezone: t.timezoneUnsupported } };
+    return { ok: false, message: t.workspaceFailed };
   }
 
   const created = Array.isArray(data) ? data[0] : data;
@@ -69,9 +79,10 @@ export async function createWorkspace(input: z.input<typeof workspaceSchema>): P
 /** Creates (or recreates) the clearly labelled sample store with generated demo data. */
 export async function createDemoStore(): Promise<ActionResult> {
   const ws = await requireWorkspace();
-  if (!ws.entitlements.canWrite) return { ok: false, message: "Your trial has ended. Subscribe to create a sample store." };
+  const t = onboardingMessages[await getRequestLocale()].actions;
+  if (!ws.entitlements.canWrite) return { ok: false, message: t.trialEnded };
   if (!(await consumeRateLimit(`demo:${ws.user.id}`, 5, 3600))) {
-    return { ok: false, message: "Too many sample stores created recently. Please try again later." };
+    return { ok: false, message: t.sampleRateLimited };
   }
 
   const timezone = ws.stores.find((s) => !s.is_demo)?.timezone ?? "Europe/Paris";
@@ -86,7 +97,7 @@ export async function createDemoStore(): Promise<ActionResult> {
     .from("stores")
     .insert({
       organization_id: ws.organization.id,
-      name: "Sample store",
+      name: t.sampleStoreName,
       platform: "other",
       currency: dataset.settings.currency,
       minor_digits: currencyDigits(dataset.settings.currency),
@@ -99,7 +110,7 @@ export async function createDemoStore(): Promise<ActionResult> {
     })
     .select("id")
     .single();
-  if (error || !store) return { ok: false, message: "We could not create the sample store. Please try again." };
+  if (error || !store) return { ok: false, message: t.sampleFailed };
 
   try {
     // Records are written with the user's own session, so RLS checks every row.
@@ -107,7 +118,7 @@ export async function createDemoStore(): Promise<ActionResult> {
   } catch (insertError) {
     console.error("[demo-store] insert failed:", insertError instanceof Error ? insertError.message : "unknown error");
     await admin.from("stores").delete().eq("id", store.id);
-    return { ok: false, message: "We could not finish creating the sample store. Please try again." };
+    return { ok: false, message: t.sampleIncomplete };
   }
 
   (await cookies()).set(ACTIVE_STORE_COOKIE, store.id, { path: "/", sameSite: "lax", httpOnly: true, secure: process.env.NODE_ENV === "production", maxAge: 60 * 60 * 24 * 365 });

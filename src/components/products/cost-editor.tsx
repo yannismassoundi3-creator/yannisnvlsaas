@@ -7,8 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toaster";
 import { currencySymbol } from "@/lib/finance/currency";
-import { e4ToInputValue, formatUnitCost } from "@/lib/finance/money";
+import { e4ToInputValue } from "@/lib/finance/money";
 import { updateProductCost } from "@/lib/products/actions";
+import { useFormat, useLocale } from "@/i18n/client";
+import { catalogCommon } from "@/i18n/messages/catalog-common";
+import { productsMessages } from "@/i18n/messages/catalog-products";
 
 type Props = { productId: string; productName: string; unitCostE4: number | null; currency: string; disabled?: boolean };
 
@@ -20,6 +23,10 @@ export function CostEditor({ productId, productName, unitCostE4, currency, disab
   const [pending, startTransition] = useTransition();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const id = useId();
+  const locale = useLocale();
+  const t = productsMessages[locale];
+  const c = catalogCommon[locale];
+  const f = useFormat();
 
   const save = () =>
     startTransition(async () => {
@@ -30,7 +37,7 @@ export function CostEditor({ productId, productName, unitCostE4, currency, disab
       }
       setError(null);
       setEditing(false);
-      toast.success(result.unitCostE4 === null ? `Cost removed for ${productName}.` : `Cost saved for ${productName}.`);
+      toast.success(result.unitCostE4 === null ? t.costRemoved(productName) : t.costSaved(productName));
       requestAnimationFrame(() => triggerRef.current?.focus());
     });
 
@@ -46,8 +53,8 @@ export function CostEditor({ productId, productName, unitCostE4, currency, disab
         }}
         className="group inline-flex items-center gap-1.5 rounded-sm px-1 py-0.5 text-right hover:bg-hover focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:outline-none disabled:pointer-events-none"
       >
-        {unitCostE4 === null ? <Badge tone="caution">No cost</Badge> : <span className="tabular">{formatUnitCost(unitCostE4, currency)}</span>}
-        <span className="sr-only">{unitCostE4 === null ? `: add a unit cost for ${productName}` : `: edit the unit cost of ${productName}`}</span>
+        {unitCostE4 === null ? <Badge tone="caution">{c.noCost}</Badge> : <span className="tabular">{f.unitCost(unitCostE4, currency)}</span>}
+        <span className="sr-only">{unitCostE4 === null ? t.costAddFor(productName) : t.costEditFor(productName)}</span>
         {!disabled ? <Pencil className="size-3 text-ink-4 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden /> : null}
       </button>
     );
@@ -77,10 +84,10 @@ export function CostEditor({ productId, productName, unitCostE4, currency, disab
             }
           }}
           leading={currencySymbol(currency)}
-          aria-label={`Unit cost for ${productName}, excluding VAT`}
+          aria-label={t.costInputLabel(productName)}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? `${id}-error` : undefined}
-          placeholder="0.00"
+          placeholder={t.amountPlaceholder}
         />
         {error ? (
           <p id={`${id}-error`} role="alert" className="mt-1 text-left text-xs text-negative-700">
@@ -88,14 +95,14 @@ export function CostEditor({ productId, productName, unitCostE4, currency, disab
           </p>
         ) : null}
       </div>
-      <Button type="submit" size="icon-sm" variant="secondary" loading={pending} aria-label="Save cost">
+      <Button type="submit" size="icon-sm" variant="secondary" loading={pending} aria-label={t.saveCost}>
         <Check />
       </Button>
       <Button
         type="button"
         size="icon-sm"
         variant="ghost"
-        aria-label="Cancel"
+        aria-label={c.cancel}
         onClick={() => {
           setEditing(false);
           setError(null);

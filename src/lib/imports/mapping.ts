@@ -1,4 +1,6 @@
-import { IMPORT_KINDS, type ImportKind } from "./schema";
+import type { Locale } from "@/i18n/config";
+import { importRows } from "@/i18n/messages/imports-rows";
+import { fieldCopy, IMPORT_KINDS, type ImportKind } from "./schema";
 
 /** Field key -> column index in the file, or null when not mapped. */
 export type ColumnMapping = Record<string, number | null>;
@@ -54,16 +56,18 @@ export function detectSource(headers: string[]): DetectedSource {
   return null;
 }
 
-export const SOURCE_LABELS: Record<Exclude<DetectedSource, null>, string> = {
-  shopify_orders: "Shopify order export",
-  shopify_products: "Shopify product export",
-  meta_ads: "Meta Ads report",
-  google_ads: "Google Ads report",
-  tiktok_ads: "TikTok Ads report",
-};
+export const SOURCE_LABELS: Record<Exclude<DetectedSource, null>, string> = importRows.en.sources;
 
-export function missingRequired(kind: ImportKind, mapping: ColumnMapping): string[] {
-  return IMPORT_KINDS[kind].fields.filter((f) => f.required && (mapping[f.key] === null || mapping[f.key] === undefined)).map((f) => f.label);
+/** Name of a recognised export, e.g. "Shopify order export". */
+export function sourceLabel(source: Exclude<DetectedSource, null>, locale: Locale = "en"): string {
+  return importRows[locale].sources[source];
+}
+
+/** Labels of the required fields that have no column. */
+export function missingRequired(kind: ImportKind, mapping: ColumnMapping, locale: Locale = "en"): string[] {
+  return IMPORT_KINDS[kind].fields
+    .filter((f) => f.required && (mapping[f.key] === null || mapping[f.key] === undefined))
+    .map((f) => fieldCopy(kind, f.key, locale).label);
 }
 
 /** Cells of the mapped columns only: the rest of the file never leaves the browser. */

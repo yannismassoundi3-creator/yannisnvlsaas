@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
+import type { Locale } from "@/i18n/config";
 import { resolveRange, type ResolvedRange } from "@/lib/analytics/range";
 import { compareProductRows, type CampaignRow } from "@/lib/analytics/reference";
 import {
@@ -140,8 +141,11 @@ export type OverviewData = {
   insights: Insight[];
 };
 
-/** Everything the overview needs for one store and period, in one round of parallel queries. */
-export const getOverviewData = cache(async (store: Store, range: DateRange, comparison: DateRange | null): Promise<OverviewData> => {
+/**
+ * Everything the overview needs for one store and period, in one round of
+ * parallel queries. `locale` sets the language of the insight texts.
+ */
+export const getOverviewData = cache(async (store: Store, range: DateRange, comparison: DateRange | null, locale: Locale = "en"): Promise<OverviewData> => {
   const client = await createClient();
   const [daily, previousDaily, products, previousProducts, campaigns] = await Promise.all([
     fetchDailyTotals(client, store.id, range),
@@ -160,12 +164,13 @@ export const getOverviewData = cache(async (store: Store, range: DateRange, comp
     products: { current: products.rows, previous: previousProducts?.rows ?? [] },
     campaigns,
     feeRule: { basisPoints: store.fee_rule_bps, fixedMinor: store.fee_rule_fixed_minor },
+    locale,
   });
 
   return {
     metrics,
     previous,
-    series: buildTimeSeries(daily, range),
+    series: buildTimeSeries(daily, range, locale),
     products: products.rows,
     unallocated: products.unallocated,
     campaigns,

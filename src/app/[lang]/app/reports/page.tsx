@@ -13,9 +13,12 @@ import { PageHeader } from "@/components/ui/page-header";
 import { rangeQuery } from "@/lib/analytics/range";
 import { requireStore } from "@/lib/auth/workspace";
 import { getOverviewData, reportPeriod } from "@/lib/data/reports";
-import { formatRange } from "@/lib/dates";
+import { reportsPage } from "@/i18n/messages/account-reports";
+import { getFormat, getLocale } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Reports" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: reportsPage[await getLocale()].metaTitle };
+}
 
 type Download = { label: string; href: string; format: "PDF" | "CSV" };
 type ReportDef = { id: string; title: string; description: string; downloads: Download[] };
@@ -29,7 +32,8 @@ export default function ReportsPage({ searchParams }: PageProps<"/[lang]/app/rep
 }
 
 async function Reports({ searchParams }: { searchParams: PageProps<"/[lang]/app/reports">["searchParams"] }) {
-  const [ws, sp] = await Promise.all([requireStore(), searchParams]);
+  const [ws, sp, locale, f] = await Promise.all([requireStore(), searchParams, getLocale(), getFormat()]);
+  const t = reportsPage[locale];
   const store = ws.activeStore;
   const period = reportPeriod(store, ws.entitlements, sp);
   const q = rangeQuery(period);
@@ -38,8 +42,8 @@ async function Reports({ searchParams }: { searchParams: PageProps<"/[lang]/app/
   const reports: ReportDef[] = [
     {
       id: "summary",
-      title: "Profitability summary",
-      description: "Key figures with the previous period, the profit breakdown from gross sales to operating estimate, top products and campaigns, observations and data-quality notes.",
+      title: t.summaryTitle,
+      description: t.summaryDescription,
       downloads: [
         { label: "PDF", href: `/api/reports/summary?format=pdf&${q}`, format: "PDF" },
         { label: "CSV", href: `/api/reports/summary?format=csv&${q}`, format: "CSV" },
@@ -47,8 +51,8 @@ async function Reports({ searchParams }: { searchParams: PageProps<"/[lang]/app/
     },
     {
       id: "products",
-      title: "Product profitability",
-      description: "Every product with units, net revenue, cost of goods, allocated shipping and fees, linked advertising and contribution margin.",
+      title: t.productsTitle,
+      description: t.productsDescription,
       downloads: [
         { label: "PDF", href: `/api/reports/products?format=pdf&${q}`, format: "PDF" },
         { label: "CSV", href: `/api/exports/products?${q}`, format: "CSV" },
@@ -56,8 +60,8 @@ async function Reports({ searchParams }: { searchParams: PageProps<"/[lang]/app/
     },
     {
       id: "advertising",
-      title: "Advertising performance",
-      description: "Spend, blended and break-even ROAS, and each campaign's platform-reported results, with campaigns below break-even flagged.",
+      title: t.advertisingTitle,
+      description: t.advertisingDescription,
       downloads: [
         { label: "PDF", href: `/api/reports/advertising?format=pdf&${q}`, format: "PDF" },
         { label: "CSV", href: `/api/exports/campaigns?${q}`, format: "CSV" },
@@ -65,8 +69,8 @@ async function Reports({ searchParams }: { searchParams: PageProps<"/[lang]/app/
     },
     {
       id: "daily",
-      title: "Daily figures",
-      description: "One row per day with orders, sales, refunds, costs and ad spend, ready for a spreadsheet or your accountant.",
+      title: t.dailyTitle,
+      description: t.dailyDescription,
       downloads: [{ label: "CSV", href: `/api/reports/daily?format=csv&${q}`, format: "CSV" }],
     },
   ];
@@ -74,8 +78,8 @@ async function Reports({ searchParams }: { searchParams: PageProps<"/[lang]/app/
   const header = (
     <PageHeader
       eyebrow={store.name}
-      title="Reports"
-      description={`Downloadable reports for ${formatRange(period.range)}. Amounts exclude VAT; text cells in CSV files are protected against spreadsheet formulas.`}
+      title={t.title}
+      description={t.description(f.range(period.range))}
       actions={<DateRangePicker pathname="/app/reports" range={period.range} preset={period.preset} today={period.today} historyStart={period.historyStart} />}
     />
   );
@@ -97,17 +101,17 @@ async function Reports({ searchParams }: { searchParams: PageProps<"/[lang]/app/
       {!canDownload ? (
         <Alert
           tone="info"
-          title="Downloads are part of Pro"
+          title={t.proTitle}
           action={
             <Link href="/app/billing" className="text-sm font-medium whitespace-nowrap underline-offset-2 hover:underline">
-              See Pro
+              {t.seePro}
             </Link>
           }
         >
-          During the trial you can read every figure on screen. PDF and CSV downloads are included in the Pro plan.
+          {t.proBody}
         </Alert>
       ) : null}
-      {store.is_demo ? <Alert tone="caution">Reports of the sample store are labelled as fictional demo data on every page.</Alert> : null}
+      {store.is_demo ? <Alert tone="caution">{t.demoNotice}</Alert> : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         {reports.map((r) => (
@@ -128,12 +132,12 @@ async function Reports({ searchParams }: { searchParams: PageProps<"/[lang]/app/
                     <a href={d.href} download>
                       <Download aria-hidden />
                       {d.label}
-                      <span className="sr-only"> of the {r.title.toLowerCase()}</span>
+                      <span className="sr-only">{t.downloadOf(r.title)}</span>
                     </a>
                   </Button>
                 ) : (
                   <Button key={d.label} variant="secondary" size="sm" asChild>
-                    <Link href="/app/billing" title="Downloads are part of Pro">
+                    <Link href="/app/billing" title={t.proTitle}>
                       <Lock aria-hidden />
                       {d.label}
                       <Badge tone="outline">Pro</Badge>
@@ -148,9 +152,9 @@ async function Reports({ searchParams }: { searchParams: PageProps<"/[lang]/app/
 
       <section aria-labelledby="preview-heading" className="space-y-3">
         <h2 id="preview-heading" className="text-lg font-semibold tracking-tight text-ink">
-          Preview: profit breakdown
+          {t.preview}
         </h2>
-        <ProfitBreakdown metrics={data.metrics} currency={store.currency} title={formatRange(period.range)} />
+        <ProfitBreakdown metrics={data.metrics} currency={store.currency} title={f.range(period.range)} />
       </section>
     </div>
   );

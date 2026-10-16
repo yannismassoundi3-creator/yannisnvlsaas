@@ -1,6 +1,7 @@
-import { formatCount, formatMultiple, formatPercent, formatPoints } from "./format";
-import { DEFINITIONS, METRIC_POLARITY, type Metrics } from "./metrics";
-import { formatMoney } from "./money";
+import type { Locale } from "@/i18n/config";
+import { createFormat } from "@/i18n/format";
+import { kpiMessages } from "@/i18n/messages/dashboard-kpis";
+import { definitionsFor, METRIC_POLARITY, type Metrics } from "./metrics";
 
 export type KpiModel = {
   key: string;
@@ -12,198 +13,211 @@ export type KpiModel = {
   footnote: string | null;
 };
 
+type Format = ReturnType<typeof createFormat>;
+
 /** Changes that display as 0.0 are treated as no change, so the arrow and colour match the text. */
 const displayedZero = (fraction: number) => (Math.abs(fraction) < 0.0005 ? 0 : fraction);
 
-function relativeDelta(current: number, previous: number | undefined | null) {
+function relativeDelta(f: Format, current: number, previous: number | undefined | null) {
   if (previous === undefined || previous === null || previous === 0) return { value: null, text: "" };
   const value = displayedZero((current - previous) / Math.abs(previous));
-  return { value, text: formatPercent(value, { signDisplay: "exceptZero" }) };
+  return { value, text: f.percent(value, { signDisplay: "exceptZero" }) };
 }
 
-function pointsDelta(current: number | null, previous: number | null | undefined) {
+function pointsDelta(f: Format, current: number | null, previous: number | null | undefined) {
   if (current === null || previous === null || previous === undefined) return { value: null, text: "" };
   const value = displayedZero(current - previous);
-  return { value, text: formatPoints(value) };
+  return { value, text: f.points(value) };
 }
 
-function costStatus(m: Metrics): KpiModel["status"] {
-  if (m.completeness.cogs === "partial" || m.completeness.cogs === "missing") return { tone: "caution", label: "Costs incomplete" };
-  if (m.completeness.fees === "estimated" || m.completeness.shipping === "estimated") return { tone: "info", label: "Includes estimates" };
+function costStatus(m: Metrics, locale: Locale): KpiModel["status"] {
+  const s = kpiMessages[locale].status;
+  if (m.completeness.cogs === "partial" || m.completeness.cogs === "missing") return { tone: "caution", label: s.costsIncomplete };
+  if (m.completeness.fees === "estimated" || m.completeness.shipping === "estimated") return { tone: "info", label: s.includesEstimates };
   if (m.completeness.fees === "missing" || m.completeness.shipping === "missing" || m.completeness.fees === "partial" || m.completeness.shipping === "partial") {
-    return { tone: "caution", label: "Costs incomplete" };
+    return { tone: "caution", label: s.costsIncomplete };
   }
   return null;
 }
 
 /** The four headline figures shown at the top of the overview. */
-export function buildPrimaryKpis(current: Metrics, previous: Metrics | null, currency: string): KpiModel[] {
-  const money = (v: number) => formatMoney(v, currency, { wholeUnits: true });
+export function buildPrimaryKpis(current: Metrics, previous: Metrics | null, currency: string, locale: Locale = "en"): KpiModel[] {
+  const f = createFormat(locale);
+  const t = kpiMessages[locale];
+  const D = definitionsFor(locale);
+  const money = (v: number) => f.money(v, currency, { wholeUnits: true });
   const p = previous;
   return [
     {
       key: "netRevenue",
-      label: "Net revenue",
+      label: t.netRevenue,
       value: money(current.netRevenue),
-      definition: { term: DEFINITIONS.netRevenue.term, text: `${DEFINITIONS.netRevenue.short} ${DEFINITIONS.netRevenue.formula}.` },
-      delta: p ? { ...relativeDelta(current.netRevenue, p.netRevenue), polarity: METRIC_POLARITY.netRevenue } : null,
+      definition: { term: D.netRevenue.term, text: `${D.netRevenue.short} ${D.netRevenue.formula}.` },
+      delta: p ? { ...relativeDelta(f, current.netRevenue, p.netRevenue), polarity: METRIC_POLARITY.netRevenue } : null,
       status: null,
-      footnote: `Net sales ${money(current.netSales)}`,
+      footnote: t.netSalesFootnote(money(current.netSales)),
     },
     {
       key: "contributionMargin",
-      label: "Contribution margin",
+      label: t.contributionMargin,
       value: money(current.contributionMargin),
       definition: {
-        term: DEFINITIONS.contributionMargin.term,
-        text: `${DEFINITIONS.contributionMargin.short} ${DEFINITIONS.contributionMargin.formula}.`,
+        term: D.contributionMargin.term,
+        text: `${D.contributionMargin.short} ${D.contributionMargin.formula}.`,
       },
-      delta: p ? { ...relativeDelta(current.contributionMargin, p.contributionMargin), polarity: METRIC_POLARITY.contributionMargin } : null,
-      status: costStatus(current),
-      footnote: current.contributionMarginRate !== null ? `${formatPercent(current.contributionMarginRate)} of net revenue` : null,
+      delta: p ? { ...relativeDelta(f, current.contributionMargin, p.contributionMargin), polarity: METRIC_POLARITY.contributionMargin } : null,
+      status: costStatus(current, locale),
+      footnote: current.contributionMarginRate !== null ? t.ofNetRevenue(f.percent(current.contributionMarginRate)) : null,
     },
     {
       key: "contributionMarginRate",
-      label: "Contribution margin %",
-      value: formatPercent(current.contributionMarginRate),
+      label: t.contributionMarginRate,
+      value: f.percent(current.contributionMarginRate),
       definition: {
-        term: DEFINITIONS.contributionMarginRate.term,
-        text: `${DEFINITIONS.contributionMarginRate.short} ${DEFINITIONS.contributionMarginRate.formula}.`,
+        term: D.contributionMarginRate.term,
+        text: `${D.contributionMarginRate.short} ${D.contributionMarginRate.formula}.`,
       },
-      delta: p ? { ...pointsDelta(current.contributionMarginRate, p.contributionMarginRate), polarity: METRIC_POLARITY.contributionMarginRate } : null,
+      delta: p ? { ...pointsDelta(f, current.contributionMarginRate, p.contributionMarginRate), polarity: METRIC_POLARITY.contributionMarginRate } : null,
       status: null,
-      footnote: current.grossMarginRate !== null ? `Gross margin ${formatPercent(current.grossMarginRate)}` : null,
+      footnote: current.grossMarginRate !== null ? t.grossMarginFootnote(f.percent(current.grossMarginRate)) : null,
     },
     {
       key: "orders",
-      label: "Orders",
-      value: formatCount(current.orders),
-      definition: { term: DEFINITIONS.orders.term, text: DEFINITIONS.orders.short },
-      delta: p ? { ...relativeDelta(current.orders, p.orders), polarity: METRIC_POLARITY.orders } : null,
+      label: t.orders,
+      value: f.count(current.orders),
+      definition: { term: D.orders.term, text: D.orders.short },
+      delta: p ? { ...relativeDelta(f, current.orders, p.orders), polarity: METRIC_POLARITY.orders } : null,
       status: null,
-      footnote: current.averageOrderValue !== null ? `Average order value ${formatMoney(current.averageOrderValue, currency)}` : null,
+      footnote: current.averageOrderValue !== null ? t.aovFootnote(f.money(current.averageOrderValue, currency)) : null,
     },
   ];
 }
 
 /** Advertising headline figures. */
-export function buildAdvertisingKpis(current: Metrics, previous: Metrics | null, currency: string): KpiModel[] {
-  const money = (v: number) => formatMoney(v, currency, { wholeUnits: true });
+export function buildAdvertisingKpis(current: Metrics, previous: Metrics | null, currency: string, locale: Locale = "en"): KpiModel[] {
+  const f = createFormat(locale);
+  const t = kpiMessages[locale];
+  const D = definitionsFor(locale);
+  const money = (v: number) => f.money(v, currency, { wholeUnits: true });
   return [
     {
       key: "adSpend",
-      label: "Ad spend",
+      label: t.adSpend,
       value: money(current.adSpend),
-      definition: { term: DEFINITIONS.adSpend.term, text: DEFINITIONS.adSpend.short },
-      delta: previous ? { ...relativeDelta(current.adSpend, previous.adSpend), polarity: METRIC_POLARITY.adSpend } : null,
+      definition: { term: D.adSpend.term, text: D.adSpend.short },
+      delta: previous ? { ...relativeDelta(f, current.adSpend, previous.adSpend), polarity: METRIC_POLARITY.adSpend } : null,
       status: null,
-      footnote: current.adSpendRate !== null ? `${formatPercent(current.adSpendRate)} of net revenue` : null,
+      footnote: current.adSpendRate !== null ? t.ofNetRevenue(f.percent(current.adSpendRate)) : null,
     },
     {
       key: "blendedRoas",
-      label: "Blended ROAS",
-      value: formatMultiple(current.blendedRoas),
-      definition: { term: DEFINITIONS.blendedRoas.term, text: `${DEFINITIONS.blendedRoas.short} ${DEFINITIONS.blendedRoas.formula}.` },
+      label: t.blendedRoas,
+      value: f.multiple(current.blendedRoas),
+      definition: { term: D.blendedRoas.term, text: `${D.blendedRoas.short} ${D.blendedRoas.formula}.` },
       delta: null,
       status: null,
-      footnote: "Net revenue ÷ ad spend",
+      footnote: t.blendedRoasFootnote,
     },
     {
       key: "breakEvenRoas",
-      label: "Break-even ROAS",
-      value: formatMultiple(current.breakEvenRoas),
-      definition: { term: DEFINITIONS.breakEvenRoas.term, text: `${DEFINITIONS.breakEvenRoas.short} ${DEFINITIONS.breakEvenRoas.formula}.` },
+      label: t.breakEvenRoas,
+      value: f.multiple(current.breakEvenRoas),
+      definition: { term: D.breakEvenRoas.term, text: `${D.breakEvenRoas.short} ${D.breakEvenRoas.formula}.` },
       delta: null,
-      status: costStatus(current),
-      footnote: "Below this, ads cost more than the margin they bring",
+      status: costStatus(current, locale),
+      footnote: t.breakEvenRoasFootnote,
     },
     {
       key: "contributionBeforeAds",
-      label: "Margin before advertising",
+      label: t.marginBeforeAds,
       value: money(current.contributionBeforeAds),
       definition: {
-        term: "Contribution before advertising",
-        text: "Net revenue minus product, shipping, payment and other variable costs, before ad spend.",
+        term: t.contributionBeforeAdsTerm,
+        text: t.contributionBeforeAdsText,
       },
       delta: previous
-        ? { ...relativeDelta(current.contributionBeforeAds, previous.contributionBeforeAds), polarity: "up" }
+        ? { ...relativeDelta(f, current.contributionBeforeAds, previous.contributionBeforeAds), polarity: "up" }
         : null,
       status: null,
-      footnote: current.netRevenue > 0 ? `${formatPercent(current.contributionBeforeAds / current.netRevenue)} of net revenue` : null,
+      footnote: current.netRevenue > 0 ? t.ofNetRevenue(f.percent(current.contributionBeforeAds / current.netRevenue)) : null,
     },
   ];
 }
 
-function shippingAndFeesStatus(m: Metrics): KpiModel["status"] {
+function shippingAndFeesStatus(m: Metrics, locale: Locale): KpiModel["status"] {
+  const s = kpiMessages[locale].status;
   const states = [m.completeness.shipping, m.completeness.fees];
-  if (states.some((s) => s === "missing" || s === "partial")) return { tone: "caution", label: "Incomplete" };
-  if (states.includes("estimated")) return { tone: "info", label: "Includes estimates" };
+  if (states.some((x) => x === "missing" || x === "partial")) return { tone: "caution", label: s.incomplete };
+  if (states.includes("estimated")) return { tone: "info", label: s.includesEstimates };
   return null;
 }
 
 /** Supporting figures under the headline KPIs, each compared with the previous period. */
-export function buildSecondaryKpis(current: Metrics, previous: Metrics | null, currency: string): KpiModel[] {
-  const money = (v: number) => formatMoney(v, currency, { wholeUnits: true });
+export function buildSecondaryKpis(current: Metrics, previous: Metrics | null, currency: string, locale: Locale = "en"): KpiModel[] {
+  const f = createFormat(locale);
+  const t = kpiMessages[locale];
+  const D = definitionsFor(locale);
+  const money = (v: number) => f.money(v, currency, { wholeUnits: true });
   const p = previous;
   const shippingAndFees = (m: Metrics) => m.shippingCosts + m.transactionFees;
   return [
     {
       key: "grossSales",
-      label: "Gross sales",
+      label: t.grossSales,
       value: money(current.grossSales),
-      definition: { term: DEFINITIONS.grossSales.term, text: `${DEFINITIONS.grossSales.short} ${DEFINITIONS.grossSales.formula}.` },
-      delta: p ? { ...relativeDelta(current.grossSales, p.grossSales), polarity: METRIC_POLARITY.grossSales } : null,
+      definition: { term: D.grossSales.term, text: `${D.grossSales.short} ${D.grossSales.formula}.` },
+      delta: p ? { ...relativeDelta(f, current.grossSales, p.grossSales), polarity: METRIC_POLARITY.grossSales } : null,
       status: null,
-      footnote: `${formatCount(current.units)} units sold`,
+      footnote: t.unitsSold(f.count(current.units), current.units),
     },
     {
       key: "discounts",
-      label: "Discounts",
+      label: t.discounts,
       value: money(current.discounts),
-      definition: { term: DEFINITIONS.discounts.term, text: DEFINITIONS.discounts.short },
-      delta: p ? { ...relativeDelta(current.discounts, p.discounts), polarity: METRIC_POLARITY.discounts } : null,
+      definition: { term: D.discounts.term, text: D.discounts.short },
+      delta: p ? { ...relativeDelta(f, current.discounts, p.discounts), polarity: METRIC_POLARITY.discounts } : null,
       status: null,
-      footnote: current.discountRate !== null ? `${formatPercent(current.discountRate)} of gross sales` : null,
+      footnote: current.discountRate !== null ? t.ofGrossSales(f.percent(current.discountRate)) : null,
     },
     {
       key: "refunds",
-      label: "Refunds",
+      label: t.refunds,
       value: money(current.refunds),
-      definition: { term: DEFINITIONS.refunds.term, text: DEFINITIONS.refunds.short },
-      delta: p ? { ...relativeDelta(current.refunds, p.refunds), polarity: METRIC_POLARITY.refunds } : null,
+      definition: { term: D.refunds.term, text: D.refunds.short },
+      delta: p ? { ...relativeDelta(f, current.refunds, p.refunds), polarity: METRIC_POLARITY.refunds } : null,
       status: null,
-      footnote: current.refundRate !== null ? `${formatPercent(current.refundRate)} of gross sales` : null,
+      footnote: current.refundRate !== null ? t.ofGrossSales(f.percent(current.refundRate)) : null,
     },
     {
       key: "cogs",
-      label: "Cost of goods sold",
+      label: t.cogs,
       value: money(current.cogs),
-      definition: { term: DEFINITIONS.cogs.term, text: DEFINITIONS.cogs.short },
-      delta: p ? { ...relativeDelta(current.cogs, p.cogs), polarity: METRIC_POLARITY.cogs } : null,
+      definition: { term: D.cogs.term, text: D.cogs.short },
+      delta: p ? { ...relativeDelta(f, current.cogs, p.cogs), polarity: METRIC_POLARITY.cogs } : null,
       status:
-        current.completeness.cogs === "partial" || current.completeness.cogs === "missing" ? { tone: "caution", label: "Costs incomplete" } : null,
-      footnote: current.costCoverage !== null && current.costCoverage < 1 ? `${formatPercent(current.costCoverage)} of sales have a cost` : null,
+        current.completeness.cogs === "partial" || current.completeness.cogs === "missing" ? { tone: "caution", label: t.status.costsIncomplete } : null,
+      footnote: current.costCoverage !== null && current.costCoverage < 1 ? t.salesWithCost(f.percent(current.costCoverage)) : null,
     },
     {
       key: "shippingAndFees",
-      label: "Shipping & fees",
+      label: t.shippingAndFees,
       value: money(shippingAndFees(current)),
       definition: {
-        term: "Shipping and payment fees",
-        text: `${DEFINITIONS.shippingCosts.short} ${DEFINITIONS.transactionFees.short}`,
+        term: t.shippingAndFeesTerm,
+        text: `${D.shippingCosts.short} ${D.transactionFees.short}`,
       },
-      delta: p ? { ...relativeDelta(shippingAndFees(current), shippingAndFees(p)), polarity: null } : null,
-      status: shippingAndFeesStatus(current),
-      footnote: `Shipping ${money(current.shippingCosts)} · Fees ${money(current.transactionFees)}`,
+      delta: p ? { ...relativeDelta(f, shippingAndFees(current), shippingAndFees(p)), polarity: null } : null,
+      status: shippingAndFeesStatus(current, locale),
+      footnote: t.shippingAndFeesFootnote(money(current.shippingCosts), money(current.transactionFees)),
     },
     {
       key: "adSpend",
-      label: "Ad spend",
+      label: t.adSpend,
       value: money(current.adSpend),
-      definition: { term: DEFINITIONS.adSpend.term, text: DEFINITIONS.adSpend.short },
-      delta: p ? { ...relativeDelta(current.adSpend, p.adSpend), polarity: METRIC_POLARITY.adSpend } : null,
+      definition: { term: D.adSpend.term, text: D.adSpend.short },
+      delta: p ? { ...relativeDelta(f, current.adSpend, p.adSpend), polarity: METRIC_POLARITY.adSpend } : null,
       status: null,
-      footnote: current.adSpendRate !== null ? `${formatPercent(current.adSpendRate)} of net revenue` : null,
+      footnote: current.adSpendRate !== null ? t.ofNetRevenue(f.percent(current.adSpendRate)) : null,
     },
   ];
 }

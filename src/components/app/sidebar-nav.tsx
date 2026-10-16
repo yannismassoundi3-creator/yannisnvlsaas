@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense } from "react";
+import { useLocale } from "@/i18n/client";
+import { shellLayout } from "@/i18n/messages/shell-layout";
 import { cn } from "@/lib/utils";
 import { isActive, PRIMARY_NAV, SECONDARY_NAV, type NavItem } from "./nav-items";
 
-function NavLink({ item, pathname, onNavigate }: { item: NavItem; pathname: string | null; onNavigate?: () => void }) {
+function NavLink({ item, label, pathname, onNavigate }: { item: NavItem; label: string; pathname: string | null; onNavigate?: () => void }) {
   const active = pathname !== null && isActive(pathname, item);
   const Icon = item.icon;
   return (
@@ -20,7 +22,7 @@ function NavLink({ item, pathname, onNavigate }: { item: NavItem; pathname: stri
       )}
     >
       <Icon className={cn("size-4 shrink-0", active ? "text-emerald-600" : "text-ink-3 group-hover:text-ink-2")} aria-hidden />
-      <span className="truncate">{item.label}</span>
+      <span className="truncate">{label}</span>
     </Link>
   );
 }
@@ -42,19 +44,20 @@ function ActiveNav({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 function NavList({ pathname, onNavigate }: { pathname: string | null; onNavigate?: () => void }) {
+  const t = shellLayout[useLocale()].nav;
   return (
-    <nav aria-label="Application" className="flex flex-1 flex-col gap-6">
+    <nav aria-label={t.label} className="flex flex-1 flex-col gap-6">
       <ul className="space-y-0.5">
         {PRIMARY_NAV.map((item) => (
           <li key={item.href}>
-            <NavLink item={item} pathname={pathname} onNavigate={onNavigate} />
+            <NavLink item={item} label={t[item.key]} pathname={pathname} onNavigate={onNavigate} />
           </li>
         ))}
       </ul>
       <ul className="mt-auto space-y-0.5">
         {SECONDARY_NAV.map((item) => (
           <li key={item.href}>
-            <NavLink item={item} pathname={pathname} onNavigate={onNavigate} />
+            <NavLink item={item} label={t[item.key]} pathname={pathname} onNavigate={onNavigate} />
           </li>
         ))}
       </ul>

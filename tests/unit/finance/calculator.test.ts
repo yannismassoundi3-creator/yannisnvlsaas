@@ -159,4 +159,14 @@ describe("calculateProfitability", () => {
     expect(errors.map((e) => e.field).sort()).toEqual(["currency", "discount.value", "paymentFeeBasisPoints", "quantity", "sellingPrice"]);
     expect(() => calculateProfitability({ ...base, sellingPrice: -1 })).toThrow(RangeError);
   });
+
+  it("returns validation messages and warnings in French", () => {
+    const errors = validateCalculatorInput({ ...base, sellingPrice: -1, quantity: -2, paymentFeeBasisPoints: 20_000 }, "fr");
+    expect(errors.find((e) => e.field === "sellingPrice")?.message).toBe("Le prix de vente doit être supérieur ou égal à zéro.");
+    expect(errors.find((e) => e.field === "quantity")?.message).toMatch(/^La quantité doit être un nombre entier compris entre 0 et 10\s000\s000\.$/);
+    expect(errors.find((e) => e.field === "paymentFeeBasisPoints")?.message).toBe("Les frais de paiement doivent être compris entre 0 % et 100 %.");
+    const r = calculateProfitability({ ...base, unitCostE4: null }, "fr");
+    expect(r.warnings).toContain("Ajoutez un coût unitaire pour calculer la marge sur coûts variables.");
+    expect(validateCalculatorInput({ ...base, quantity: -2 })[0].message).toBe("Quantity must be a whole number between 0 and 10,000,000.");
+  });
 });

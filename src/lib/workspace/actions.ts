@@ -3,6 +3,8 @@
 import { refresh } from "next/cache";
 import { cookies } from "next/headers";
 import { z } from "zod";
+import { shellMenus } from "@/i18n/messages/shell-menus";
+import { getRequestLocale } from "@/i18n/request";
 import { ACTIVE_STORE_COOKIE, requireWorkspace } from "@/lib/auth/workspace";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
@@ -22,18 +24,23 @@ export async function switchStore(storeId: string): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
-const feedbackSchema = z.object({
-  kind: z.enum(["question", "bug", "idea", "other"]),
-  message: z.string().trim().min(3, "Tell us a little more.").max(4000, "Please keep it under 4,000 characters."),
-  page: z.string().max(200).optional(),
-});
+type FeedbackMessages = (typeof shellMenus)["en"]["feedback"];
 
-export async function sendFeedback(input: z.input<typeof feedbackSchema>): Promise<{ ok: true } | { ok: false; message: string }> {
+function feedbackSchema(t: FeedbackMessages) {
+  return z.object({
+    kind: z.enum(["question", "bug", "idea", "other"]),
+    message: z.string().trim().min(3, t.tooShort).max(4000, t.tooLong),
+    page: z.string().max(200).optional(),
+  });
+}
+
+export async function sendFeedback(input: z.input<ReturnType<typeof feedbackSchema>>): Promise<{ ok: true } | { ok: false; message: string }> {
   const ws = await requireWorkspace();
-  const parsed = feedbackSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Check your message." };
+  const t = shellMenus[await getRequestLocale()].feedback;
+  const parsed = feedbackSchema(t).safeParse(input);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? t.invalid };
   if (!(await consumeRateLimit(`feedback:${ws.user.id}`, 10, 3600))) {
-    return { ok: false, message: "You have sent a lot of messages recently. Please try again later." };
+    return { ok: false, message: t.rateLimited };
   }
   const supabase = await createClient();
   const { error } = await supabase.from("feedback").insert({
@@ -43,6 +50,6 @@ export async function sendFeedback(input: z.input<typeof feedbackSchema>): Promi
     message: parsed.data.message,
     page: parsed.data.page ?? null,
   });
-  if (error) return { ok: false, message: "We could not send your message. Please try again." };
+  if (error) return { ok: false, message: t.failed };
   return { ok: true };
 }

@@ -1,3 +1,5 @@
+import { INTL_LOCALE, type Locale } from "@/i18n/config";
+import { calculatorRules } from "@/i18n/messages/account-calculator";
 import { currencyDigits } from "./currency";
 import { applyBasisPoints, lineCostMinor, mulDivRound } from "./money";
 
@@ -72,44 +74,45 @@ export type CalculatorResult = {
 const MAX_QUANTITY = 10_000_000;
 const MAX_BPS = 10_000;
 
-export function validateCalculatorInput(input: CalculatorInput): CalculatorValidationError[] {
+export function validateCalculatorInput(input: CalculatorInput, locale: Locale = "en"): CalculatorValidationError[] {
+  const t = calculatorRules[locale];
   const errors: CalculatorValidationError[] = [];
   const nonNegativeInt = (value: number, field: CalculatorValidationError["field"], label: string) => {
-    if (!Number.isSafeInteger(value) || value < 0) errors.push({ field, message: `${label} must be zero or more.` });
+    if (!Number.isSafeInteger(value) || value < 0) errors.push({ field, message: t.nonNegative(label) });
   };
-  nonNegativeInt(input.sellingPrice, "sellingPrice", "Selling price");
+  nonNegativeInt(input.sellingPrice, "sellingPrice", t.labels.sellingPrice);
   if (!Number.isSafeInteger(input.quantity) || input.quantity < 0 || input.quantity > MAX_QUANTITY) {
-    errors.push({ field: "quantity", message: `Quantity must be a whole number between 0 and ${MAX_QUANTITY.toLocaleString("en-GB")}.` });
+    errors.push({ field: "quantity", message: t.quantityRange(MAX_QUANTITY.toLocaleString(INTL_LOCALE[locale])) });
   }
-  if (input.unitCostE4 !== null) nonNegativeInt(input.unitCostE4, "unitCostE4", "Unit cost");
+  if (input.unitCostE4 !== null) nonNegativeInt(input.unitCostE4, "unitCostE4", t.labels.unitCost);
   for (const [adj, field, label] of [
-    [input.discount, "discount.value", "Discount"],
-    [input.refunds, "refunds.value", "Refunds"],
+    [input.discount, "discount.value", t.labels.discount],
+    [input.refunds, "refunds.value", t.labels.refunds],
   ] as const) {
     if (adj.kind === "percent") {
       if (!Number.isSafeInteger(adj.basisPoints) || adj.basisPoints < 0 || adj.basisPoints > MAX_BPS) {
-        errors.push({ field, message: `${label} must be between 0% and 100%.` });
+        errors.push({ field, message: t.percentRange(label) });
       }
     } else {
       nonNegativeInt(adj.minor, field, label);
     }
   }
   if (!Number.isSafeInteger(input.paymentFeeBasisPoints) || input.paymentFeeBasisPoints < 0 || input.paymentFeeBasisPoints > MAX_BPS) {
-    errors.push({ field: "paymentFeeBasisPoints", message: "Payment fee must be between 0% and 100%." });
+    errors.push({ field: "paymentFeeBasisPoints", message: t.paymentFeeRange });
   }
-  nonNegativeInt(input.paymentFeeFixedPerOrder, "paymentFeeFixedPerOrder", "Fixed fee per order");
+  nonNegativeInt(input.paymentFeeFixedPerOrder, "paymentFeeFixedPerOrder", t.labels.feeFixed);
   if (input.orders !== null) {
     if (!Number.isSafeInteger(input.orders) || input.orders < 0 || input.orders > MAX_QUANTITY) {
-      errors.push({ field: "orders", message: "Orders must be a whole number of zero or more." });
+      errors.push({ field: "orders", message: t.ordersRange });
     }
   }
-  nonNegativeInt(input.shippingCosts, "shippingCosts", "Shipping costs");
-  nonNegativeInt(input.advertising, "advertising", "Advertising");
-  nonNegativeInt(input.otherVariableCosts, "otherVariableCosts", "Other variable costs");
+  nonNegativeInt(input.shippingCosts, "shippingCosts", t.labels.shippingCosts);
+  nonNegativeInt(input.advertising, "advertising", t.labels.advertising);
+  nonNegativeInt(input.otherVariableCosts, "otherVariableCosts", t.labels.otherVariableCosts);
   try {
     currencyDigits(input.currency);
   } catch {
-    errors.push({ field: "currency", message: "Unsupported currency." });
+    errors.push({ field: "currency", message: t.unsupportedCurrency });
   }
   return errors;
 }
@@ -118,8 +121,10 @@ function adjustmentAmount(adj: Adjustment, base: number): number {
   return adj.kind === "percent" ? applyBasisPoints(base, adj.basisPoints) : adj.minor;
 }
 
-export function calculateProfitability(input: CalculatorInput): CalculatorResult {
-  const errors = validateCalculatorInput(input);
+/** `locale` sets the language of the warnings (and of the error thrown for invalid input). */
+export function calculateProfitability(input: CalculatorInput, locale: Locale = "en"): CalculatorResult {
+  const t = calculatorRules[locale];
+  const errors = validateCalculatorInput(input, locale);
   if (errors.length > 0) {
     throw new RangeError(`Invalid calculator input: ${errors.map((e) => e.message).join(" ")}`);
   }
@@ -131,9 +136,9 @@ export function calculateProfitability(input: CalculatorInput): CalculatorResult
     orders,
   );
 
-  if (discounts > grossSales) warnings.push("Discounts are larger than gross sales.");
-  if (refunds > grossSales - discounts) warnings.push("Refunds are larger than the amount paid after discounts.");
-  if (cogs === null) warnings.push("Add a unit cost to calculate contribution margin.");
+  if (discounts > grossSales) warnings.push(t.warnDiscounts);
+  if (refunds > grossSales - discounts) warnings.push(t.warnRefunds);
+  if (cogs === null) warnings.push(t.warnUnitCost);
 
   return {
     grossSales,

@@ -1,5 +1,6 @@
 import "server-only";
 import { cacheLife } from "next/cache";
+import type { Locale } from "@/i18n/config";
 import { computeCampaignBreakdown, computeDailyTotals, computeProductBreakdown, computeTotals } from "@/lib/analytics/reference";
 import { buildTimeSeries } from "@/lib/analytics/series";
 import { addDays, previousPeriod, todayIn } from "@/lib/dates";
@@ -11,9 +12,10 @@ const DEMO_TIMEZONE = "Europe/Paris";
 
 /**
  * Demo figures for the public website, computed from the fictional sample
- * store. Cached for a day so the marketing pages stay static and fast.
+ * store. Cached for a day so the marketing pages stay static and fast. The
+ * locale only changes the wording of the insights (it is part of the cache key).
  */
-export async function getMarketingDemo() {
+export async function getMarketingDemo(locale: Locale = "en") {
   "use cache";
   cacheLife("days");
 
@@ -35,6 +37,7 @@ export async function getMarketingDemo() {
     products: { current: products.rows, previous: previousProducts.rows },
     campaigns,
     feeRule: { basisPoints: ds.settings.feeRuleBasisPoints, fixedMinor: ds.settings.feeRuleFixedMinor },
+    locale,
   });
 
   return {

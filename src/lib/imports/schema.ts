@@ -1,3 +1,5 @@
+import type { Locale } from "@/i18n/config";
+import { importKindsFr } from "@/i18n/messages/imports-fields";
 import type { ExpenseCategory, ExpenseKind, Platform } from "@/lib/domain/types";
 
 /**
@@ -199,6 +201,25 @@ export const IMPORT_KINDS: Record<ImportKind, KindDef> = {
   },
 };
 
+/** Label and description of an import kind in a language. */
+export function kindCopy(kind: ImportKind, locale: Locale = "en"): { label: string; description: string } {
+  const copy = locale === "fr" ? importKindsFr[kind] : IMPORT_KINDS[kind];
+  return { label: copy.label, description: copy.description };
+}
+
+/** Label and description of a field in a language (the key itself when unknown). */
+export function fieldCopy(kind: ImportKind, key: string, locale: Locale = "en"): { label: string; description: string } {
+  const fr = locale === "fr" ? importKindsFr[kind]?.fields[key] : undefined;
+  if (fr) return fr;
+  const field = IMPORT_KINDS[kind]?.fields.find((f) => f.key === key);
+  return field ? { label: field.label, description: field.description } : { label: key, description: "" };
+}
+
+/** Field key -> label, for tables and messages. */
+export function fieldLabels(kind: ImportKind, locale: Locale = "en"): Record<string, string> {
+  return Object.fromEntries(IMPORT_KINDS[kind].fields.map((f) => [f.key, fieldCopy(kind, f.key, locale).label]));
+}
+
 export const KIND_ORDER: ImportKind[] = ["orders", "products", "ad_spend", "expenses"];
 
 export function isImportKind(value: unknown): value is ImportKind {
@@ -223,6 +244,8 @@ export type ImportOptions = {
   defaultCategory: ExpenseCategory;
   /** Expenses: overrides each category's usual kind for rows without one. */
   defaultKind: ExpenseKind | null;
+  /** Language of the row messages (set on the server from the request when the job is created). */
+  locale: Locale;
 };
 
 export const DEFAULT_OPTIONS: ImportOptions = {
@@ -235,6 +258,7 @@ export const DEFAULT_OPTIONS: ImportOptions = {
   defaultPlatform: "meta",
   defaultCategory: "other",
   defaultKind: null,
+  locale: "en",
 };
 
 /** Limits independent of the plan. */

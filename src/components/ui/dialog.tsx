@@ -3,6 +3,8 @@
 import { X } from "lucide-react";
 import { AlertDialog as AlertPrimitive, Dialog as DialogPrimitive } from "radix-ui";
 import type { ComponentProps, ReactNode } from "react";
+import { useLocale } from "@/i18n/client";
+import { shellUi } from "@/i18n/messages/shell-ui";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
 
@@ -34,6 +36,7 @@ export function DialogContent({
   children,
   ...props
 }: DialogContentProps) {
+  const t = shellUi[useLocale()];
   const width = size === "sm" ? "max-w-sm" : size === "lg" ? "max-w-2xl" : "max-w-lg";
   return (
     <DialogPrimitive.Portal>
@@ -49,7 +52,7 @@ export function DialogContent({
             )}
           </div>
           <DialogPrimitive.Close asChild>
-            <Button variant="ghost" size="icon-sm" aria-label="Close" className="-mt-1 -mr-1.5">
+            <Button variant="ghost" size="icon-sm" aria-label={t.close} className="-mt-1 -mr-1.5">
               <X />
             </Button>
           </DialogPrimitive.Close>
@@ -86,7 +89,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
-  cancelLabel = "Cancel",
+  cancelLabel,
   destructive = false,
   onConfirm,
   pending = false,
@@ -94,6 +97,7 @@ export function ConfirmDialog({
   onOpenChange,
   children,
 }: ConfirmDialogProps) {
+  const t = shellUi[useLocale()];
   return (
     <AlertPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <AlertPrimitive.Trigger asChild>{trigger}</AlertPrimitive.Trigger>
@@ -108,7 +112,7 @@ export function ConfirmDialog({
           <div className="mt-5 flex flex-col-reverse gap-2 border-t border-line px-5 py-3.5 sm:flex-row sm:justify-end">
             <AlertPrimitive.Cancel asChild>
               <Button variant="secondary" disabled={pending}>
-                {cancelLabel}
+                {cancelLabel ?? t.cancel}
               </Button>
             </AlertPrimitive.Cancel>
             <Button

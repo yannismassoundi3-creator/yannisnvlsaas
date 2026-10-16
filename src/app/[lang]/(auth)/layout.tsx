@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
+import { localizedPath } from "@/i18n/config";
+import { authPageMessages } from "@/i18n/messages/auth-pages";
+import { getLocale } from "@/i18n/server";
 
-export default function AuthLayout({ children }: LayoutProps<"/[lang]">) {
+export default async function AuthLayout({ children }: LayoutProps<"/[lang]">) {
+  const locale = await getLocale();
+  const t = authPageMessages[locale].layout;
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="mx-auto flex w-full max-w-6xl items-center px-4 py-5 sm:px-6">
-        <Link href="/" aria-label="Narixia home" className="rounded-sm">
+        <Link href={localizedPath("/", locale)} aria-label={t.home} className="rounded-sm">
           <Logo />
         </Link>
       </header>
@@ -13,14 +18,14 @@ export default function AuthLayout({ children }: LayoutProps<"/[lang]">) {
         <div className="w-full max-w-[400px]">{children}</div>
       </main>
       <footer className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-center gap-x-5 gap-y-2 px-4 pb-8 text-xs text-ink-3 sm:px-6">
-        <Link href="/privacy" className="hover:text-ink">
-          Privacy
+        <Link href={localizedPath("/privacy", locale)} className="hover:text-ink">
+          {t.privacy}
         </Link>
-        <Link href="/terms" className="hover:text-ink">
-          Terms
+        <Link href={localizedPath("/terms", locale)} className="hover:text-ink">
+          {t.terms}
         </Link>
-        <Link href="/contact" className="hover:text-ink">
-          Contact
+        <Link href={localizedPath("/contact", locale)} className="hover:text-ink">
+          {t.contact}
         </Link>
       </footer>
     </div>

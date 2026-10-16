@@ -4,6 +4,8 @@ import { BarChart3, Table2 } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Table, TableContainer, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { useLocale } from "@/i18n/client";
+import { chartMessages } from "@/i18n/messages/dashboard-charts";
 import { cn } from "@/lib/utils";
 
 export type LegendItem = { label: string; color: string; shape: "bar" | "line" };
@@ -31,6 +33,7 @@ type ChartFrameProps = {
  * shown in the chart can be read without hovering or relying on colour.
  */
 export function ChartFrame({ title, description, legend, table, children, className, actions, headingLevel = "h2" }: ChartFrameProps) {
+  const t = chartMessages[useLocale()];
   const [view, setView] = useState<"chart" | "table">("chart");
   const titleId = useId();
   const Heading = headingLevel;
@@ -53,8 +56,8 @@ export function ChartFrame({ title, description, legend, table, children, classN
             className="text-ink-3"
           >
             {view === "chart" ? <Table2 aria-hidden /> : <BarChart3 aria-hidden />}
-            <span className="hidden sm:inline">{view === "chart" ? "View as table" : "View as chart"}</span>
-            <span className="sr-only sm:hidden">{view === "chart" ? "View as table" : "View as chart"}</span>
+            <span className="hidden sm:inline">{view === "chart" ? t.viewAsTable : t.viewAsChart}</span>
+            <span className="sr-only sm:hidden">{view === "chart" ? t.viewAsTable : t.viewAsChart}</span>
           </Button>
         </div>
       </div>
@@ -95,8 +98,9 @@ export function ChartFrame({ title, description, legend, table, children, classN
 }
 
 export function Legend({ items, className }: { items: LegendItem[]; className?: string }) {
+  const t = chartMessages[useLocale()];
   return (
-    <ul className={cn("flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-ink-2", className)} aria-label="Legend">
+    <ul className={cn("flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-ink-2", className)} aria-label={t.legend}>
       {items.map((item) => (
         <li key={item.label} className="flex items-center gap-2">
           <LegendKey color={item.color} shape={item.shape} />

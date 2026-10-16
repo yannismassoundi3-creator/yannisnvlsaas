@@ -1,9 +1,13 @@
 "use client";
 
-import { ChevronsUpDown, LifeBuoy, LogOut, Settings } from "lucide-react";
+import { Check, ChevronsUpDown, LifeBuoy, LogOut, Settings } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/menu";
+import { useSearchParams } from "next/navigation";
+import { useId, useState } from "react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/menu";
+import { useLocale } from "@/i18n/client";
+import { LOCALE_NAMES, LOCALE_PARAM, LOCALES, type Locale } from "@/i18n/config";
+import { shellMenus } from "@/i18n/messages/shell-menus";
 import { signOut } from "@/lib/auth/actions";
 import { FeedbackDialog } from "./feedback-dialog";
 
@@ -13,8 +17,22 @@ function initials(name: string | null, email: string | null) {
   return ((parts[0]?.[0] ?? "?") + (parts.length > 1 && name ? parts[1][0] : "")).toUpperCase();
 }
 
+/** Same page and query in another language: the proxy stores the choice and redirects. */
+function useLanguageHref() {
+  const params = useSearchParams();
+  return (locale: Locale) => {
+    const query = new URLSearchParams(params?.toString());
+    query.set(LOCALE_PARAM, locale);
+    return `?${query.toString()}`;
+  };
+}
+
 export function UserMenu({ name, email, organization }: { name: string | null; email: string | null; organization: string }) {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const locale = useLocale();
+  const t = shellMenus[locale].account;
+  const languageHref = useLanguageHref();
+  const languageId = useId();
   return (
     <>
       <DropdownMenu>
@@ -26,7 +44,7 @@ export function UserMenu({ name, email, organization }: { name: string | null; e
             <span className="block truncate text-sm font-medium text-ink">{name || email}</span>
             <span className="block truncate text-xs text-ink-3">{organization}</span>
           </span>
-          <span className="sr-only">, account menu</span>
+          <span className="sr-only">{t.menuSuffix}</span>
           <ChevronsUpDown className="size-4 shrink-0 text-ink-3" aria-hidden />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="top" className="w-60">
@@ -35,13 +53,38 @@ export function UserMenu({ name, email, organization }: { name: string | null; e
           <DropdownMenuItem asChild>
             <Link href="/app/settings">
               <Settings aria-hidden />
-              Settings
+              {t.settings}
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setFeedbackOpen(true)}>
             <LifeBuoy aria-hidden />
-            Help &amp; feedback
+            {t.help}
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup aria-labelledby={languageId}>
+            <DropdownMenuLabel id={languageId}>{t.language}</DropdownMenuLabel>
+            {LOCALES.map((l) => {
+              const current = l === locale;
+              return (
+                <DropdownMenuItem key={l} asChild>
+                  {/* A full page load, so the whole interface is rendered again in the new language. */}
+                  <a href={languageHref(l)} hrefLang={l} lang={l} aria-current={current ? "true" : undefined}>
+                    <span className="min-w-0 flex-1">{LOCALE_NAMES[l]}</span>
+                    {current ? (
+                      <>
+                        <Check className="!text-ink" aria-hidden />
+                        <span className="sr-only" lang={locale}>
+                          , {t.currentLanguage}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="w-4" />
+                    )}
+                  </a>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onSelect={() => {
@@ -49,7 +92,7 @@ export function UserMenu({ name, email, organization }: { name: string | null; e
             }}
           >
             <LogOut aria-hidden />
-            Sign out
+            {t.signOut}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

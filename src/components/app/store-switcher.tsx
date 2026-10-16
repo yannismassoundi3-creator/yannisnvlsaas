@@ -6,6 +6,8 @@ import { useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/menu";
 import { toast } from "@/components/ui/toaster";
+import { useLocale } from "@/i18n/client";
+import { shellMenus } from "@/i18n/messages/shell-menus";
 import { switchStore } from "@/lib/workspace/actions";
 import { cn } from "@/lib/utils";
 
@@ -13,13 +15,14 @@ export type SwitcherStore = { id: string; name: string; currency: string; isDemo
 
 export function StoreSwitcher({ stores, activeId }: { stores: SwitcherStore[]; activeId: string | null }) {
   const [pending, startTransition] = useTransition();
+  const t = shellMenus[useLocale()].store;
   const active = stores.find((s) => s.id === activeId) ?? stores[0];
 
   function choose(id: string) {
     if (id === activeId) return;
     startTransition(async () => {
       const result = await switchStore(id);
-      if (!result.ok) toast.error("Could not switch store.");
+      if (!result.ok) toast.error(t.switchFailed);
     });
   }
 
@@ -35,29 +38,31 @@ export function StoreSwitcher({ stores, activeId }: { stores: SwitcherStore[]; a
           <StoreIcon className="size-3.5" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-ink">{active?.name ?? "No store"}</span>
+          <span className="block truncate text-sm font-medium text-ink">{active?.name ?? t.none}</span>
           <span className="flex items-center gap-1.5 text-xs text-ink-3">
             {active?.currency}
-            {active?.isDemo ? <Badge tone="demo" className="px-1 py-0">Demo</Badge> : null}
+            {active?.isDemo ? <Badge tone="demo" className="px-1 py-0">
+                {t.demo}
+              </Badge> : null}
           </span>
         </span>
-        <span className="sr-only">, switch store</span>
+        <span className="sr-only">{t.switchSuffix}</span>
         <ChevronsUpDown className="size-4 shrink-0 text-ink-3" aria-hidden />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
-        <DropdownMenuLabel>Stores</DropdownMenuLabel>
+        <DropdownMenuLabel>{t.heading}</DropdownMenuLabel>
         {stores.map((s) => (
           <DropdownMenuItem key={s.id} onSelect={() => choose(s.id)}>
             <span className="min-w-0 flex-1 truncate">{s.name}</span>
-            {s.isDemo ? <Badge tone="demo">Demo</Badge> : <span className="text-xs text-ink-3">{s.currency}</span>}
-            {s.id === active?.id ? <Check className="!text-ink" aria-label="Current store" /> : <span className="w-4" />}
+            {s.isDemo ? <Badge tone="demo">{t.demo}</Badge> : <span className="text-xs text-ink-3">{s.currency}</span>}
+            {s.id === active?.id ? <Check className="!text-ink" aria-label={t.current} /> : <span className="w-4" />}
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/app/settings?section=stores">
             <Plus aria-hidden />
-            Manage stores
+            {t.manage}
           </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>

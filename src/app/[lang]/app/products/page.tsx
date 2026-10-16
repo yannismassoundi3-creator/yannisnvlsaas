@@ -19,28 +19,34 @@ import { rangeQuery } from "@/lib/analytics/range";
 import { requireStore } from "@/lib/auth/workspace";
 import { listCatalog, PRODUCT_SORTS, type ProductFilter, type ProductSort } from "@/lib/data/products";
 import { getStoreDataStatus, reportPeriod, ReportsPausedError } from "@/lib/data/reports";
-import { formatRange } from "@/lib/dates";
-import { formatCount, formatPercent } from "@/lib/finance/format";
-import { DEFINITIONS } from "@/lib/finance/metrics";
-import { formatMoney } from "@/lib/finance/money";
+import { definitionsFor } from "@/lib/finance/metrics";
 import { cn } from "@/lib/utils";
+import { catalogCommon } from "@/i18n/messages/catalog-common";
+import { productsMessages } from "@/i18n/messages/catalog-products";
+import { getFormat, getLocale } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Products" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: productsMessages[await getLocale()].metaTitle };
+}
 
 const PAGE_SIZE = 50;
 const FILTER_PARAMS: Record<string, ProductFilter> = { active: "active", "missing-cost": "missing_cost", loss: "loss", archived: "archived", all: "all" };
 const FILTER_SLUG: Record<ProductFilter, string> = { active: "active", missing_cost: "missing-cost", loss: "loss", archived: "archived", all: "all" };
 
-export default function ProductsPage({ searchParams }: PageProps<"/[lang]/app/products">) {
+export default async function ProductsPage({ searchParams }: PageProps<"/[lang]/app/products">) {
+  const locale = await getLocale();
   return (
-    <Suspense fallback={<ProductsSkeleton />}>
+    <Suspense fallback={<ProductsSkeleton label={productsMessages[locale].loading} />}>
       <Products searchParams={searchParams} />
     </Suspense>
   );
 }
 
 async function Products({ searchParams }: { searchParams: PageProps<"/[lang]/app/products">["searchParams"] }) {
-  const [ws, sp] = await Promise.all([requireStore(), searchParams]);
+  const [ws, sp, locale, f] = await Promise.all([requireStore(), searchParams, getLocale(), getFormat()]);
+  const t = productsMessages[locale];
+  const c = catalogCommon[locale];
+  const definitions = definitionsFor(locale);
   const store = ws.activeStore;
   const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const period = reportPeriod(store, ws.entitlements, sp);
@@ -73,8 +79,8 @@ async function Products({ searchParams }: { searchParams: PageProps<"/[lang]/app
   const header = (
     <PageHeader
       eyebrow={store.name}
-      title="Products"
-      description={`Profitability per product, ${formatRange(period.range)}.`}
+      title={t.title}
+      description={t.description(f.range(period.range))}
       actions={
         <>
           <DateRangePicker
@@ -90,14 +96,14 @@ async function Products({ searchParams }: { searchParams: PageProps<"/[lang]/app
             <Button variant="secondary" asChild>
               <a href={`/api/exports/products?${keep}`}>
                 <Download aria-hidden />
-                Export CSV
+                {c.exportCsv}
               </a>
             </Button>
           ) : (
             <Button variant="secondary" asChild>
-              <Link href="/app/billing" title="CSV exports are part of Pro">
+              <Link href="/app/billing" title={c.exportsPro}>
                 <Lock aria-hidden />
-                Export CSV
+                {c.exportCsv}
                 <Badge tone="outline">Pro</Badge>
               </Link>
             </Button>
@@ -111,7 +117,7 @@ async function Products({ searchParams }: { searchParams: PageProps<"/[lang]/app
     return (
       <div className="space-y-6">
         {header}
-        <AnalyticsPaused what="Product analytics" />
+        <AnalyticsPaused what={t.analytics} />
       </div>
     );
   }
@@ -127,7 +133,7 @@ async function Products({ searchParams }: { searchParams: PageProps<"/[lang]/app
       return (
         <div className="space-y-6">
           {header}
-          <AnalyticsPaused what="Product analytics" />
+          <AnalyticsPaused what={t.analytics} />
         </div>
       );
     }
@@ -136,13 +142,13 @@ async function Products({ searchParams }: { searchParams: PageProps<"/[lang]/app
 
   const { rows, total } = catalog;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const money = (v: number) => formatMoney(v, store.currency);
+  const money = (v: number) => f.money(v, store.currency);
   const tabs: { id: ProductFilter; label: string; count?: number; pro?: boolean }[] = [
-    { id: "active", label: "Active" },
-    { id: "missing_cost", label: "Missing cost", count: status.productsWithoutCost },
-    { id: "loss", label: "Loss-making", pro: !advanced },
-    { id: "archived", label: "Archived" },
-    { id: "all", label: "All" },
+    { id: "active", label: t.filters.active },
+    { id: "missing_cost", label: t.filters.missing_cost, count: status.productsWithoutCost },
+    { id: "loss", label: t.filters.loss, pro: !advanced },
+    { id: "archived", label: t.filters.archived },
+    { id: "all", label: t.filters.all },
   ];
 
   const sortHeader = (key: ProductSort, label: React.ReactNode, numeric = true) => {
@@ -153,7 +159,7 @@ async function Products({ searchParams }: { searchParams: PageProps<"/[lang]/app
         <Link href={href({ sort: key, dir: next, page: 0 })} className={cn("inline-flex items-center gap-1 hover:text-ink", active && "text-ink")}>
           {label}
           {active ? dir === "asc" ? <ArrowUp className="size-3" aria-hidden /> : <ArrowDown className="size-3" aria-hidden /> : null}
-          <span className="sr-only">{active ? `, sorted ${dir === "asc" ? "ascending" : "descending"}` : ", sort"}</span>
+          <span className="sr-only">{active ? (dir === "asc" ? t.sortedAsc : t.sortedDesc) : t.sort}</span>
         </Link>
       </TH>
     );
@@ -166,22 +172,22 @@ async function Products({ searchParams }: { searchParams: PageProps<"/[lang]/app
       {status.productsWithoutCost > 0 && filter !== "missing_cost" ? (
         <Alert
           tone="caution"
-          title={`${formatCount(status.productsWithoutCost)} ${status.productsWithoutCost === 1 ? "product has" : "products have"} no unit cost`}
+          title={t.missingCostTitle(f.count(status.productsWithoutCost), status.productsWithoutCost)}
           action={
             <Link href={href({ filter: "missing_cost", page: 0 })} className="text-sm font-medium whitespace-nowrap underline-offset-2 hover:underline">
-              Show them
+              {t.showThem}
             </Link>
           }
         >
-          Their sales count as revenue with no cost, so margins look better than they are. Add costs here, or import them from a product list.
+          {t.missingCostBody}
         </Alert>
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <nav aria-label="Product filter" className="flex flex-wrap gap-1">
+        <nav aria-label={t.filterNav} className="flex flex-wrap gap-1">
           {tabs.map((t) =>
             t.pro ? (
-              <Link key={t.id} href="/app/billing" className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-ink-3 hover:bg-hover" title="Advanced filters are part of Pro">
+              <Link key={t.id} href="/app/billing" className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-ink-3 hover:bg-hover" title={t.advancedPro}>
                 {t.label}
                 <Badge tone="outline">Pro</Badge>
               </Link>
@@ -207,7 +213,7 @@ async function Products({ searchParams }: { searchParams: PageProps<"/[lang]/app
             .map(([k, v]) => (
               <input key={k} type="hidden" name={k} value={v} />
             ))}
-          <Input name="q" type="search" defaultValue={q} placeholder="Search name or SKU" aria-label="Search products by name or SKU" leading={<Search className="size-4" aria-hidden />} className="w-full" />
+          <Input name="q" type="search" defaultValue={q} placeholder={t.searchPlaceholder} aria-label={t.searchLabel} leading={<Search className="size-4" aria-hidden />} className="w-full" />
         </Form>
       </div>
 
@@ -215,18 +221,12 @@ async function Products({ searchParams }: { searchParams: PageProps<"/[lang]/app
         {rows.length === 0 ? (
           <EmptyState
             icon={<Package aria-hidden />}
-            title={q ? `No products match “${q}”` : filter === "missing_cost" ? "Every product has a cost" : status.products === 0 ? "No products yet" : "No products in this view"}
-            description={
-              status.products === 0
-                ? "Products are created automatically from your order imports. You can also import a product list with costs, or add products one by one."
-                : filter === "missing_cost"
-                  ? "Margins for this store are complete as far as product costs go."
-                  : "Try another filter or search."
-            }
+            title={q ? t.emptyMatch(q) : filter === "missing_cost" ? t.emptyAllCosted : status.products === 0 ? t.emptyNone : t.emptyView}
+            description={status.products === 0 ? t.emptyNoneBody : filter === "missing_cost" ? t.emptyAllCostedBody : t.emptyViewBody}
             actions={
               status.products === 0 ? (
                 <Button asChild>
-                  <Link href={"/app/imports/new?kind=products" as Route}>Import products</Link>
+                  <Link href={"/app/imports/new?kind=products" as Route}>{t.importProducts}</Link>
                 </Button>
               ) : null
             }
@@ -234,21 +234,21 @@ async function Products({ searchParams }: { searchParams: PageProps<"/[lang]/app
         ) : (
           <TableContainer>
             <Table>
-              <caption className="sr-only">Products with figures for {formatRange(period.range)}</caption>
+              <caption className="sr-only">{t.caption(f.range(period.range))}</caption>
               <THead>
                 <TR>
-                  {sortHeader("name", "Product", false)}
-                  {sortHeader("cost", "Unit cost")}
-                  {sortHeader("units", "Units")}
-                  {sortHeader("revenue", "Net revenue")}
+                  {sortHeader("name", t.colProduct, false)}
+                  {sortHeader("cost", t.colUnitCost)}
+                  {sortHeader("units", t.colUnits)}
+                  {sortHeader("revenue", t.colNetRevenue)}
                   <TH numeric>
                     <span className="inline-flex items-center gap-1">
-                      COGS
-                      <TermTip term={DEFINITIONS.cogs.term}>{DEFINITIONS.cogs.short}</TermTip>
+                      {t.colCogs}
+                      <TermTip term={definitions.cogs.term}>{definitions.cogs.short}</TermTip>
                     </span>
                   </TH>
-                  {sortHeader("margin", "Contribution margin")}
-                  {sortHeader("rate", "Margin %")}
+                  {sortHeader("margin", t.colMargin)}
+                  {sortHeader("rate", t.colRate)}
                 </TR>
               </THead>
               <TBody>
@@ -259,23 +259,23 @@ async function Products({ searchParams }: { searchParams: PageProps<"/[lang]/app
                         {r.name}
                       </Link>
                       <span className="flex items-center gap-1.5 text-xs text-ink-3">
-                        {r.sku ?? "No SKU"}
-                        {r.archived ? <Badge tone="neutral">Archived</Badge> : null}
+                        {r.sku ?? c.noSku}
+                        {r.archived ? <Badge tone="neutral">{c.archived}</Badge> : null}
                       </span>
                     </TD>
                     <TD numeric className="py-2">
                       <CostEditor productId={r.productId} productName={r.name} unitCostE4={r.unitCostE4} currency={store.currency} disabled={!ws.entitlements.canWrite} />
                     </TD>
-                    <TD numeric>{formatCount(r.units)}</TD>
+                    <TD numeric>{f.count(r.units)}</TD>
                     <TD numeric>{money(r.netRevenue)}</TD>
                     <TD numeric className={r.cogs === null ? "text-ink-3" : undefined}>
-                      {r.cogs === null ? <span title={`${r.linesWithoutCost} order lines have no cost`}>Incomplete</span> : money(r.cogs)}
+                      {r.cogs === null ? <span title={t.linesWithoutCost(f.count(r.linesWithoutCost))}>{c.incomplete}</span> : money(r.cogs)}
                     </TD>
                     <TD numeric className={cn("font-medium", r.contributionMargin !== null && r.contributionMargin < 0 && "text-negative-700")}>
                       {r.contributionMargin === null ? <span className="font-normal text-ink-3">—</span> : money(r.contributionMargin)}
                     </TD>
                     <TD numeric className={cn(r.contributionMarginRate !== null && r.contributionMarginRate < 0 && "text-negative-700")}>
-                      {formatPercent(r.contributionMarginRate)}
+                      {f.percent(r.contributionMarginRate)}
                     </TD>
                   </TR>
                 ))}
@@ -286,18 +286,18 @@ async function Products({ searchParams }: { searchParams: PageProps<"/[lang]/app
         {total > 0 ? (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3 text-sm">
             <span className="text-ink-3 tabular">
-              {formatCount(page * PAGE_SIZE + 1)}–{formatCount(Math.min(total, (page + 1) * PAGE_SIZE))} of {formatCount(total)} products
+              {t.shown(f.count(page * PAGE_SIZE + 1), f.count(Math.min(total, (page + 1) * PAGE_SIZE)), f.count(total))}
             </span>
             {pages > 1 ? (
-              <nav aria-label="Pagination" className="flex gap-3">
+              <nav aria-label={c.pagination} className="flex gap-3">
                 {page > 0 ? (
                   <Link href={href({ page: page - 1 })} className="font-medium text-emerald-700 hover:underline">
-                    Previous
+                    {c.previous}
                   </Link>
                 ) : null}
                 {page + 1 < pages ? (
                   <Link href={href({ page: page + 1 })} className="font-medium text-emerald-700 hover:underline">
-                    Next
+                    {c.next}
                   </Link>
                 ) : null}
               </nav>
@@ -306,18 +306,14 @@ async function Products({ searchParams }: { searchParams: PageProps<"/[lang]/app
         ) : null}
       </Card>
 
-      <p className="max-w-4xl text-xs text-ink-3">
-        Contribution margin per product = net revenue − COGS − shipping and payment fees allocated by each line&rsquo;s share of the order − spend of campaigns linked
-        to the product. Ad spend of campaigns not linked to a product stays at store level: splitting it across products would be arbitrary. A product with any
-        sold line lacking a cost shows no margin instead of an overstated one.
-      </p>
+      <p className="max-w-4xl text-xs text-ink-3">{t.footnote}</p>
     </div>
   );
 }
 
-function ProductsSkeleton() {
+function ProductsSkeleton({ label }: { label: string }) {
   return (
-    <div className="space-y-5" aria-busy="true" aria-label="Loading products">
+    <div className="space-y-5" aria-busy="true" aria-label={label}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
           <Skeleton className="h-4 w-28" />

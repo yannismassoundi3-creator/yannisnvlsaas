@@ -1,3 +1,5 @@
+import type { Locale } from "@/i18n/config";
+
 /**
  * Public site configuration.
  *
@@ -26,10 +28,44 @@ export const site = {
    * list accurate for your deployment: it is published in the privacy policy.
    */
   processors: [
-    { name: "Supabase", purpose: "Database, authentication and transactional authentication emails", location: process.env.NEXT_PUBLIC_DATA_REGION || "Region chosen at deployment" },
-    { name: "Stripe", purpose: "Subscription payments, invoices and the billing portal", location: "European Union and United States" },
-    { name: process.env.NEXT_PUBLIC_HOSTING_PROVIDER || "Vercel", purpose: "Application hosting and delivery", location: process.env.NEXT_PUBLIC_HOSTING_REGION || "Region chosen at deployment" },
+    { id: "database", name: "Supabase", purpose: "Database, authentication and transactional authentication emails", location: process.env.NEXT_PUBLIC_DATA_REGION || "Region chosen at deployment" },
+    { id: "payments", name: "Stripe", purpose: "Subscription payments, invoices and the billing portal", location: "European Union and United States" },
+    { id: "hosting", name: process.env.NEXT_PUBLIC_HOSTING_PROVIDER || "Vercel", purpose: "Application hosting and delivery", location: process.env.NEXT_PUBLIC_HOSTING_REGION || "Region chosen at deployment" },
   ],
 } as const;
 
 export type Site = typeof site;
+
+type ProcessorId = Site["processors"][number]["id"];
+
+const COPY_FR = {
+  tagline: "Comprenez vos vraies marges. Prenez de meilleures décisions.",
+  description:
+    "Analyse de rentabilité pour les petites boutiques en ligne. Voyez vos vraies marges par produit, la performance de vos publicités et vos coûts d'exploitation en un coup d'œil.",
+};
+
+const PROCESSORS_FR: Record<ProcessorId, { purpose: string; location: string }> = {
+  database: {
+    purpose: "Base de données, authentification et e-mails transactionnels d'authentification",
+    location: process.env.NEXT_PUBLIC_DATA_REGION || "Région choisie au déploiement",
+  },
+  payments: { purpose: "Paiement des abonnements, factures et portail de facturation", location: "Union européenne et États-Unis" },
+  hosting: {
+    purpose: "Hébergement et diffusion de l'application",
+    location: process.env.NEXT_PUBLIC_HOSTING_REGION || "Région choisie au déploiement",
+  },
+};
+
+/** Tagline and description in the interface language. */
+export function siteCopy(locale: Locale = "en"): { tagline: string; description: string } {
+  return locale === "fr" ? COPY_FR : { tagline: site.tagline, description: site.description };
+}
+
+/** Service providers with their purpose and location in the interface language (configured regions are shown as set). */
+export function processorsFor(locale: Locale = "en"): { id: ProcessorId; name: string; purpose: string; location: string }[] {
+  return site.processors.map((p) => {
+    if (locale === "en") return { id: p.id, name: p.name, purpose: p.purpose, location: p.location };
+    const fr = PROCESSORS_FR[p.id];
+    return { id: p.id, name: p.name, purpose: fr.purpose, location: fr.location };
+  });
+}

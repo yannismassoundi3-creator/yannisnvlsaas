@@ -1,5 +1,9 @@
+"use client";
+
 import { Label as LabelPrimitive } from "radix-ui";
 import type { ComponentProps, ReactNode } from "react";
+import { useLocale } from "@/i18n/client";
+import { shellUi } from "@/i18n/messages/shell-ui";
 import { cn } from "@/lib/utils";
 
 export function Label({ className, ...props }: ComponentProps<typeof LabelPrimitive.Root>) {
@@ -30,12 +34,13 @@ type FieldProps = {
  */
 export function Field({ htmlFor, label, hint, error, optional, className, children, aside }: FieldProps) {
   const errorText = Array.isArray(error) ? error[0] : error;
+  const t = shellUi[useLocale()];
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
       <div className="flex items-baseline justify-between gap-3">
         <Label htmlFor={htmlFor}>
           {label}
-          {optional ? <span className="ml-1.5 font-normal text-ink-3">Optional</span> : null}
+          {optional ? <span className="ml-1.5 font-normal text-ink-3">{t.optional}</span> : null}
         </Label>
         {aside}
       </div>
