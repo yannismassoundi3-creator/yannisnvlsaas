@@ -214,3 +214,37 @@ export const getStoreDataStatus = cache(async (store: Store): Promise<StoreDataS
     shippingRuleSet: store.default_shipping_cost_minor !== null,
   };
 });
+
+export type AdvertisingData = {
+  metrics: Metrics;
+  previous: Metrics | null;
+  campaigns: CampaignRow[];
+  daily: AdDailyPoint[];
+  products: { id: string; name: string; sku: string | null }[];
+};
+
+/** Store-level advertising figures, campaigns, daily spend by platform and products for linking. */
+export async function getAdvertisingData(store: Store, range: DateRange, comparison: DateRange | null): Promise<AdvertisingData> {
+  const client = await createClient();
+  const [daily, previousDaily, campaigns, adDaily, products] = await Promise.all([
+    fetchDailyTotals(client, store.id, range),
+    comparison ? fetchDailyTotals(client, store.id, comparison) : null,
+    fetchCampaigns(client, store.id, range),
+    fetchAdDaily(client, store.id, range),
+    client.from("products").select("id, name, sku").eq("store_id", store.id).is("archived_at", null).order("name").limit(1000),
+  ]);
+  return {
+    metrics: deriveMetrics(sumTotals(daily)),
+    previous: previousDaily ? deriveMetrics(sumTotals(previousDaily)) : null,
+    campaigns,
+    daily: adDaily,
+    products: products.data ?? [],
+  };
+}
+
+/** Campaigns of the store, also those without spend in the period (for manual entry). */
+export async function listCampaignOptions(store: Pick<Store, "id">) {
+  const client = await createClient();
+  const { data } = await client.from("ad_campaigns").select("id, platform, name").eq("store_id", store.id).order("name").limit(500);
+  return data ?? [];
+}

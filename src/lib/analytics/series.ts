@@ -99,3 +99,32 @@ export function endOfBucket(start: string, granularity: Granularity): string {
   const [y, m] = start.split("-").map(Number);
   return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
 }
+
+export type BucketPoint<K extends string> = { key: string; from: string; to: string; label: string; partial: boolean; values: Record<K, number> };
+
+/**
+ * Generic version of buildTimeSeries for plain daily values (product sales,
+ * ad spend by platform): sums each key per bucket, clipped to the range.
+ */
+export function bucketDailyValues<K extends string>(daily: { day: string; values: Partial<Record<K, number>> }[], keys: readonly K[], range: DateRange): { granularity: Granularity; points: BucketPoint<K>[] } {
+  const granularity = granularityFor(range);
+  const buckets = new Map<string, BucketPoint<K>>();
+  // Every bucket in the range exists, even without data, so gaps show as zero.
+  for (let d = range.from; d <= range.to; d = addDays(d, 1)) {
+    const key = bucketKey(d, granularity);
+    if (!buckets.has(key)) {
+      const end = endOfBucket(key, granularity);
+      const from = key < range.from ? range.from : key;
+      const to = end > range.to ? range.to : end;
+      const label = granularity === "day" ? formatShortDate(key) : granularity === "week" ? formatShortDate(from) : monthFormatter.format(new Date(`${key}T00:00:00Z`));
+      buckets.set(key, { key, from, to, label, partial: from !== key || to !== end, values: Object.fromEntries(keys.map((k) => [k, 0])) as Record<K, number> });
+    }
+  }
+  for (const { day, values } of daily) {
+    if (day < range.from || day > range.to) continue;
+    const bucket = buckets.get(bucketKey(day, granularity));
+    if (!bucket) continue;
+    for (const k of keys) bucket.values[k] += values[k] ?? 0;
+  }
+  return { granularity, points: [...buckets.values()].sort((a, b) => (a.key < b.key ? -1 : 1)) };
+}

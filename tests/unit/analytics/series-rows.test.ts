@@ -145,3 +145,17 @@ describe("SQL row mapping", () => {
     expect(unallocatedFromSql(undefined)).toEqual({ adSpend: 0, refunds: 0, variableExpenses: 0 });
   });
 });
+
+describe("bucketDailyValues", () => {
+  it("fills empty days with zero and sums keys per bucket", async () => {
+    const { bucketDailyValues } = await import("@/lib/analytics/series");
+    const range = { from: "2026-10-01", to: "2026-10-03" };
+    const out = bucketDailyValues([{ day: "2026-10-02", values: { meta: 500, google: 100 } }, { day: "2026-10-09", values: { meta: 999 } }], ["meta", "google"] as const, range);
+    expect(out.granularity).toBe("day");
+    expect(out.points.map((p) => p.values)).toEqual([
+      { meta: 0, google: 0 },
+      { meta: 500, google: 100 },
+      { meta: 0, google: 0 },
+    ]);
+  });
+});

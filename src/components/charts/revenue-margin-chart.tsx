@@ -93,7 +93,7 @@ export function RevenueMarginChart({
             />
             <Bar dataKey="netRevenue" name={REVENUE.label} fill={REVENUE.color} radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false}>
               {points.map((p) => (
-                <Cell key={p.key} fillOpacity={p.partial ? 0.45 : 1} />
+                <Cell key={p.key} fill={REVENUE.color} fillOpacity={p.partial ? 0.45 : 1} />
               ))}
             </Bar>
             <Line
