@@ -54,7 +54,7 @@ async function insert(event: ProductEvent, ctx: Context, properties: Properties,
       event,
       organization_id: ctx.organizationId ?? null,
       user_id: ctx.userId ?? null,
-      properties: sanitize(properties) as Json,
+      properties: sanitize(properties) as NonNullable<Json>,
     });
   } catch {
     // Analytics must never break the product.

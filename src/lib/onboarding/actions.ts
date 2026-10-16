@@ -1,5 +1,7 @@
 "use server";
 
+import type { Route } from "next";
+import { refresh } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -111,11 +113,12 @@ export async function createDemoStore(): Promise<ActionResult> {
   (await cookies()).set(ACTIVE_STORE_COOKIE, store.id, { path: "/", sameSite: "lax", httpOnly: true, secure: process.env.NODE_ENV === "production", maxAge: 60 * 60 * 24 * 365 });
   track("demo_store_created", { organizationId: ws.organization.id, userId: ws.user.id });
   audit("demo_store.created", { organizationId: ws.organization.id, actorId: ws.user.id }, { type: "store", id: store.id });
+  refresh();
   return { ok: true };
 }
 
 export async function completeOnboarding(destination: "dashboard" | "import" | "products") {
   const ws = await getWorkspace();
   if (ws.organization) trackFirst("onboarding_completed", { organizationId: ws.organization.id, userId: ws.user.id }, { destination });
-  redirect(destination === "import" ? "/app/imports/new" : destination === "products" ? "/app/products?new=1" : "/app");
+  redirect((destination === "import" ? "/app/imports/new" : destination === "products" ? "/app/products?new=1" : "/app") as Route);
 }

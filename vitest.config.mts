@@ -1,9 +1,13 @@
 import react from "@vitejs/plugin-react";
+import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [react()],
-  resolve: { tsconfigPaths: true },
+  resolve: {
+    tsconfigPaths: true,
+    alias: { "server-only": new URL("./tests/server-only-stub.ts", import.meta.url).pathname },
+  },
   test: {
     projects: [
       {
@@ -29,6 +33,8 @@ export default defineConfig({
           name: "db",
           include: ["tests/db/**/*.test.ts"],
           environment: "node",
+          // Local stack URLs and keys come from .env.local (see .env.example).
+          env: loadEnv("test", process.cwd(), ""),
           // Database tests share one local Postgres; run files serially.
           fileParallelism: false,
           testTimeout: 30_000,

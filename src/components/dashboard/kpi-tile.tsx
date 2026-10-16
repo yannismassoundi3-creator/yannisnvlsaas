@@ -22,6 +22,8 @@ type KpiTileProps = {
   deltaContext?: string;
   status?: { tone: "caution" | "info" | "neutral"; label: string } | null;
   footnote?: ReactNode;
+  /** "sm" for supporting figures under the headline KPIs. */
+  size?: "md" | "sm";
   className?: string;
 };
 
@@ -30,14 +32,14 @@ type KpiTileProps = {
  * direction is clearly better (e.g. contribution margin up); otherwise they
  * stay neutral, and the arrow plus text always carry the meaning.
  */
-export function KpiTile({ label, value, definition, delta, deltaContext, status, footnote, className }: KpiTileProps) {
+export function KpiTile({ label, value, definition, delta, deltaContext, status, footnote, size = "md", className }: KpiTileProps) {
   return (
-    <div className={cn("flex min-w-0 flex-col gap-1.5 bg-surface px-5 py-4", className)}>
+    <div className={cn("flex min-w-0 flex-col bg-surface", size === "md" ? "gap-1.5 px-5 py-4" : "gap-1 px-4 py-3", className)}>
       <div className="flex items-center gap-1.5">
         <span className="text-sm font-medium text-ink-3">{label}</span>
         {definition ? <TermTip term={definition.term}>{definition.text}</TermTip> : null}
       </div>
-      <div className="text-[1.625rem] leading-8 font-semibold tracking-tight text-ink tabular">{value}</div>
+      <div className={cn("font-semibold tracking-tight text-ink tabular", size === "md" ? "text-[1.625rem] leading-8" : "text-lg leading-7")}>{value}</div>
       {delta ? <DeltaLine delta={delta} context={deltaContext} /> : null}
       {footnote || status ? (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
@@ -76,12 +78,14 @@ export function DeltaLine({ delta, context }: { delta: KpiDelta; context?: strin
 }
 
 /** Grid of KPI tiles separated by hairlines, as one card. */
-export function KpiGrid({ children, className }: { children: ReactNode; className?: string }) {
+export function KpiGrid({ children, columns = 4, className }: { children: ReactNode; columns?: 2 | 4 | 6; className?: string }) {
   return (
     <div
       className={cn(
         "grid gap-px overflow-hidden rounded-lg border border-line bg-line shadow-xs",
-        "grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-4",
+        columns === 2 && "grid-cols-1 min-[480px]:grid-cols-2",
+        columns === 4 && "grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-4",
+        columns === 6 && "grid-cols-2 md:grid-cols-3 xl:grid-cols-6",
         className,
       )}
     >

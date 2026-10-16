@@ -46,7 +46,7 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
     pricesIncludeTax: "" as "" | "yes" | "no",
   });
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((f) => ({ ...f, [key]: value }));
-  const otherCurrencies = useMemo(allCurrencies, []);
+  const otherCurrencies = useMemo(() => allCurrencies(), []);
   // Always offer UTC and the browser's own zone, which may be missing from the canonical list.
   const timezones = useMemo(() => {
     const list = allTimezones();

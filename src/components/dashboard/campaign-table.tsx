@@ -26,7 +26,7 @@ export function CampaignTable({ campaigns, currency, breakEvenRoas, productNames
             <TH>Campaign</TH>
             <TH numeric>Spend</TH>
             {!compact ? <TH numeric>Clicks</TH> : null}
-            <TH numeric>Platform conversion value</TH>
+            {!compact ? <TH numeric>Platform conversion value</TH> : null}
             <TH numeric>
               <span className="inline-flex items-center gap-1">
                 Platform ROAS
@@ -49,7 +49,7 @@ export function CampaignTable({ campaigns, currency, breakEvenRoas, productNames
                 </TD>
                 <TD numeric>{formatMoney(c.spend, currency)}</TD>
                 {!compact ? <TD numeric>{formatCount(c.clicks)}</TD> : null}
-                <TD numeric>{formatMoney(c.conversionValue, currency)}</TD>
+                {!compact ? <TD numeric>{formatMoney(c.conversionValue, currency)}</TD> : null}
                 <TD numeric>
                   <span className="inline-flex items-center justify-end gap-2">
                     {below ? (

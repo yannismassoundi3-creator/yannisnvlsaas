@@ -1,3 +1,4 @@
+import type { Route } from "next";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import type { NextRequest } from "next/server";
@@ -26,14 +27,14 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
     if (!error) {
       if (type === "signup" || type === "email") track("registration_completed", { userId: data.user?.id ?? null });
-      redirect(next);
+      redirect(next as Route);
     }
     redirect(`/auth/error?reason=${error.code === "otp_expired" ? "expired" : "invalid"}`);
   }
 
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) redirect(next);
+    if (!error) redirect(next as Route);
     redirect("/auth/error?reason=invalid");
   }
 

@@ -130,3 +130,77 @@ export function buildAdvertisingKpis(current: Metrics, previous: Metrics | null,
     },
   ];
 }
+
+function shippingAndFeesStatus(m: Metrics): KpiModel["status"] {
+  const states = [m.completeness.shipping, m.completeness.fees];
+  if (states.some((s) => s === "missing" || s === "partial")) return { tone: "caution", label: "Incomplete" };
+  if (states.includes("estimated")) return { tone: "info", label: "Includes estimates" };
+  return null;
+}
+
+/** Supporting figures under the headline KPIs, each compared with the previous period. */
+export function buildSecondaryKpis(current: Metrics, previous: Metrics | null, currency: string): KpiModel[] {
+  const money = (v: number) => formatMoney(v, currency, { wholeUnits: true });
+  const p = previous;
+  const shippingAndFees = (m: Metrics) => m.shippingCosts + m.transactionFees;
+  return [
+    {
+      key: "grossSales",
+      label: "Gross sales",
+      value: money(current.grossSales),
+      definition: { term: DEFINITIONS.grossSales.term, text: `${DEFINITIONS.grossSales.short} ${DEFINITIONS.grossSales.formula}.` },
+      delta: p ? { ...relativeDelta(current.grossSales, p.grossSales), polarity: METRIC_POLARITY.grossSales } : null,
+      status: null,
+      footnote: `${formatCount(current.units)} units sold`,
+    },
+    {
+      key: "discounts",
+      label: "Discounts",
+      value: money(current.discounts),
+      definition: { term: DEFINITIONS.discounts.term, text: DEFINITIONS.discounts.short },
+      delta: p ? { ...relativeDelta(current.discounts, p.discounts), polarity: METRIC_POLARITY.discounts } : null,
+      status: null,
+      footnote: current.discountRate !== null ? `${formatPercent(current.discountRate)} of gross sales` : null,
+    },
+    {
+      key: "refunds",
+      label: "Refunds",
+      value: money(current.refunds),
+      definition: { term: DEFINITIONS.refunds.term, text: DEFINITIONS.refunds.short },
+      delta: p ? { ...relativeDelta(current.refunds, p.refunds), polarity: METRIC_POLARITY.refunds } : null,
+      status: null,
+      footnote: current.refundRate !== null ? `${formatPercent(current.refundRate)} of gross sales` : null,
+    },
+    {
+      key: "cogs",
+      label: "Cost of goods sold",
+      value: money(current.cogs),
+      definition: { term: DEFINITIONS.cogs.term, text: DEFINITIONS.cogs.short },
+      delta: p ? { ...relativeDelta(current.cogs, p.cogs), polarity: METRIC_POLARITY.cogs } : null,
+      status:
+        current.completeness.cogs === "partial" || current.completeness.cogs === "missing" ? { tone: "caution", label: "Costs incomplete" } : null,
+      footnote: current.costCoverage !== null && current.costCoverage < 1 ? `${formatPercent(current.costCoverage)} of sales have a cost` : null,
+    },
+    {
+      key: "shippingAndFees",
+      label: "Shipping & fees",
+      value: money(shippingAndFees(current)),
+      definition: {
+        term: "Shipping and payment fees",
+        text: `${DEFINITIONS.shippingCosts.short} ${DEFINITIONS.transactionFees.short}`,
+      },
+      delta: p ? { ...relativeDelta(shippingAndFees(current), shippingAndFees(p)), polarity: null } : null,
+      status: shippingAndFeesStatus(current),
+      footnote: `Shipping ${money(current.shippingCosts)} · Fees ${money(current.transactionFees)}`,
+    },
+    {
+      key: "adSpend",
+      label: "Ad spend",
+      value: money(current.adSpend),
+      definition: { term: DEFINITIONS.adSpend.term, text: DEFINITIONS.adSpend.short },
+      delta: p ? { ...relativeDelta(current.adSpend, p.adSpend), polarity: METRIC_POLARITY.adSpend } : null,
+      status: null,
+      footnote: current.adSpendRate !== null ? `${formatPercent(current.adSpendRate)} of net revenue` : null,
+    },
+  ];
+}

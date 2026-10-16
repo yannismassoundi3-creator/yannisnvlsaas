@@ -163,7 +163,33 @@ export type ProductBreakdown = {
   unallocated: { adSpend: number; refunds: number; variableExpenses: number };
 };
 
-type Acc = Omit<ProductRow, "netSales" | "netRevenue" | "contributionMargin" | "contributionMarginRate" | "cogs"> & { cogsKnown: number };
+/** Aggregated product amounts before the derived figures are computed. */
+export type ProductBase = Omit<ProductRow, "netSales" | "netRevenue" | "contributionMargin" | "contributionMarginRate">;
+
+/**
+ * Derived product figures, shared by this reference and the SQL-backed reports.
+ * Contribution margin is unknown (null) when any sold line has no unit cost.
+ */
+export function deriveProductRow(base: ProductBase): ProductRow {
+  const netSales = base.grossSales - base.discounts - base.refunds;
+  const netRevenue = netSales + base.shippingCharged;
+  const contributionMargin =
+    base.cogs === null ? null : netRevenue - base.cogs - base.shippingCosts - base.transactionFees - base.adSpend;
+  return {
+    ...base,
+    netSales,
+    netRevenue,
+    contributionMargin,
+    contributionMarginRate: contributionMargin !== null && netRevenue > 0 ? contributionMargin / netRevenue : null,
+  };
+}
+
+/** Default product order: highest net revenue first, then by name. */
+export function compareProductRows(x: Pick<ProductRow, "netRevenue" | "name">, y: Pick<ProductRow, "netRevenue" | "name">) {
+  return y.netRevenue - x.netRevenue || x.name.localeCompare(y.name);
+}
+
+type Acc = Omit<ProductBase, "cogs"> & { cogsKnown: number };
 
 export function computeProductBreakdown(ds: Dataset, range: DateRange): ProductBreakdown {
   const { settings } = ds;
@@ -200,6 +226,8 @@ export function computeProductBreakdown(ds: Dataset, range: DateRange): ProductB
   for (const order of ds.orders) {
     if (!isInRange(localDateOf(order.orderedAt, settings.timezone), range)) continue;
     const lines = sortedLines(order);
+    // Orders without lines have nothing to allocate to (they still count at store level).
+    if (lines.length === 0) continue;
     const weights = lines.map(lineNet).map((w) => Math.max(w, 0));
     const shippingCharged = allocateProportionally(order.shippingChargedMinor, weights);
     const shippingCost = resolvedShippingCost(order, settings).amount;
@@ -252,23 +280,10 @@ export function computeProductBreakdown(ds: Dataset, range: DateRange): ProductB
     if (e.kind === "variable" && isInRange(e.incurredOn, range)) variableExpenses += e.amountMinor;
   }
 
-  const rows: ProductRow[] = [...acc.values()].map((a) => {
-    const netSales = a.grossSales - a.discounts - a.refunds;
-    const netRevenue = netSales + a.shippingCharged;
-    const cogs = a.linesWithoutCost > 0 ? null : a.cogsKnown;
-    const contributionMargin = cogs === null ? null : netRevenue - cogs - a.shippingCosts - a.transactionFees - a.adSpend;
-    const { cogsKnown: _ignored, ...rest } = a;
-    void _ignored;
-    return {
-      ...rest,
-      netSales,
-      netRevenue,
-      cogs,
-      contributionMargin,
-      contributionMarginRate: contributionMargin !== null && netRevenue > 0 ? contributionMargin / netRevenue : null,
-    };
-  });
-  rows.sort((x, y) => y.netRevenue - x.netRevenue || x.name.localeCompare(y.name));
+  const rows: ProductRow[] = [...acc.values()].map(({ cogsKnown, ...rest }) =>
+    deriveProductRow({ ...rest, cogs: rest.linesWithoutCost > 0 ? null : cogsKnown }),
+  );
+  rows.sort(compareProductRows);
 
   return { rows, unallocated: { adSpend: unallocatedAds, refunds: unallocatedRefunds, variableExpenses } };
 }

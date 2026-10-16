@@ -1,6 +1,6 @@
 "use client";
 
-import { Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, CartesianGrid, Cell, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { TooltipContentProps } from "recharts";
 import { bucketDescription, type Granularity, type SeriesPoint } from "@/lib/analytics/series";
 import { niceScale } from "@/lib/analytics/ticks";
@@ -35,11 +35,13 @@ export function RevenueMarginChart({
   const values = points.flatMap((p) => [p.netRevenue, p.contributionMargin]);
   const scale = niceScale(Math.min(0, ...values), Math.max(0, ...values), 6);
   const granularityLabel = granularity === "day" ? "Daily" : granularity === "week" ? "Weekly" : "Monthly";
+  const unit = granularity === "week" ? "weeks" : "months";
+  const partialNote = points.some((p) => p.partial) ? ` Lighter bars are partial ${unit}, cut short by the selected dates.` : "";
 
   return (
     <ChartFrame
       title={title}
-      description={description ?? `${granularityLabel} totals. Contribution margin is net revenue minus product and variable costs.`}
+      description={(description ?? `${granularityLabel} totals. Contribution margin is net revenue minus product and variable costs.`) + partialNote}
       headingLevel={headingLevel}
       legend={[
         { label: REVENUE.label, color: REVENUE.color, shape: "bar" },
@@ -89,7 +91,11 @@ export function RevenueMarginChart({
               content={(props) => <SeriesTooltip {...props} currency={currency} granularity={granularity} />}
               isAnimationActive={false}
             />
-            <Bar dataKey="netRevenue" name={REVENUE.label} fill={REVENUE.color} radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false} />
+            <Bar dataKey="netRevenue" name={REVENUE.label} fill={REVENUE.color} radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false}>
+              {points.map((p) => (
+                <Cell key={p.key} fillOpacity={p.partial ? 0.45 : 1} />
+              ))}
+            </Bar>
             <Line
               dataKey="contributionMargin"
               name={MARGIN.label}
@@ -120,7 +126,10 @@ function SeriesTooltip({
   const rate = point.netRevenue > 0 ? point.contributionMargin / point.netRevenue : null;
   return (
     <div className="min-w-52 rounded-md border border-line bg-surface px-3 py-2.5 text-sm shadow-lg">
-      <p className="mb-1.5 text-xs font-medium text-ink-3">{bucketDescription(point, granularity)}</p>
+      <p className="mb-1.5 text-xs font-medium text-ink-3">
+        {bucketDescription(point, granularity)}
+        {point.partial ? ` (partial ${granularity})` : ""}
+      </p>
       <dl className="space-y-1">
         <div className="flex items-center justify-between gap-6">
           <dt className="flex items-center gap-2 text-ink-3">

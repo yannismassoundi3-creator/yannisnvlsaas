@@ -14,8 +14,8 @@ export const pool = new pg.Pool({ connectionString: DB_URL, max: 4 });
 // bigint columns arrive as strings by default; tests compare numbers.
 pg.types.setTypeParser(20, (v) => Number(v));
 
-export async function adminQuery<T extends pg.QueryResultRow = pg.QueryResultRow>(sql: string, params: unknown[] = []) {
-  return pool.query<T>(sql, params);
+export async function adminQuery<T extends pg.QueryResultRow = pg.QueryResultRow>(sql: string, params: readonly unknown[] = []) {
+  return pool.query<T>(sql, [...params]);
 }
 
 /** Creates an auth user directly (the on_auth_user_created trigger runs). */
@@ -29,7 +29,7 @@ export async function createUser(email = `user-${randomUUID()}@example.test`): P
   return id;
 }
 
-export type AsUser = <T extends pg.QueryResultRow = pg.QueryResultRow>(sql: string, params?: unknown[]) => Promise<pg.QueryResult<T>>;
+export type AsUser = <T extends pg.QueryResultRow = pg.QueryResultRow>(sql: string, params?: readonly unknown[]) => Promise<pg.QueryResult<T>>;
 
 /**
  * Runs `fn` inside a transaction as `userId` (role authenticated) or as anon.
@@ -45,7 +45,7 @@ export async function asUser<R>(userId: string | null, fn: (q: AsUser) => Promis
     } else {
       await client.query("set local role anon");
     }
-    const q: AsUser = (sql, params = []) => client.query(sql, params);
+    const q: AsUser = (sql, params = []) => client.query(sql, [...params]);
     const result = await fn(q);
     await client.query(commit ? "commit" : "rollback");
     return result;

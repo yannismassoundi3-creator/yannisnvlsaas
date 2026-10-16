@@ -37,7 +37,7 @@ export function audit(
         actor_id: ctx.actorId,
         target_type: target?.type ?? null,
         target_id: target?.id ?? null,
-        metadata: metadata as Json,
+        metadata: metadata as NonNullable<Json>,
       });
     } catch {
       // Never fail the user's action because the audit write failed; it is logged by the platform.

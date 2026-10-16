@@ -27,11 +27,13 @@ export function Alert({ tone = "info", title, action, className, children, ...pr
       {...props}
     >
       {t.icon}
-      <div className="min-w-0 flex-1 space-y-0.5">
-        {title ? <p className="font-semibold">{title}</p> : null}
-        {children ? <div className="text-ink-2 [&_a]:font-medium [&_a]:text-current [&_a]:underline">{children}</div> : null}
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="min-w-0 flex-[1_1_18rem] space-y-0.5">
+          {title ? <p className="font-semibold">{title}</p> : null}
+          {children ? <div className="text-ink-2 [&_a]:font-medium [&_a]:text-current [&_a]:underline">{children}</div> : null}
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
       </div>
-      {action ? <div className="shrink-0 self-center">{action}</div> : null}
     </div>
   );
 }

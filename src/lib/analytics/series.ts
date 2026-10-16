@@ -17,6 +17,8 @@ export type SeriesPoint = {
   orders: number;
   /** Ad spend as a share of net revenue; null without revenue. */
   adSpendRate: number | null;
+  /** True when the range cuts the bucket short (e.g. a week with only 3 days in range). */
+  partial: boolean;
 };
 
 export type TimeSeries = { granularity: Granularity; points: SeriesPoint[] };
@@ -52,11 +54,11 @@ export function buildTimeSeries(daily: Map<string, PeriodTotals> | [string, Peri
     const key = bucketKey(date, granularity);
     let bucket = buckets.get(key);
     if (!bucket) {
-      bucket = { from: date, to: date, totals: { ...EMPTY_TOTALS } };
+      // Clip the bucket to the range so its dates describe exactly what it contains.
+      const end = endOfBucket(key, granularity);
+      bucket = { from: key < range.from ? range.from : key, to: end > range.to ? range.to : end, totals: { ...EMPTY_TOTALS } };
       buckets.set(key, bucket);
     }
-    bucket.to = date > bucket.to ? date : bucket.to;
-    bucket.from = date < bucket.from ? date : bucket.from;
     for (const k of Object.keys(totals) as (keyof PeriodTotals)[]) bucket.totals[k] += totals[k];
   }
 
@@ -79,6 +81,7 @@ export function buildTimeSeries(daily: Map<string, PeriodTotals> | [string, Peri
       adSpend: m.adSpend,
       orders: m.orders,
       adSpendRate: m.adSpendRate,
+      partial: b.from !== key || b.to !== endOfBucket(key, granularity),
     };
   });
   return { granularity, points };

@@ -51,7 +51,8 @@ export function ProfitBreakdown({ metrics, currency, className, title = "Profit 
     { key: "operatingProfit", label: "Operating profit (estimate)", amount: m.operatingProfit, sign: "=", definition: "operatingProfit", kind: "muted", share: true },
   ];
 
-  const share = (amount: number) => (m.netRevenue > 0 ? Math.abs(amount) / m.netRevenue : null);
+  // Cost lines show their size as a share of net revenue; results (rows with "=") keep their sign.
+  const share = (row: Row) => (m.netRevenue > 0 ? (row.sign === "=" ? row.amount : Math.abs(row.amount)) / m.netRevenue : null);
 
   return (
     <div className={cn("rounded-lg border border-line bg-surface shadow-xs", className)}>
@@ -71,7 +72,7 @@ export function ProfitBreakdown({ metrics, currency, className, title = "Profit 
         <tbody>
           {rows.map((row) => {
             const def = row.definition ? DEFINITIONS[row.definition] : null;
-            const pct = share(row.amount);
+            const pct = share(row);
             return (
               <tr
                 key={row.key}
@@ -84,28 +85,28 @@ export function ProfitBreakdown({ metrics, currency, className, title = "Profit 
                 <th
                   scope="row"
                   className={cn(
-                    "py-2 pr-2 pl-5 text-left font-normal",
+                    "py-2 pr-2 pl-4 text-left font-normal sm:pl-5",
                     row.kind === "subtotal" && "font-medium",
                     row.kind === "total" && "font-semibold",
                     row.kind === "muted" ? "text-ink-3" : "text-ink",
                   )}
                 >
-                  <span className="flex items-center gap-1.5">
-                    <span aria-hidden className="w-3 text-center text-ink-3 tabular">
+                  <span className="flex items-start gap-1.5">
+                    <span aria-hidden className="w-3 shrink-0 text-center text-ink-3 tabular">
                       {row.sign}
                     </span>
-                    {row.label}
-                    {def ? <TermTip term={def.term}>{def.short}</TermTip> : null}
-                    {row.badge ? (
-                      <Badge tone={row.badge.tone} className="ml-1">
-                        {row.badge.label}
-                      </Badge>
-                    ) : null}
+                    <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                      <span className="inline-flex items-center gap-1.5 sm:whitespace-nowrap">
+                        {row.label}
+                        {def ? <TermTip term={def.term}>{def.short}</TermTip> : null}
+                      </span>
+                      {row.badge ? <Badge tone={row.badge.tone}>{row.badge.label}</Badge> : null}
+                    </span>
                   </span>
                 </th>
                 <td
                   className={cn(
-                    "py-2 pr-3 text-right whitespace-nowrap tabular",
+                    "py-2 pr-2 text-right whitespace-nowrap tabular sm:pr-3",
                     row.kind === "total" && "font-semibold",
                     row.kind === "subtotal" && "font-medium",
                     row.kind === "muted" ? "text-ink-3" : "text-ink",
@@ -113,7 +114,7 @@ export function ProfitBreakdown({ metrics, currency, className, title = "Profit 
                 >
                   {formatMoney(row.amount, currency)}
                 </td>
-                <td className="w-[38%] py-2 pr-5">
+                <td className="w-14 py-2 pr-3 sm:w-[38%] sm:pr-5">
                   <div className="flex items-center justify-end gap-3">
                     {row.bar && pct !== null ? (
                       <span aria-hidden className="hidden h-1.5 flex-1 overflow-hidden rounded-full bg-sunken sm:block">
@@ -122,7 +123,7 @@ export function ProfitBreakdown({ metrics, currency, className, title = "Profit 
                     ) : (
                       <span className="hidden flex-1 sm:block" />
                     )}
-                    <span className={cn("w-14 text-right text-xs tabular", row.kind === "total" ? "font-semibold text-ink" : "text-ink-3")}>
+                    <span className={cn("w-11 shrink-0 text-right text-xs tabular sm:w-14", row.kind === "total" ? "font-semibold text-ink" : "text-ink-3")}>
                       {row.share ? formatPercent(pct) : ""}
                     </span>
                   </div>
