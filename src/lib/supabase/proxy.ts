@@ -15,8 +15,14 @@ function matches(pathname: string, prefixes: string[]) {
  * security boundary: pages, server actions and route handlers re-check the
  * session, and Row Level Security protects the data itself.
  */
-export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({ request });
+/** Paths that need a fresh Supabase session (the language prefix is already stripped). */
+export function needsSession(pathname: string) {
+  return matches(pathname, [...PROTECTED_PREFIXES, ...AUTH_PAGES, "/reset-password", "/auth", "/api"]);
+}
+
+export async function updateSession(request: NextRequest, rewriteTo?: URL) {
+  const pass = () => (rewriteTo ? NextResponse.rewrite(rewriteTo, { request }) : NextResponse.next({ request }));
+  let response = pass();
   if (!isSupabaseConfigured()) return response;
 
   const supabase = createServerClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
@@ -26,7 +32,7 @@ export async function updateSession(request: NextRequest) {
       },
       setAll(cookiesToSet, headers) {
         for (const { name, value } of cookiesToSet) request.cookies.set(name, value);
-        response = NextResponse.next({ request });
+        response = pass();
         for (const { name, value, options } of cookiesToSet) response.cookies.set(name, value, options);
         // Responses that set auth cookies must never be cached by shared caches.
         for (const [key, value] of Object.entries(headers)) response.headers.set(key, value);

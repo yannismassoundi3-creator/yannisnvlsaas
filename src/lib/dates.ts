@@ -121,6 +121,20 @@ export const RANGE_PRESETS: { id: RangePreset; label: string }[] = [
   { id: "year_to_date", label: "Year to date" },
 ];
 
+const RANGE_PRESET_LABELS_FR: Record<RangePreset, string> = {
+  last_7: "7 derniers jours",
+  last_30: "30 derniers jours",
+  last_90: "90 derniers jours",
+  month_to_date: "Mois en cours",
+  last_month: "Mois dernier",
+  quarter_to_date: "Trimestre en cours",
+  year_to_date: "Année en cours",
+};
+
+export function rangePresetLabel(preset: RangePreset, locale: "en" | "fr" = "en"): string {
+  return locale === "fr" ? RANGE_PRESET_LABELS_FR[preset] : RANGE_PRESETS.find((p) => p.id === preset)!.label;
+}
+
 export function presetRange(preset: RangePreset, today: string): DateRange {
   const [y, m] = today.split("-").map(Number);
   switch (preset) {
@@ -148,30 +162,31 @@ export function presetRange(preset: RangePreset, today: string): DateRange {
 
 const labelFormatters = new Map<string, Intl.DateTimeFormat>();
 
-function labelFormatter(key: string, options: Intl.DateTimeFormatOptions) {
-  let f = labelFormatters.get(key);
+function labelFormatter(key: string, locale: string, options: Intl.DateTimeFormatOptions) {
+  const cacheKey = `${locale}|${key}`;
+  let f = labelFormatters.get(cacheKey);
   if (!f) {
-    f = new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", ...options });
-    labelFormatters.set(key, f);
+    f = new Intl.DateTimeFormat(locale, { timeZone: "UTC", ...options });
+    labelFormatters.set(cacheKey, f);
   }
   return f;
 }
 
-/** "12 Mar 2026" */
-export function formatDate(date: string): string {
-  return labelFormatter("long", { day: "numeric", month: "short", year: "numeric" }).format(toUtcDate(date));
+/** "12 Mar 2026" ("12 mars 2026" in French) */
+export function formatDate(date: string, locale = "en-GB"): string {
+  return labelFormatter("long", locale, { day: "numeric", month: "short", year: "numeric" }).format(toUtcDate(date));
 }
 
 /** "12 Mar" */
-export function formatShortDate(date: string): string {
-  return labelFormatter("short", { day: "numeric", month: "short" }).format(toUtcDate(date));
+export function formatShortDate(date: string, locale = "en-GB"): string {
+  return labelFormatter("short", locale, { day: "numeric", month: "short" }).format(toUtcDate(date));
 }
 
 /** "1 Mar – 30 Mar 2026" or "28 Dec 2025 – 3 Jan 2026" */
-export function formatRange(range: DateRange): string {
-  if (range.from === range.to) return formatDate(range.from);
+export function formatRange(range: DateRange, locale = "en-GB"): string {
+  if (range.from === range.to) return formatDate(range.from, locale);
   const sameYear = range.from.slice(0, 4) === range.to.slice(0, 4);
-  return `${sameYear ? formatShortDate(range.from) : formatDate(range.from)} – ${formatDate(range.to)}`;
+  return `${sameYear ? formatShortDate(range.from, locale) : formatDate(range.from, locale)} – ${formatDate(range.to, locale)}`;
 }
 
 /** Monday-based ISO week start for a date. */
@@ -184,11 +199,12 @@ export function weekStart(date: string): string {
 const dateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
 
 /** "16 Oct 2026, 14:05" in the given time zone. */
-export function formatDateTime(instant: string | Date, timezone: string): string {
-  let f = dateTimeFormatters.get(timezone);
+export function formatDateTime(instant: string | Date, timezone: string, locale = "en-GB"): string {
+  const key = `${locale}|${timezone}`;
+  let f = dateTimeFormatters.get(key);
   if (!f) {
-    f = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-    dateTimeFormatters.set(timezone, f);
+    f = new Intl.DateTimeFormat(locale, { timeZone: timezone, day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    dateTimeFormatters.set(key, f);
   }
   return f.format(typeof instant === "string" ? new Date(instant) : instant);
 }

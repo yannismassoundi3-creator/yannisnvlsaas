@@ -5,6 +5,8 @@
  * amounts exclude sales tax / VAT.
  */
 
+import type { Locale } from "@/i18n/config";
+
 export type Platform = "meta" | "google" | "tiktok" | "pinterest" | "microsoft" | "other";
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
@@ -44,6 +46,35 @@ export const EXPENSE_CATEGORIES: Record<ExpenseCategory, { label: string; defaul
   professional_services: { label: "Professional services", defaultKind: "fixed" },
   other: { label: "Other", defaultKind: "fixed" },
 };
+
+const PLATFORM_LABELS_FR: Record<Platform, string> = { ...PLATFORM_LABELS, other: "Autre" };
+
+const EXPENSE_CATEGORY_LABELS_FR: Record<ExpenseCategory, string> = {
+  shipping: "Expédition et transporteurs",
+  packaging: "Emballage",
+  payment_fees: "Frais de paiement",
+  marketplace_fees: "Commissions des places de marché",
+  fulfilment: "Logistique et entreposage",
+  marketing_other: "Autres dépenses marketing",
+  software: "Logiciels et abonnements",
+  staff: "Personnel et prestataires",
+  rent: "Loyer et charges",
+  professional_services: "Services professionnels",
+  other: "Autre",
+};
+
+export function platformLabel(platform: Platform, locale: Locale = "en"): string {
+  return locale === "fr" ? PLATFORM_LABELS_FR[platform] : PLATFORM_LABELS[platform];
+}
+
+export function expenseCategoryLabel(category: ExpenseCategory, locale: Locale = "en"): string {
+  return locale === "fr" ? EXPENSE_CATEGORY_LABELS_FR[category] : EXPENSE_CATEGORIES[category].label;
+}
+
+export function expenseKindLabel(kind: ExpenseKind, locale: Locale = "en"): string {
+  if (locale === "fr") return kind === "fixed" ? "Fixe" : "Variable";
+  return kind === "fixed" ? "Fixed" : "Variable";
+}
 
 export type StoreSettings = {
   currency: string;

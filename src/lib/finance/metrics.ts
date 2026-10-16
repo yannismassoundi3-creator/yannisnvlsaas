@@ -16,6 +16,7 @@
  * excludes fixed costs, taxes on profit, interest and depreciation.
  */
 
+import type { Locale } from "@/i18n/config";
 import { mulDivRound } from "./money";
 
 export type PeriodTotals = {
@@ -357,3 +358,15 @@ export const DEFINITIONS = {
 } as const;
 
 export type DefinitionKey = keyof typeof DEFINITIONS;
+export type Definition = { term: string; short: string; formula: string };
+
+/**
+ * French definitions. Same keys as DEFINITIONS; keep both in sync.
+ * TODO(i18n): placeholder until translated.
+ */
+const DEFINITIONS_FR: Record<DefinitionKey, Definition> = DEFINITIONS;
+
+/** Definitions in the interface language (glossary, tooltips, reports). */
+export function definitionsFor(locale: Locale = "en"): Record<DefinitionKey, Definition> {
+  return locale === "fr" ? DEFINITIONS_FR : DEFINITIONS;
+}

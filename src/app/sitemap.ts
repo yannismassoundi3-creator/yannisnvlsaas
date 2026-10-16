@@ -1,9 +1,10 @@
 import type { MetadataRoute } from "next";
 import { site } from "@/config/site";
+import { localizedPath, type PublicPath } from "@/i18n/config";
 
-/** Public, indexable pages only. The application and auth pages are excluded. */
+/** Public, indexable pages in both languages, with hreflang alternates. Application and auth pages are excluded. */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const pages: { path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"] }[] = [
+  const pages: { path: PublicPath; priority: number; changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"] }[] = [
     { path: "/", priority: 1, changeFrequency: "weekly" },
     { path: "/pricing", priority: 0.8, changeFrequency: "monthly" },
     { path: "/tools/profit-margin-calculator", priority: 0.8, changeFrequency: "monthly" },
@@ -13,10 +14,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/terms", priority: 0.2, changeFrequency: "yearly" },
     { path: "/legal", priority: 0.2, changeFrequency: "yearly" },
   ];
-  return pages.map((p) => ({
-    url: `${site.url}${p.path === "/" ? "" : p.path}`,
-    lastModified: site.legalLastUpdated,
-    changeFrequency: p.changeFrequency,
-    priority: p.priority,
-  }));
+  const url = (path: string) => `${site.url}${path === "/" ? "" : path}`;
+  return pages.flatMap((p) => {
+    const languages = { en: url(localizedPath(p.path, "en")), fr: url(localizedPath(p.path, "fr")), "x-default": url(p.path) };
+    return (["en", "fr"] as const).map((locale) => ({
+      url: url(localizedPath(p.path, locale)),
+      lastModified: site.legalLastUpdated,
+      changeFrequency: p.changeFrequency,
+      priority: p.priority,
+      alternates: { languages },
+    }));
+  });
 }

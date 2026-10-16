@@ -55,7 +55,8 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   poweredByHeader: false,
   reactStrictMode: true,
-  typedRoutes: true,
+  // Off: every page now lives under /[lang], and private URLs carry no prefix, which typed routes cannot express.
+  typedRoutes: false,
   // pdfkit reads its font metrics from its own package directory at runtime.
   serverExternalPackages: ["pdfkit"],
   // Fonts embedded in PDF reports and social images.
