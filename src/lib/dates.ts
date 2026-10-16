@@ -180,3 +180,15 @@ export function weekStart(date: string): string {
   const dow = (dt.getUTCDay() + 6) % 7; // 0 = Monday
   return addDays(date, -dow);
 }
+
+const dateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
+
+/** "16 Oct 2026, 14:05" in the given time zone. */
+export function formatDateTime(instant: string | Date, timezone: string): string {
+  let f = dateTimeFormatters.get(timezone);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    dateTimeFormatters.set(timezone, f);
+  }
+  return f.format(typeof instant === "string" ? new Date(instant) : instant);
+}

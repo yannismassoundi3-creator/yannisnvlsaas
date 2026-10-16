@@ -168,3 +168,15 @@ describe("delta", () => {
     expect(delta(null, 5).absolute).toBeNull();
   });
 });
+
+describe("KPI deltas", () => {
+  it("shows a change that rounds to zero as unchanged", async () => {
+    const { buildPrimaryKpis } = await import("@/lib/finance/kpis");
+    const { deriveMetrics, EMPTY_TOTALS } = await import("@/lib/finance/metrics");
+    const base = { ...EMPTY_TOTALS, orders: 10, grossSales: 100_000, cogs: 50_000 };
+    const current = deriveMetrics({ ...base, grossSales: 100_010, cogs: 50_010 });
+    const previous = deriveMetrics(base);
+    const rate = buildPrimaryKpis(current, previous, "EUR").find((k) => k.key === "contributionMarginRate")!;
+    expect(rate.delta).toMatchObject({ value: 0, text: "0.0 pts" });
+  });
+});

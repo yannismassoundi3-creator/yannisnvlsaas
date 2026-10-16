@@ -12,15 +12,18 @@ export type KpiModel = {
   footnote: string | null;
 };
 
+/** Changes that display as 0.0 are treated as no change, so the arrow and colour match the text. */
+const displayedZero = (fraction: number) => (Math.abs(fraction) < 0.0005 ? 0 : fraction);
+
 function relativeDelta(current: number, previous: number | undefined | null) {
   if (previous === undefined || previous === null || previous === 0) return { value: null, text: "" };
-  const value = (current - previous) / Math.abs(previous);
+  const value = displayedZero((current - previous) / Math.abs(previous));
   return { value, text: formatPercent(value, { signDisplay: "exceptZero" }) };
 }
 
 function pointsDelta(current: number | null, previous: number | null | undefined) {
   if (current === null || previous === null || previous === undefined) return { value: null, text: "" };
-  const value = current - previous;
+  const value = displayedZero(current - previous);
   return { value, text: formatPoints(value) };
 }
 

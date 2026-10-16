@@ -20,5 +20,6 @@ export const config = {
     "/api/exports/:path*",
     "/api/reports/:path*",
     "/api/account/:path*",
+    "/api/imports/:path*",
   ],
 };

@@ -25,6 +25,7 @@ export type Database = {
           created_at: string;
           external_id: string | null;
           id: string;
+          import_job_id: string | null;
           match_key: string | null;
           name: string;
           organization_id: string;
@@ -38,6 +39,7 @@ export type Database = {
           created_at?: string;
           external_id?: string | null;
           id?: string;
+          import_job_id?: string | null;
           match_key?: never;
           name: string;
           organization_id: string;
@@ -50,6 +52,7 @@ export type Database = {
           created_at?: string;
           external_id?: string | null;
           id?: string;
+          import_job_id?: string | null;
           match_key?: never;
           name?: string;
           organization_id?: string;
@@ -59,6 +62,13 @@ export type Database = {
           updated_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "ad_campaigns_import_job_id_fkey";
+            columns: ["import_job_id"];
+            isOneToOne: false;
+            referencedRelation: "import_jobs";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "ad_campaigns_organization_id_fkey";
             columns: ["organization_id"];
@@ -539,6 +549,7 @@ export type Database = {
       };
       import_rows: {
         Row: {
+          chunk: number | null;
           data: Json | null;
           dedupe_key: string | null;
           errors: NonNullable<Json>;
@@ -553,6 +564,7 @@ export type Database = {
         };
         ComputedFields: never;
         Insert: {
+          chunk?: number | null;
           data?: Json | null;
           dedupe_key?: string | null;
           errors?: NonNullable<Json>;
@@ -566,6 +578,7 @@ export type Database = {
           warnings?: NonNullable<Json>;
         };
         Update: {
+          chunk?: number | null;
           data?: Json | null;
           dedupe_key?: string | null;
           errors?: NonNullable<Json>;
@@ -1231,6 +1244,10 @@ export type Database = {
           store_id: string;
         }[];
       };
+      import_commit_batch: { Args: { p_job: string; p_limit?: number }; Returns: Json };
+      import_finalize: { Args: { p_job: string }; Returns: Json };
+      import_rollback: { Args: { p_job: string }; Returns: Json };
+      prune_abandoned_imports: { Args: Record<PropertyKey, never>; Returns: number };
       prune_rate_limits: { Args: Record<PropertyKey, never>; Returns: number };
       report_ad_daily: {
         Args: { p_from: string; p_store_id: string; p_to: string };
@@ -1280,6 +1297,31 @@ export type Database = {
           units: number;
         }[];
       };
+      report_order_list: {
+        Args: { p_from: string; p_search?: string; p_store_id: string; p_to: string };
+        Returns: {
+          cogs: number;
+          converted_from_tax_inclusive: boolean;
+          day: string;
+          discounts: number;
+          external_id: string;
+          fees: number;
+          fees_estimated: boolean;
+          gross: number;
+          line_count: number;
+          lines_without_cost: number;
+          net: number;
+          order_id: string;
+          ordered_at: string;
+          refunds: number;
+          shipping_charged: number;
+          shipping_cost: number;
+          shipping_estimated: boolean;
+          source: string;
+          taxes: number;
+          units: number;
+        }[];
+      };
       report_product_breakdown: {
         Args: { p_from: string; p_store_id: string; p_to: string };
         Returns: {
@@ -1297,6 +1339,41 @@ export type Database = {
           sku: string;
           transaction_fees: number;
           unit_cost_e4: number;
+          units: number;
+        }[];
+      };
+      report_product_catalog: {
+        Args: { p_filter?: string; p_from: string; p_search?: string; p_store_id: string; p_to: string };
+        Returns: {
+          ad_spend: number;
+          archived: boolean;
+          cogs: number;
+          contribution_margin: number;
+          contribution_margin_rate: number;
+          created_at: string;
+          discounts: number;
+          gross_sales: number;
+          lines_without_cost: number;
+          name: string;
+          net_revenue: number;
+          net_sales: number;
+          price_minor: number;
+          product_id: string;
+          refunds: number;
+          shipping_charged: number;
+          shipping_costs: number;
+          sku: string;
+          source: string;
+          transaction_fees: number;
+          unit_cost_e4: number;
+          units: number;
+        }[];
+      };
+      report_product_daily: {
+        Args: { p_from: string; p_product_id: string; p_store_id: string; p_to: string };
+        Returns: {
+          day: string;
+          sales: number;
           units: number;
         }[];
       };
