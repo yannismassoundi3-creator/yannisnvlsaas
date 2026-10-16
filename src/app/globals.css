@@ -1,0 +1,268 @@
+@import "tailwindcss";
+
+/*
+ * Narixia design tokens.
+ *
+ * Every text/background pair below was checked for WCAG contrast
+ * (see docs/DESIGN.md). The chart palette was validated for lightness band,
+ * chroma floor, colour-vision-deficiency separation and contrast against the
+ * white card surface. Do not introduce ad-hoc colours: add a token here instead.
+ */
+@theme {
+  /* Reset Tailwind's default palette so only design-system colours exist. */
+  --color-*: initial;
+
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  /* Surfaces */
+  --color-ivory: #f8f7f4; /* page background */
+  --color-surface: #ffffff; /* cards, inputs, popovers */
+  --color-sunken: #f2f0eb; /* table headers, insets */
+  --color-hover: #f5f3ef; /* row and item hover */
+
+  /* Lines */
+  --color-line: #e6e3dc; /* decorative hairlines (cards, tables) */
+  --color-line-strong: #d5d1c8; /* separators that need more presence */
+  --color-control: #948f88; /* form control borders: 3.2:1 on surface, 3.0:1 on ivory */
+  --color-control-strong: #7a766f; /* hovered control borders */
+
+  /* Ink (text) */
+  --color-ink: #172033; /* primary text: 15.2:1 on ivory */
+  --color-ink-2: #464e60; /* secondary text: 7.8:1 on ivory */
+  --color-ink-3: #5d6474; /* muted text: 5.5:1 on ivory, 5.2:1 on sunken */
+  --color-ink-4: #6e7482; /* placeholders on white only: 4.7:1 */
+
+  /* Navy (brand primary) */
+  --color-navy-950: #0c1220;
+  --color-navy-900: #111827;
+  --color-navy-800: #172033; /* brand navy */
+  --color-navy-700: #222d45;
+  --color-navy-600: #2e3a56;
+  --color-navy-100: #e3e6ee;
+  --color-navy-50: #eef0f5;
+
+  /* Emerald (brand accent) */
+  --color-emerald-500: #21866b; /* brand emerald: graphics, focus rings (4.2:1 on ivory) */
+  --color-emerald-600: #1c7a60; /* fills behind white text: 5.3:1 */
+  --color-emerald-700: #1a6e57; /* emerald text: 5.8:1 on ivory */
+  --color-emerald-800: #155a47; /* emerald text on soft emerald: 7:1 */
+  --color-emerald-200: #b9dccf;
+  --color-emerald-100: #d3e9e0;
+  --color-emerald-50: #e4f1ec;
+
+  /* Semantic: negative (losses, destructive actions) */
+  --color-negative-700: #a63a2c; /* 6:1 on ivory */
+  --color-negative-800: #8f2f23; /* text on soft negative: 6.8:1 */
+  --color-negative-600: #b3402f; /* fills behind white text: 5.7:1 */
+  --color-negative-100: #f1d6cf;
+  --color-negative-50: #f8e8e4;
+
+  /* Semantic: caution (estimated or incomplete data, warnings) */
+  --color-caution-700: #865a06; /* 5.6:1 on ivory */
+  --color-caution-800: #6e4a06; /* text on soft caution: 6.8:1 */
+  --color-caution-100: #eedfb8;
+  --color-caution-50: #f6edd5;
+
+  /* Semantic: info (neutral notices) */
+  --color-info-700: #2d4673; /* 8.8:1 on ivory */
+  --color-info-100: #d6deec;
+  --color-info-50: #e7ecf4;
+
+  /*
+   * Chart palette — categorical slots in fixed order (never cycled).
+   * Validated on #ffffff: all 8 inside OKLCH L 0.43–0.77, C >= 0.10,
+   * worst adjacent CVD ΔE 9.9, normal-vision ΔE 17.7, all >= 3:1.
+   */
+  --color-chart-1: #3e5c99; /* navy blue */
+  --color-chart-2: #1b8a6b; /* emerald */
+  --color-chart-3: #c28a2c; /* ochre */
+  --color-chart-4: #c65a84; /* rose */
+  --color-chart-5: #3d93c2; /* sky */
+  --color-chart-6: #cc5f45; /* terracotta */
+  --color-chart-7: #8c5baf; /* plum */
+  --color-chart-8: #7d8b2e; /* olive */
+  /* Diverging pair for values above / below zero (CVD ΔE 8.2). */
+  --color-chart-positive: #1b8a6b;
+  --color-chart-negative: #c2503a;
+  --color-chart-neutral: #ece9e3;
+  /* De-emphasised context series (e.g. previous period). */
+  --color-chart-context: #a8a39a;
+  /* Chart furniture */
+  --color-chart-grid: #ece9e3;
+  --color-chart-axis: #d5d1c8;
+
+  /* Typography */
+  --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
+
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.375rem;
+  --text-md: 0.9375rem;
+  --text-md--line-height: 1.5rem;
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 1.875rem;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl: 2.5rem;
+  --text-4xl--line-height: 2.75rem;
+  --text-5xl: 3.25rem;
+  --text-5xl--line-height: 3.5rem;
+  --text-6xl: 4rem;
+  --text-6xl--line-height: 4.125rem;
+
+  --tracking-tightest: -0.035em;
+  --tracking-tighter: -0.025em;
+  --tracking-tight: -0.012em;
+
+  /* Radii: restrained, consistent */
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+
+  /* Elevation: soft, navy-tinted, never glowing */
+  --shadow-xs: 0 1px 2px rgb(23 32 51 / 0.05);
+  --shadow-sm: 0 1px 2px rgb(23 32 51 / 0.05), 0 1px 3px rgb(23 32 51 / 0.04);
+  --shadow-md: 0 4px 12px -2px rgb(23 32 51 / 0.08), 0 2px 4px -2px rgb(23 32 51 / 0.05);
+  --shadow-lg: 0 16px 40px -12px rgb(23 32 51 / 0.2), 0 4px 10px -4px rgb(23 32 51 / 0.08);
+  --shadow-frame: 0 1px 0 rgb(255 255 255 / 0.6) inset, 0 24px 60px -24px rgb(23 32 51 / 0.25), 0 8px 20px -8px rgb(23 32 51 / 0.08);
+
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+
+  --animate-fade-in: fade-in 180ms var(--ease-out-quart);
+  --animate-rise-in: rise-in 220ms var(--ease-out-quart);
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes shimmer {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  html {
+    background: var(--color-ivory);
+  }
+
+  body {
+    background: var(--color-ivory);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    font-feature-settings: "kern";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: var(--color-emerald-100);
+    color: var(--color-ink);
+  }
+
+  /* One visible, consistent focus treatment for keyboard users. */
+  :focus-visible {
+    outline: 2px solid var(--color-emerald-500);
+    outline-offset: 2px;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Native form controls inherit the type scale. */
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+@utility proportional {
+  font-variant-numeric: proportional-nums;
+  font-feature-settings: "pnum" 1;
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+/* Print: reports are designed to be printed or saved as PDF from the browser. */
+@media print {
+  html,
+  body {
+    background: #ffffff;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
