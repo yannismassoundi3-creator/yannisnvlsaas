@@ -13,6 +13,8 @@ let secondStore: string;
 beforeAll(async () => {
   user = await createUser();
   org = await createOrganization(user);
+  // A second store needs the Pro plan (store limit); grant it directly for the test.
+  await adminQuery("insert into public.subscriptions (id, organization_id, status, stripe_event_at) values ($1, $2, 'active', now())", [`sub_integrity_${org.orgId.slice(0, 8)}`, org.orgId]);
   const { rows } = await adminQuery(
     "insert into public.stores (organization_id, name, currency, minor_digits, timezone) values ($1, 'Second', 'EUR', 2, 'UTC') returning id",
     [org.orgId],

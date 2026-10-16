@@ -1,5 +1,5 @@
 import "server-only";
-import { after } from "next/server";
+import { runAfter } from "@/lib/after";
 import { serverEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/database.types";
@@ -63,10 +63,10 @@ async function insert(event: ProductEvent, ctx: Context, properties: Properties,
 
 /** Records an event after the response is sent. */
 export function track(event: ProductEvent, ctx: Context, properties: Properties = {}) {
-  after(() => insert(event, ctx, properties, false));
+  runAfter(() => insert(event, ctx, properties, false));
 }
 
 /** Records an event only the first time it happens for an organisation. */
 export function trackFirst(event: ProductEvent, ctx: Context, properties: Properties = {}) {
-  after(() => insert(event, ctx, properties, true));
+  runAfter(() => insert(event, ctx, properties, true));
 }

@@ -9,6 +9,7 @@ import { Field } from "@/components/ui/field";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { COMMON_CURRENCIES, currencyName } from "@/lib/finance/currency";
+import { otherCurrencies, timezoneOptions } from "@/lib/locale-lists";
 import { completeOnboarding, createDemoStore, createWorkspace } from "@/lib/onboarding/actions";
 import { PLATFORM_NAMES, PLATFORMS, type PlatformId } from "@/lib/onboarding/constants";
 import { cn } from "@/lib/utils";
@@ -16,18 +17,6 @@ import { cn } from "@/lib/utils";
 const STEPS = ["Store profile", "Currency and reporting", "Add your data", "Explore a sample"] as const;
 
 type Props = { initialStep: 0 | 2; defaultName: string | null };
-
-function allCurrencies(): string[] {
-  const intl = Intl as typeof Intl & { supportedValuesOf?: (k: string) => string[] };
-  const all = intl.supportedValuesOf ? intl.supportedValuesOf("currency") : [...COMMON_CURRENCIES];
-  const common = new Set<string>(COMMON_CURRENCIES);
-  return all.filter((c) => !common.has(c));
-}
-
-function allTimezones(): string[] {
-  const intl = Intl as typeof Intl & { supportedValuesOf?: (k: string) => string[] };
-  return intl.supportedValuesOf ? intl.supportedValuesOf("timeZone") : ["UTC", "Europe/Paris", "Europe/London", "America/New_York"];
-}
 
 export function OnboardingFlow({ initialStep, defaultName }: Props) {
   const router = useRouter();
@@ -46,12 +35,9 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
     pricesIncludeTax: "" as "" | "yes" | "no",
   });
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((f) => ({ ...f, [key]: value }));
-  const otherCurrencies = useMemo(() => allCurrencies(), []);
+  const moreCurrencies = useMemo(() => otherCurrencies(), []);
   // Always offer UTC and the browser's own zone, which may be missing from the canonical list.
-  const timezones = useMemo(() => {
-    const list = allTimezones();
-    return [...new Set(["UTC", browserTz, ...list])].sort((a, b) => (a === "UTC" ? -1 : b === "UTC" ? 1 : a.localeCompare(b)));
-  }, [browserTz]);
+  const timezones = useMemo(() => timezoneOptions([browserTz]), [browserTz]);
 
   function next() {
     setError(null);
@@ -164,7 +150,7 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
                       ))}
                     </optgroup>
                     <optgroup label="All currencies">
-                      {otherCurrencies.map((c) => (
+                      {moreCurrencies.map((c) => (
                         <option key={c} value={c}>
                           {c} — {currencyName(c)}
                         </option>

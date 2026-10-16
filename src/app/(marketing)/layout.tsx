@@ -1,4 +1,6 @@
 import { SiteFooter } from "@/components/marketing/site-footer";
+import { Suspense } from "react";
+import { AccountDeletedNotice } from "@/components/marketing/account-notice";
 import { SiteHeader } from "@/components/marketing/site-header";
 
 export default function MarketingLayout({ children }: LayoutProps<"/">) {
@@ -11,6 +13,9 @@ export default function MarketingLayout({ children }: LayoutProps<"/">) {
         Skip to content
       </a>
       <SiteHeader />
+      <Suspense fallback={null}>
+        <AccountDeletedNotice />
+      </Suspense>
       <main id="main" className="flex-1">
         {children}
       </main>

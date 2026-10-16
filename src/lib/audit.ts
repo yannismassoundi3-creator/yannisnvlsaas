@@ -1,5 +1,5 @@
 import "server-only";
-import { after } from "next/server";
+import { runAfter } from "@/lib/after";
 import { serverEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/database.types";
@@ -28,7 +28,7 @@ export function audit(
   target?: { type: string; id: string },
   metadata: Record<string, string | number | boolean | null> = {},
 ) {
-  after(async () => {
+  runAfter(async () => {
     if (!serverEnv().supabaseSecretKey) return;
     try {
       await createAdminClient().from("audit_events").insert({
