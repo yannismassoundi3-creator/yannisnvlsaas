@@ -1,4 +1,4 @@
-import { ArrowRight, Check, FileSpreadsheet, ListChecks, Rows3, ShieldCheck, Store, Upload } from "lucide-react";
+import { ArrowRight, Check, FileSpreadsheet, ListChecks, Rows3, ShieldCheck, Upload } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";

@@ -6,6 +6,8 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toaster";
+import { useFormat, useLocale } from "@/i18n/client";
+import { importUi } from "@/i18n/messages/imports-ui";
 import { cancelImport, commitImportBatch, deleteImportRecord, rollbackImport } from "@/lib/imports/actions";
 
 type Props = {
@@ -18,6 +20,8 @@ type Props = {
 
 export function ImportJobActions({ jobId, status, validRows, canUndo, canWrite }: Props) {
   const router = useRouter();
+  const t = importUi[useLocale()].jobActions;
+  const f = useFormat();
   const [committing, setCommitting] = useState<{ remaining: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -31,7 +35,7 @@ export function ImportJobActions({ jobId, status, validRows, canUndo, canWrite }
       const result = await commitImportBatch(jobId).catch(() => null);
       if (!result) {
         setCommitting(null);
-        setError("The connection was interrupted. Reload the page to see the import's state.");
+        setError(t.interrupted);
         return;
       }
       if (!result.ok) {
@@ -44,7 +48,7 @@ export function ImportJobActions({ jobId, status, validRows, canUndo, canWrite }
       setCommitting({ remaining: result.remaining });
     }
     setCommitting(null);
-    toast.success("Import complete. Your dashboard is up to date.");
+    toast.success(t.complete);
     router.refresh();
   }
 
@@ -57,7 +61,7 @@ export function ImportJobActions({ jobId, status, validRows, canUndo, canWrite }
           <>
             <Button onClick={() => void confirm()} loading={Boolean(committing)} disabled={validRows === 0 || !canWrite}>
               <CheckCircle2 aria-hidden />
-              Import {validRows.toLocaleString("en-GB")} {validRows === 1 ? "row" : "rows"}
+              {t.importRows(f.count(validRows), validRows)}
             </Button>
             <Button
               variant="ghost"
@@ -71,14 +75,14 @@ export function ImportJobActions({ jobId, status, validRows, canUndo, canWrite }
               }
             >
               <X aria-hidden />
-              Cancel
+              {t.cancel}
             </Button>
           </>
         ) : null}
         {status === "committing" ? (
           <Button onClick={() => void confirm()} loading={Boolean(committing)} disabled={!canWrite}>
             <Play aria-hidden />
-            Resume import
+            {t.resume}
           </Button>
         ) : null}
         {status === "staging" ? (
@@ -93,7 +97,7 @@ export function ImportJobActions({ jobId, status, validRows, canUndo, canWrite }
               })
             }
           >
-            Cancel this upload
+            {t.cancelUpload}
           </Button>
         ) : null}
         {status === "committed" ? (
@@ -103,12 +107,12 @@ export function ImportJobActions({ jobId, status, validRows, canUndo, canWrite }
             trigger={
               <Button variant="secondary" disabled={!canUndo}>
                 <RotateCcw aria-hidden />
-                Undo import
+                {t.undo}
               </Button>
             }
-            title="Undo this import?"
-            description="Records this import created are removed and records it replaced are restored to their earlier values. Changes you made to those records since the import are lost."
-            confirmLabel="Undo import"
+            title={t.undoTitle}
+            description={t.undoDescription}
+            confirmLabel={t.undo}
             destructive
             pending={pending}
             onConfirm={() =>
@@ -119,7 +123,7 @@ export function ImportJobActions({ jobId, status, validRows, canUndo, canWrite }
                   setUndoOpen(false);
                   if (!r.ok) toast.error(r.message);
                   else {
-                    toast.success(`Import undone: ${r.removed.toLocaleString("en-GB")} removed, ${r.restored.toLocaleString("en-GB")} restored.`);
+                    toast.success(t.undone(f.count(r.removed), f.count(r.restored)));
                     router.refresh();
                   }
                 }),
@@ -134,16 +138,12 @@ export function ImportJobActions({ jobId, status, validRows, canUndo, canWrite }
             trigger={
               <Button variant="danger-ghost">
                 <Trash2 aria-hidden />
-                Remove from history
+                {t.remove}
               </Button>
             }
-            title="Remove this import from the history?"
-            description={
-              status === "committed"
-                ? "The imported data stays in Narixia, but this import can no longer be undone."
-                : "Only the history entry and its row details are removed."
-            }
-            confirmLabel="Remove"
+            title={t.removeTitle}
+            description={status === "committed" ? t.removeCommitted : t.removeOther}
+            confirmLabel={t.removeConfirm}
             destructive
             pending={pending}
             onConfirm={() =>
@@ -161,14 +161,14 @@ export function ImportJobActions({ jobId, status, validRows, canUndo, canWrite }
         ) : null}
       </div>
       {status === "committed" && !canUndo ? (
-        <p className="text-sm text-ink-3">Only the most recent import of this store can be undone, so later imports are never overwritten with older values.</p>
+        <p className="text-sm text-ink-3">{t.onlyLatest}</p>
       ) : null}
       {committing ? (
         <div className="max-w-md space-y-1.5" aria-live="polite">
           <div className="flex justify-between text-sm text-ink-2">
-            <span>Importing…</span>
+            <span>{t.importing}</span>
             <span className="tabular">
-              {done.toLocaleString("en-GB")} / {validRows.toLocaleString("en-GB")}
+              {f.count(done)} / {f.count(validRows)}
             </span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-sunken">

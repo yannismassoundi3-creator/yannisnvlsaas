@@ -9,21 +9,19 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Alert, Skeleton } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableContainer, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { importPages } from "@/i18n/messages/imports-pages";
+import { getFormat, getLocale } from "@/i18n/server";
 import { requireStore } from "@/lib/auth/workspace";
 import { getImportJob, getImportRows, latestCommittedImportId, type IssueFilter } from "@/lib/data/imports";
-import { formatDateTime } from "@/lib/dates";
-import { PLATFORM_LABELS, EXPENSE_CATEGORIES } from "@/lib/domain/types";
-import { IMPORT_KINDS } from "@/lib/imports/schema";
+import { expenseCategoryLabel, platformLabel } from "@/lib/domain/types";
+import { fieldLabels, IMPORT_KINDS, kindCopy } from "@/lib/imports/schema";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Import" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: importPages[await getLocale()].job.metaTitle };
+}
 
-const FILTERS: { id: IssueFilter; label: string }[] = [
-  { id: "problems", label: "Errors" },
-  { id: "duplicates", label: "Duplicates" },
-  { id: "skipped", label: "Skipped" },
-  { id: "all", label: "All rows" },
-];
+const FILTERS: IssueFilter[] = ["problems", "duplicates", "skipped", "all"];
 const PAGE_SIZE = 50;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -36,18 +34,20 @@ export default function ImportJobPage({ params, searchParams }: PageProps<"/[lan
 }
 
 async function Job({ params, searchParams }: Pick<PageProps<"/[lang]/app/imports/[id]">, "params" | "searchParams">) {
-  const [{ id }, sp, ws] = await Promise.all([params, searchParams, requireStore()]);
+  const [{ id }, sp, ws, locale, fmt] = await Promise.all([params, searchParams, requireStore(), getLocale(), getFormat()]);
+  const t = importPages[locale].job;
   if (!UUID_RE.test(id)) notFound();
   const job = await getImportJob(id);
   if (!job) notFound();
   const tz = ws.activeStore.timezone;
   const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const defaultFilter: IssueFilter = job.invalidRows > 0 ? "problems" : job.duplicateRows > 0 ? "duplicates" : "all";
-  const filter = (FILTERS.find((f) => f.id === first(sp.filter))?.id ?? defaultFilter) as IssueFilter;
+  const filter = FILTERS.find((f) => f === first(sp.filter)) ?? defaultFilter;
   const page = Math.max(0, Math.min(10_000, Number.parseInt(first(sp.page) ?? "0", 10) || 0));
   const [rows, latest] = await Promise.all([getImportRows(job.id, filter, page, PAGE_SIZE), latestCommittedImportId(ws.activeStore)]);
   const def = IMPORT_KINDS[job.kind];
-  const labels = Object.fromEntries(def.fields.map((f) => [f.key, f.label]));
+  const labels = fieldLabels(job.kind, locale);
+  const n = fmt.count;
   const o = job.options;
   const pages = Math.ceil(rows.total / PAGE_SIZE);
   const href = (f: IssueFilter, p = 0) => `/app/imports/${job.id}?filter=${f}${p ? `&page=${p}` : ""}` as Route;
@@ -57,65 +57,64 @@ async function Job({ params, searchParams }: Pick<PageProps<"/[lang]/app/imports
       <PageHeader
         eyebrow={
           <Link href="/app/imports" className="hover:underline">
-            Imports
+            {t.imports}
           </Link>
         }
         title={
           <span className="flex flex-wrap items-center gap-3">
-            {def.label} import <ImportStatusBadge status={job.status} />
+            {t.title(kindCopy(job.kind, locale).label)} <ImportStatusBadge status={job.status} />
           </span>
         }
-        description={`${job.fileName} · started ${formatDateTime(job.createdAt, tz)}`}
+        description={t.started(job.fileName, fmt.dateTime(job.createdAt, tz))}
       />
 
       {job.status === "validated" ? (
-        <Alert tone="info" title="Nothing has been saved yet">
-          Review the rows below. Confirming imports the {job.validRows.toLocaleString("en-GB")} ready rows
-          {job.duplicateRows > 0 ? ` and skips ${job.duplicateRows.toLocaleString("en-GB")} duplicates` : ""}
-          {job.invalidRows > 0 ? `; ${job.invalidRows.toLocaleString("en-GB")} rows with errors stay out` : ""}.
+        <Alert tone="info" title={t.validatedTitle}>
+          {t.validatedBody(n(job.validRows), job.duplicateRows > 0 ? n(job.duplicateRows) : null, job.invalidRows > 0 ? n(job.invalidRows) : null)}
         </Alert>
       ) : null}
       {job.status === "committed" && job.committedAt ? (
-        <Alert tone="positive" title={`Imported on ${formatDateTime(job.committedAt, tz)}`}>
-          {job.insertedCount.toLocaleString("en-GB")} rows added, {job.updatedCount.toLocaleString("en-GB")} updated, {job.skippedCount.toLocaleString("en-GB")}{" "}
-          skipped{job.invalidRows > 0 ? `, ${job.invalidRows.toLocaleString("en-GB")} with errors not imported` : ""}.
+        <Alert tone="positive" title={t.committedTitle(fmt.dateTime(job.committedAt, tz))}>
+          {t.committedBody(n(job.insertedCount), n(job.updatedCount), n(job.skippedCount), job.invalidRows > 0 ? n(job.invalidRows) : null)}
         </Alert>
       ) : null}
       {job.status === "rolled_back" && job.rolledBackAt ? (
-        <Alert tone="info" title={`Undone on ${formatDateTime(job.rolledBackAt, tz)}`}>
-          Records created by this import were removed and records it replaced were restored.
+        <Alert tone="info" title={t.undoneTitle(fmt.dateTime(job.rolledBackAt, tz))}>
+          {t.undoneBody}
         </Alert>
       ) : null}
       {job.status === "failed" ? (
-        <Alert tone="negative" title="This import failed">
-          {job.errorMessage ?? "The import stopped before it finished."}
+        <Alert tone="negative" title={t.failedTitle}>
+          {job.errorMessage ?? t.failedFallback}
         </Alert>
       ) : null}
       {job.status === "committing" ? (
-        <Alert tone="caution" title="This import has not finished">
-          If the page was closed while importing, resume it: rows already imported are saved and are not imported twice.
+        <Alert tone="caution" title={t.committingTitle}>
+          {t.committingBody}
         </Alert>
       ) : null}
       {job.status === "staging" ? (
-        <Alert tone="caution" title="This upload did not finish">
-          The file was not fully uploaded. Cancel it and start a new import.
+        <Alert tone="caution" title={t.stagingTitle}>
+          {t.stagingBody}
         </Alert>
       ) : null}
 
       <ImportJobActions jobId={job.id} status={job.status} validRows={job.validRows} canUndo={latest === job.id} canWrite={ws.entitlements.canWrite} />
 
       <dl className="grid gap-px overflow-hidden rounded-lg border border-line bg-line shadow-xs sm:grid-cols-3 lg:grid-cols-6">
-        {[
-          ["Rows in file", job.totalRows],
-          ["Ready", job.validRows],
-          ["Duplicates", job.duplicateRows],
-          ["Errors", job.invalidRows],
-          ["Added", job.status === "committed" || job.status === "rolled_back" ? job.insertedCount : null],
-          ["Updated", job.status === "committed" || job.status === "rolled_back" ? job.updatedCount : null],
-        ].map(([label, value]) => (
-          <div key={label as string} className="bg-surface px-4 py-3">
+        {(
+          [
+            [t.counts.total, job.totalRows],
+            [t.counts.ready, job.validRows],
+            [t.counts.duplicates, job.duplicateRows],
+            [t.counts.errors, job.invalidRows],
+            [t.counts.added, job.status === "committed" || job.status === "rolled_back" ? job.insertedCount : null],
+            [t.counts.updated, job.status === "committed" || job.status === "rolled_back" ? job.updatedCount : null],
+          ] as [string, number | null][]
+        ).map(([label, value]) => (
+          <div key={label} className="bg-surface px-4 py-3">
             <dt className="text-xs text-ink-3">{label}</dt>
-            <dd className="mt-0.5 text-lg font-semibold text-ink tabular">{value === null ? "—" : (value as number).toLocaleString("en-GB")}</dd>
+            <dd className="mt-0.5 text-lg font-semibold text-ink tabular">{value === null ? "—" : n(value)}</dd>
           </div>
         ))}
       </dl>
@@ -123,39 +122,36 @@ async function Job({ params, searchParams }: Pick<PageProps<"/[lang]/app/imports
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
         <Card className="min-w-0">
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4">
-            <nav aria-label="Row filter" className="flex flex-wrap gap-1">
+            <nav aria-label={t.filterLabel} className="flex flex-wrap gap-1">
               {FILTERS.map((f) => (
                 <Link
-                  key={f.id}
-                  href={href(f.id)}
-                  aria-current={f.id === filter ? "page" : undefined}
-                  className={cn(
-                    "rounded-md px-2.5 py-1.5 text-sm font-medium",
-                    f.id === filter ? "bg-navy-800 text-white" : "text-ink-2 hover:bg-hover",
-                  )}
+                  key={f}
+                  href={href(f)}
+                  aria-current={f === filter ? "page" : undefined}
+                  className={cn("rounded-md px-2.5 py-1.5 text-sm font-medium", f === filter ? "bg-navy-800 text-white" : "text-ink-2 hover:bg-hover")}
                 >
-                  {f.label}
+                  {t.filters[f]}
                 </Link>
               ))}
             </nav>
             {job.invalidRows + job.duplicateRows > 0 ? (
               <a href={`/api/imports/${job.id}/issues`} className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 hover:underline">
                 <Download className="size-4" aria-hidden />
-                Download rows to fix (CSV)
+                {t.download}
               </a>
             ) : null}
           </div>
           {rows.rows.length === 0 ? (
-            <p className="px-5 py-8 text-sm text-ink-3">No rows in this view.</p>
+            <p className="px-5 py-8 text-sm text-ink-3">{t.noRows}</p>
           ) : (
             <TableContainer className="mt-3">
               <Table className="text-sm">
-                <caption className="sr-only">Import rows</caption>
+                <caption className="sr-only">{t.caption}</caption>
                 <THead>
                   <TR>
-                    <TH className="w-16">Row</TH>
-                    <TH>Values</TH>
-                    <TH>Notes</TH>
+                    <TH className="w-16">{t.row}</TH>
+                    <TH>{t.values}</TH>
+                    <TH>{t.notes}</TH>
                   </TR>
                 </THead>
                 <TBody>
@@ -177,15 +173,15 @@ async function Job({ params, searchParams }: Pick<PageProps<"/[lang]/app/imports
                       </TD>
                       <TD className="min-w-64 py-2.5 text-xs">
                         {r.status === "imported" || r.status === "updated" || r.status === "valid" ? (
-                          <p className="mb-1 text-ink-3">{r.status === "imported" ? "Added" : r.status === "updated" ? "Updated" : "Ready"}</p>
+                          <p className="mb-1 text-ink-3">{r.status === "imported" ? t.added : r.status === "updated" ? t.updated : t.ready}</p>
                         ) : r.status === "skipped" ? (
-                          <p className="mb-1 text-ink-3">Skipped</p>
+                          <p className="mb-1 text-ink-3">{t.skipped}</p>
                         ) : null}
                         {r.errors.map((e, i) => (
                           <p key={`e${i}`} className="flex gap-1.5 text-negative-700">
                             <XCircle className="mt-0.5 size-3 shrink-0" aria-hidden />
                             <span>
-                              {e.field && labels[e.field] ? <span className="font-medium">{labels[e.field]}: </span> : null}
+                              {e.field && labels[e.field] ? <span className="font-medium">{locale === "fr" ? `${labels[e.field]} : ` : `${labels[e.field]}: `}</span> : null}
                               {e.message}
                             </span>
                           </p>
@@ -204,19 +200,17 @@ async function Job({ params, searchParams }: Pick<PageProps<"/[lang]/app/imports
             </TableContainer>
           )}
           {pages > 1 ? (
-            <nav aria-label="Pagination" className="flex items-center justify-between border-t border-line px-5 py-3 text-sm">
-              <span className="text-ink-3 tabular">
-                Page {page + 1} of {pages}
-              </span>
+            <nav aria-label={t.pagination} className="flex items-center justify-between border-t border-line px-5 py-3 text-sm">
+              <span className="text-ink-3 tabular">{t.page(page + 1, pages)}</span>
               <span className="flex gap-3">
                 {page > 0 ? (
                   <Link href={href(filter, page - 1)} className="font-medium text-emerald-700 hover:underline">
-                    Previous
+                    {t.previous}
                   </Link>
                 ) : null}
                 {page + 1 < pages ? (
                   <Link href={href(filter, page + 1)} className="font-medium text-emerald-700 hover:underline">
-                    Next
+                    {t.next}
                   </Link>
                 ) : null}
               </span>
@@ -225,16 +219,16 @@ async function Job({ params, searchParams }: Pick<PageProps<"/[lang]/app/imports
         </Card>
 
         <Card className="h-fit">
-          <CardHeader title="How the file was read" as="h3" />
+          <CardHeader title={t.howRead} as="h3" />
           <dl className="space-y-3 px-5 pt-3 pb-5 text-sm">
             <div>
-              <dt className="text-xs text-ink-3">Columns</dt>
+              <dt className="text-xs text-ink-3">{t.columns}</dt>
               <dd className="mt-1 space-y-0.5">
                 {def.fields
                   .filter((f) => job.mapping[f.key])
                   .map((f) => (
                     <p key={f.key} className="flex justify-between gap-3">
-                      <span className="text-ink-2">{f.label}</span>
+                      <span className="text-ink-2">{labels[f.key]}</span>
                       <span className="truncate text-right text-ink-3" title={job.mapping[f.key] ?? ""}>
                         {job.mapping[f.key]}
                       </span>
@@ -244,37 +238,37 @@ async function Job({ params, searchParams }: Pick<PageProps<"/[lang]/app/imports
             </div>
             {o.dateFormat ? (
               <div>
-                <dt className="text-xs text-ink-3">Dates</dt>
-                <dd className="text-ink-2">{{ ymd: "Year-month-day", dmy: "Day/month/year", mdy: "Month/day/year" }[o.dateFormat]}</dd>
+                <dt className="text-xs text-ink-3">{t.dates}</dt>
+                <dd className="text-ink-2">{t.dateFormats[o.dateFormat]}</dd>
               </div>
             ) : null}
             <div>
-              <dt className="text-xs text-ink-3">Decimal separator</dt>
-              <dd className="text-ink-2">{o.decimalSeparator === "," ? "Comma" : "Point"}</dd>
+              <dt className="text-xs text-ink-3">{t.decimalSeparator}</dt>
+              <dd className="text-ink-2">{o.decimalSeparator === "," ? t.comma : t.point}</dd>
             </div>
             <div>
-              <dt className="text-xs text-ink-3">Existing records</dt>
-              <dd className="text-ink-2">{job.kind === "expenses" ? "Identical expenses skipped" : o.duplicates === "update" ? "Replaced" : "Skipped"}</dd>
+              <dt className="text-xs text-ink-3">{t.existing}</dt>
+              <dd className="text-ink-2">{job.kind === "expenses" ? t.identicalExpenses : o.duplicates === "update" ? t.replaced : t.skippedExisting}</dd>
             </div>
             {job.kind === "orders" ? (
               <div>
-                <dt className="text-xs text-ink-3">Tax</dt>
+                <dt className="text-xs text-ink-3">{t.tax}</dt>
                 <dd className="text-ink-2">
-                  {o.pricesIncludeTax ? "Prices include tax (removed per order)" : "Prices exclude tax"}
-                  {o.refundsIncludeTax ? "; refunds include tax" : ""}
+                  {o.pricesIncludeTax ? t.pricesInclude : t.pricesExclude}
+                  {o.refundsIncludeTax ? t.refundsInclude : ""}
                 </dd>
               </div>
             ) : null}
             {job.kind === "ad_spend" && o.defaultPlatform ? (
               <div>
-                <dt className="text-xs text-ink-3">Default platform</dt>
-                <dd className="text-ink-2">{PLATFORM_LABELS[o.defaultPlatform]}</dd>
+                <dt className="text-xs text-ink-3">{t.defaultPlatform}</dt>
+                <dd className="text-ink-2">{platformLabel(o.defaultPlatform, locale)}</dd>
               </div>
             ) : null}
             {job.kind === "expenses" && o.defaultCategory ? (
               <div>
-                <dt className="text-xs text-ink-3">Default category</dt>
-                <dd className="text-ink-2">{EXPENSE_CATEGORIES[o.defaultCategory].label}</dd>
+                <dt className="text-xs text-ink-3">{t.defaultCategory}</dt>
+                <dd className="text-ink-2">{expenseCategoryLabel(o.defaultCategory, locale)}</dd>
               </div>
             ) : null}
           </dl>

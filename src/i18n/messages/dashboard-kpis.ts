@@ -25,8 +25,9 @@ export const kpiMessages = defineMessages({
     contributionBeforeAdsTerm: "Contribution before advertising",
     contributionBeforeAdsText: "Net revenue minus product, shipping, payment and other variable costs, before ad spend.",
     grossSales: "Gross sales",
+    // English keeps its single wording; French needs the number for agreement.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    unitsSold: (count: string, n: number) => `${count} units sold`,
+    unitsSold: (count: string, units: number) => `${count} units sold`,
     discounts: "Discounts",
     ofGrossSales: (pct: string) => `${pct} of gross sales`,
     refunds: "Refunds",

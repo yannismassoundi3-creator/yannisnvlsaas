@@ -100,8 +100,7 @@ export const importPages = defineMessages({
       templates: "Modèles",
       templatesDescription: "Des mises en page de colonnes que Narixia lit sans association. Les lignes d'exemple sont fictives.",
       history: "Historique",
-      usage: (used: string, monthly: string, perFile: string) =>
-        `${used} lignes importées ce mois-ci sur ${monthly} · jusqu'à ${perFile} lignes par fichier`,
+      usage: (used: string, monthly: string, perFile: string) => `Lignes importées ce mois-ci : ${used} sur ${monthly} · jusqu'à ${perFile} lignes par fichier`,
       emptyTitle: "Aucun import pour l'instant",
       emptyDescription: "Commencez par vos commandes : les tableaux de bord, les marges produits et les analyses en dépendent.",
       importOrders: "Importer des commandes",
@@ -127,10 +126,10 @@ export const importPages = defineMessages({
       filters: { problems: "Erreurs", duplicates: "Doublons", skipped: "Ignorées", all: "Toutes les lignes" },
       validatedTitle: "Rien n'a encore été enregistré",
       validatedBody: (ready: string, duplicates: string | null, errors: string | null) =>
-        `Vérifiez les lignes ci-dessous. La confirmation importe les ${ready} lignes prêtes${duplicates ? ` et ignore ${duplicates} doublons` : ""}${errors ? ` ; ${errors} lignes en erreur restent à l'écart` : ""}.`,
+        `Vérifiez les lignes ci-dessous. La confirmation importe les lignes prêtes (${ready})${duplicates ? ` et ignore les doublons (${duplicates})` : ""}${errors ? ` ; les lignes en erreur (${errors}) restent à l'écart` : ""}.`,
       committedTitle: (at: string) => `Importé le ${at}`,
       committedBody: (added: string, updated: string, skipped: string, errors: string | null) =>
-        `${added} lignes ajoutées, ${updated} mises à jour, ${skipped} ignorées${errors ? `, ${errors} en erreur non importées` : ""}.`,
+        `Lignes ajoutées : ${added}, mises à jour : ${updated}, ignorées : ${skipped}${errors ? `, en erreur non importées : ${errors}` : ""}.`,
       undoneTitle: (at: string) => `Annulé le ${at}`,
       undoneBody: "Les enregistrements créés par cet import ont été supprimés et ceux qu'il avait remplacés ont été restaurés.",
       failedTitle: "Cet import a échoué",
