@@ -1,6 +1,6 @@
 import "server-only";
 import type { ReadyWorkspace } from "@/lib/auth/workspace";
-import { getStripe, isLiveMode } from "@/lib/billing/stripe";
+import { getStripe, isLiveCheckoutBlocked, isLiveMode } from "@/lib/billing/stripe";
 import { isStripeConfigured, serverEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -19,6 +19,8 @@ export type InvoiceSummary = {
 export type BillingDetails = {
   configured: boolean;
   liveMode: boolean;
+  /** Live keys are set but live checkouts have not been enabled yet. */
+  liveCheckoutBlocked: boolean;
   hasCustomer: boolean;
   subscription: {
     status: string;
@@ -72,6 +74,7 @@ export async function getBillingDetails(ws: ReadyWorkspace): Promise<BillingDeta
   return {
     configured,
     liveMode: configured && isLiveMode(),
+    liveCheckoutBlocked: configured && isLiveCheckoutBlocked(),
     hasCustomer: Boolean(customerId),
     subscription: sub
       ? {

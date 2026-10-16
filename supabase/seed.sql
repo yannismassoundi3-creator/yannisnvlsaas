@@ -1,0 +1,6 @@
+-- Intentionally empty.
+--
+-- `supabase db reset` loads this file after the migrations. Accounts cannot be
+-- created safely from SQL (passwords and identities belong to Supabase Auth),
+-- so the local demo account is created by `npm run seed` instead, through the
+-- Auth admin API. See README.md.

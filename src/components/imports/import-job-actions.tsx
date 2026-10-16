@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, RotateCcw, Trash2, X } from "lucide-react";
+import { CheckCircle2, Play, RotateCcw, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
@@ -74,6 +74,12 @@ export function ImportJobActions({ jobId, status, validRows, canUndo, canWrite }
               Cancel
             </Button>
           </>
+        ) : null}
+        {status === "committing" ? (
+          <Button onClick={() => void confirm()} loading={Boolean(committing)} disabled={!canWrite}>
+            <Play aria-hidden />
+            Resume import
+          </Button>
         ) : null}
         {status === "staging" ? (
           <Button

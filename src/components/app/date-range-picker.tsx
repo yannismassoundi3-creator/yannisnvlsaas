@@ -68,10 +68,12 @@ export function DateRangePicker({ pathname, preserve = {}, range, preset, today,
       }}
     >
       <PopoverTrigger asChild>
-        <Button variant="secondary" aria-label={`Reporting period: ${label}, ${formatRange(range)}. Change period`}>
+        <Button variant="secondary">
           {pending ? <Spinner className="size-4" /> : <CalendarDays aria-hidden />}
+          <span className="sr-only">Reporting period: </span>
           <span className="font-medium">{label}</span>
-          <span className="hidden text-ink-3 tabular sm:inline">{formatRange(range)}</span>
+          <span className="sr-only sm:not-sr-only sm:text-ink-3 sm:tabular">{formatRange(range)}</span>
+          <span className="sr-only">. Change period</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[min(22rem,calc(100vw-2rem))] p-0">

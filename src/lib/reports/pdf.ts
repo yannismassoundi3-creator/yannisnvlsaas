@@ -8,7 +8,7 @@ import type { DateRange } from "@/lib/domain/types";
 import { PLATFORM_LABELS, type Platform } from "@/lib/domain/types";
 import { formatCount, formatMultiple, formatPercent, formatPoints } from "@/lib/finance/format";
 import type { Insight } from "@/lib/finance/insights";
-import type { Metrics } from "@/lib/finance/metrics";
+import { DEFINITIONS, type DefinitionKey, type Metrics } from "@/lib/finance/metrics";
 import { formatMoney } from "@/lib/finance/money";
 
 /**
@@ -64,6 +64,27 @@ const TITLES: Record<ReportKind, string> = {
   summary: "Profitability summary",
   products: "Product profitability",
   advertising: "Advertising performance",
+};
+
+/** Definitions printed at the end of each report, from the same source as the in-app glossary. */
+const DEFINITION_KEYS: Record<ReportKind, DefinitionKey[]> = {
+  summary: [
+    "grossSales",
+    "discounts",
+    "refunds",
+    "netSales",
+    "netRevenue",
+    "cogs",
+    "shippingCosts",
+    "transactionFees",
+    "adSpend",
+    "otherVariableCosts",
+    "contributionMargin",
+    "fixedCosts",
+    "operatingProfit",
+  ],
+  products: ["netRevenue", "cogs", "shippingCosts", "transactionFees", "contributionMargin", "contributionMarginRate"],
+  advertising: ["adSpend", "netRevenue", "blendedRoas", "roas", "breakEvenRoas", "contributionMargin"],
 };
 
 type Column = { header: string; width: number; align?: "left" | "right" };
@@ -323,6 +344,16 @@ export async function renderPdfReport(input: PdfReportInput): Promise<Buffer> {
       doc.font("Sans").fontSize(8.5).fillColor(C.ink2).text(`• ${note}`, left, doc.y, { width });
       doc.moveDown(0.2);
     }
+  }
+
+  // ---- Definitions ---------------------------------------------------------------
+  sectionTitle("Definitions", "Amounts exclude VAT / sales tax. Narixia does not calculate net profit or cash flow.");
+  for (const key of DEFINITION_KEYS[input.kind]) {
+    const d = DEFINITIONS[key];
+    ensure(30);
+    doc.font("Bold").fontSize(8.5).fillColor(C.ink).text(`${d.term}: `, left, doc.y, { width, continued: true });
+    doc.font("Sans").fillColor(C.ink2).text(`${d.formula}. ${d.short}`);
+    doc.moveDown(0.25);
   }
 
   // ---- Footer on every page -------------------------------------------------------

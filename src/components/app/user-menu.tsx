@@ -18,7 +18,7 @@ export function UserMenu({ name, email, organization }: { name: string | null; e
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-hover" aria-label="Account menu">
+        <DropdownMenuTrigger className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-hover">
           <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-navy-800 text-[11px] font-semibold text-white" aria-hidden>
             {initials(name, email)}
           </span>
@@ -26,6 +26,7 @@ export function UserMenu({ name, email, organization }: { name: string | null; e
             <span className="block truncate text-sm font-medium text-ink">{name || email}</span>
             <span className="block truncate text-xs text-ink-3">{organization}</span>
           </span>
+          <span className="sr-only">, account menu</span>
           <ChevronsUpDown className="size-4 shrink-0 text-ink-3" aria-hidden />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="top" className="w-60">

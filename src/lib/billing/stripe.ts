@@ -22,7 +22,17 @@ export function getStripe(): Stripe {
 }
 
 export function isLiveMode(): boolean {
-  return serverEnv().stripeSecretKey.startsWith("sk_live_");
+  const key = serverEnv().stripeSecretKey;
+  return key.startsWith("sk_live_") || key.startsWith("rk_live_");
+}
+
+/**
+ * Live keys alone never start real payments: new checkouts also need
+ * STRIPE_LIVE_ENABLED=true, set once the launch checklist is complete.
+ * Webhooks, the billing portal and cancellations keep working regardless.
+ */
+export function isLiveCheckoutBlocked(): boolean {
+  return isLiveMode() && !serverEnv().stripeLiveEnabled;
 }
 
 export type { Stripe };

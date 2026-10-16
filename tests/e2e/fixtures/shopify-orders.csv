@@ -1,0 +1,5 @@
+Name,Email,Financial Status,Currency,Subtotal,Shipping,Taxes,Total,Discount Code,Discount Amount,Created at,Lineitem quantity,Lineitem name,Lineitem price,Lineitem sku,Refunded Amount,Cancelled at
+#E2E-1001,buyer1@example.test,paid,EUR,72.00,4.90,0.00,76.90,,0.00,2026-10-02 10:15:00 +0200,2,Linen tote bag,24.00,E2E-TOTE,0.00,
+#E2E-1001,,,,,,,,,,,1,Cotton tee,24.00,E2E-TEE,,
+#E2E-1002,buyer2@example.test,paid,EUR,45.00,0.00,0.00,45.00,,0.00,2026-10-03 16:40:00 +0200,1,Pour-over set,45.00,E2E-POUR,0.00,
+#E2E-1003,buyer3@example.test,paid,EUR,30.00,4.90,0.00,34.90,,0.00,2026-10-05 09:05:00 +0200,two,Candle trio,15.00,E2E-CANDLE,0.00,

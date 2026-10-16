@@ -45,7 +45,7 @@ export default function AppLayout({ children }: LayoutProps<"/app">) {
         Skip to content
       </a>
       <aside className="no-print sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-5 border-r border-line bg-ivory px-3 py-4 lg:flex">
-        <Link href="/app" className="px-1.5" aria-label="Overview">
+        <Link href="/app" className="px-1.5" aria-label="Narixia, overview">
           <Logo />
         </Link>
         <Suspense fallback={switcherFallback}>

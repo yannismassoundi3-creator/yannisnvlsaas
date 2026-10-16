@@ -75,7 +75,7 @@ async function Billing({ searchParams }: { searchParams: PageProps<"/app/billing
   const isOwner = ws.role === "owner";
   const e = ws.entitlements;
   const price = formatMoney(pro.priceMinor, pro.currency, { wholeUnits: pro.priceMinor % 100 === 0 });
-  const canSubscribe = billing.configured && isOwner && (e.access === "trial" || e.access === "expired");
+  const canSubscribe = billing.configured && !billing.liveCheckoutBlocked && isOwner && (e.access === "trial" || e.access === "expired");
   const showPortal = billing.configured && isOwner && billing.hasCustomer;
   const taxNote = serverEnv().stripeAutomaticTax ? "VAT is calculated at checkout from your billing address." : "Prices exclude VAT where it applies.";
 
@@ -91,6 +91,10 @@ async function Billing({ searchParams }: { searchParams: PageProps<"/app/billing
       {!billing.configured ? (
         <Alert tone="caution" title="Payments are not set up on this deployment">
           Stripe keys are not configured, so subscriptions cannot be started here and no payment can be taken. See docs/BILLING.md for the setup steps.
+        </Alert>
+      ) : billing.liveCheckoutBlocked ? (
+        <Alert tone="caution" title="Live payments are not enabled yet">
+          This deployment has live Stripe keys, but new subscriptions stay disabled until STRIPE_LIVE_ENABLED is set to true after the launch checklist in docs/BILLING.md.
         </Alert>
       ) : !billing.liveMode ? (
         <Alert tone="info" title="Stripe test mode">

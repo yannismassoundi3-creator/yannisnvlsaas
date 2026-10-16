@@ -45,9 +45,9 @@ export function CostEditor({ productId, productName, unitCostE4, currency, disab
           setEditing(true);
         }}
         className="group inline-flex items-center gap-1.5 rounded-sm px-1 py-0.5 text-right hover:bg-hover focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:outline-none disabled:pointer-events-none"
-        aria-label={unitCostE4 === null ? `Add unit cost for ${productName}` : `Edit unit cost for ${productName}, currently ${formatUnitCost(unitCostE4, currency)}`}
       >
         {unitCostE4 === null ? <Badge tone="caution">No cost</Badge> : <span className="tabular">{formatUnitCost(unitCostE4, currency)}</span>}
+        <span className="sr-only">{unitCostE4 === null ? `: add a unit cost for ${productName}` : `: edit the unit cost of ${productName}`}</span>
         {!disabled ? <Pencil className="size-3 text-ink-4 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden /> : null}
       </button>
     );

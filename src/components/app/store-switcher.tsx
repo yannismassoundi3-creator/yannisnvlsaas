@@ -30,7 +30,6 @@ export function StoreSwitcher({ stores, activeId }: { stores: SwitcherStore[]; a
           "flex w-full items-center gap-2.5 rounded-md border border-line bg-surface px-2.5 py-2 text-left shadow-xs transition-colors hover:bg-hover",
           pending && "opacity-60",
         )}
-        aria-label="Switch store"
       >
         <span className="flex size-7 shrink-0 items-center justify-center rounded-sm bg-sunken text-ink-2" aria-hidden>
           <StoreIcon className="size-3.5" />
@@ -42,6 +41,7 @@ export function StoreSwitcher({ stores, activeId }: { stores: SwitcherStore[]; a
             {active?.isDemo ? <Badge tone="demo" className="px-1 py-0">Demo</Badge> : null}
           </span>
         </span>
+        <span className="sr-only">, switch store</span>
         <ChevronsUpDown className="size-4 shrink-0 text-ink-3" aria-hidden />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">

@@ -40,6 +40,8 @@ export function serverEnv() {
     stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
     stripePriceProMonthly: process.env.STRIPE_PRICE_PRO_MONTHLY ?? "",
     stripeAutomaticTax: process.env.STRIPE_AUTOMATIC_TAX === "true",
+    /** Explicit operator opt-in before live keys may start checkouts (see docs/BILLING.md). */
+    stripeLiveEnabled: process.env.STRIPE_LIVE_ENABLED === "true",
     cronSecret: process.env.CRON_SECRET ?? "",
   };
 }

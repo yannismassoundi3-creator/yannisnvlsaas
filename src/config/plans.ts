@@ -35,8 +35,8 @@ export type Plan = {
   highlights: string[];
 };
 
-function envInt(name: string, fallback: number): number {
-  const raw = process.env[name];
+/** `raw` must come from a literal process.env.NEXT_PUBLIC_* reference so Next.js can inline it. */
+function envInt(raw: string | undefined, fallback: number): number {
   if (!raw) return fallback;
   const n = Number(raw);
   return Number.isSafeInteger(n) && n >= 0 ? n : fallback;
@@ -78,7 +78,7 @@ export const PLANS: Record<PlanId, Plan> = {
   pro: {
     id: "pro",
     name: "Pro",
-    priceMinor: envInt("NEXT_PUBLIC_PRO_PRICE_MINOR", 1_900),
+    priceMinor: envInt(process.env.NEXT_PUBLIC_PRO_PRICE_MINOR, 1_900),
     currency: process.env.NEXT_PUBLIC_PRO_PRICE_CURRENCY || "EUR",
     interval: "month",
     description: "For stores that want the full picture, month after month.",

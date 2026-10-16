@@ -91,6 +91,11 @@ async function Job({ params, searchParams }: Pick<PageProps<"/app/imports/[id]">
           {job.errorMessage ?? "The import stopped before it finished."}
         </Alert>
       ) : null}
+      {job.status === "committing" ? (
+        <Alert tone="caution" title="This import has not finished">
+          If the page was closed while importing, resume it: rows already imported are saved and are not imported twice.
+        </Alert>
+      ) : null}
       {job.status === "staging" ? (
         <Alert tone="caution" title="This upload did not finish">
           The file was not fully uploaded. Cancel it and start a new import.

@@ -8,7 +8,7 @@ import { requireWorkspace } from "@/lib/auth/workspace";
 import { isStripeConfigured, publicEnv, serverEnv } from "@/lib/env";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getStripe } from "./stripe";
+import { getStripe, isLiveCheckoutBlocked } from "./stripe";
 
 type Failure = { ok: false; message: string };
 
@@ -39,7 +39,7 @@ async function ensureCustomer(organizationId: string, organizationName: string, 
 export async function startCheckout(): Promise<Failure> {
   const ws = await requireWorkspace();
   if (ws.role !== "owner") return { ok: false, message: "Only the account owner can manage billing." };
-  if (!isStripeConfigured()) return { ok: false, message: NOT_CONFIGURED };
+  if (!isStripeConfigured() || isLiveCheckoutBlocked()) return { ok: false, message: NOT_CONFIGURED };
   if (ws.entitlements.access === "pro") return { ok: false, message: "Your Pro subscription is already active." };
   if (ws.entitlements.access === "grace") return { ok: false, message: "Update your payment method in the billing portal to keep Pro." };
   if (!(await consumeRateLimit(`checkout:${ws.user.id}`, 10, 3600))) return { ok: false, message: "Too many attempts. Please try again later." };

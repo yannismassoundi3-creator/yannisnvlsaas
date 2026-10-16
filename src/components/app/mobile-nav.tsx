@@ -13,7 +13,7 @@ export function MobileNav({ storeSwitcher, userMenu }: { storeSwitcher: ReactNod
   const [open, setOpen] = useState(false);
   return (
     <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-ivory/95 px-4 backdrop-blur-[6px] lg:hidden">
-      <Link href="/app" aria-label="Overview">
+      <Link href="/app" aria-label="Narixia, overview">
         <Logo />
       </Link>
       <DialogPrimitive.Root open={open} onOpenChange={setOpen}>

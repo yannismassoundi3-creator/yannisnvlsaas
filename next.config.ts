@@ -34,7 +34,8 @@ const csp = [
   "form-action 'self' https://checkout.stripe.com https://billing.stripe.com",
   "frame-ancestors 'none'",
   "worker-src 'self' blob:",
-  ...(isDev ? [] : ["upgrade-insecure-requests"]),
+  // Only when the site is served over HTTPS; a local production run on http would break itself.
+  ...(!isDev && (process.env.NEXT_PUBLIC_SITE_URL ?? "").startsWith("https://") ? ["upgrade-insecure-requests"] : []),
 ].join("; ");
 
 const securityHeaders = [
