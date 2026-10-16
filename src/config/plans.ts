@@ -42,9 +42,14 @@ function envInt(name: string, fallback: number): number {
   return Number.isSafeInteger(n) && n >= 0 ? n : fallback;
 }
 
-export const TRIAL_DAYS = envInt("NEXT_PUBLIC_TRIAL_DAYS", 14);
+/**
+ * Trial length and payment grace period. Mirrored by private.trial_period()
+ * and private.payment_grace_period() in the database, which enforce them; a
+ * database test fails if the values drift apart. Change both together.
+ */
+export const TRIAL_DAYS = 14;
 /** Days of full access kept after a renewal payment fails, while Stripe retries. */
-export const PAYMENT_GRACE_DAYS = envInt("NEXT_PUBLIC_PAYMENT_GRACE_DAYS", 7);
+export const PAYMENT_GRACE_DAYS = 7;
 
 export const PLANS: Record<PlanId, Plan> = {
   trial: {
