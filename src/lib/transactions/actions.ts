@@ -11,18 +11,27 @@ import { removeIncludedTax } from "@/lib/finance/tax";
 import { normalizeText } from "@/lib/imports/normalize";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
+import { catalogCommon } from "@/i18n/messages/catalog-common";
+import { transactionsMessages } from "@/i18n/messages/catalog-transactions";
+import { getRequestLocale } from "@/i18n/request";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; message: string; fieldErrors?: Record<string, string> };
 
-const PAUSED = "Editing is paused because your trial or subscription has ended.";
 const uuid = z.string().uuid();
 const TIME_RE = /^\d{2}:\d{2}$/;
 
+/** Messages of the current request's language. */
+async function messages() {
+  const locale = await getRequestLocale();
+  return { locale, t: transactionsMessages[locale], c: catalogCommon[locale] };
+}
+
 async function writeContext(limitKey: string) {
   const ws = await requireStore();
-  if (!ws.entitlements.canWrite) return { ws, error: PAUSED };
-  if (!(await consumeRateLimit(`${limitKey}:${ws.user.id}`, 300, 3600))) return { ws, error: "Too many changes in a short time. Please wait a moment." };
-  return { ws, error: null };
+  const m = await messages();
+  if (!ws.entitlements.canWrite) return { ws, ...m, error: m.c.paused };
+  if (!(await consumeRateLimit(`${limitKey}:${ws.user.id}`, 300, 3600))) return { ws, ...m, error: m.c.rateLimited };
+  return { ws, ...m, error: null };
 }
 
 // -----------------------------------------------------------------------------
@@ -37,19 +46,19 @@ const expenseInput = z.object({
 });
 
 export async function createExpense(input: z.input<typeof expenseInput>): Promise<Result> {
-  const { ws, error: blocked } = await writeContext("expense");
+  const { ws, locale, t, c, error: blocked } = await writeContext("expense");
   if (blocked) return { ok: false, message: blocked };
   const parsed = expenseInput.safeParse(input);
-  if (!parsed.success) return { ok: false, message: "Check the form." };
+  if (!parsed.success) return { ok: false, message: c.checkForm };
   const v = parsed.data;
   const fieldErrors: Record<string, string> = {};
-  if (!isValidDateString(v.date)) fieldErrors.date = "Enter a valid date.";
-  const amount = parseUserAmount(v.amount, ws.activeStore.currency);
+  if (!isValidDateString(v.date)) fieldErrors.date = c.validDate;
+  const amount = parseUserAmount(v.amount, ws.activeStore.currency, { locale });
   if (!amount.ok) fieldErrors.amount = amount.message;
-  else if (amount.value === 0) fieldErrors.amount = "Enter an amount greater than zero.";
+  else if (amount.value === 0) fieldErrors.amount = t.amountPositive;
   const description = normalizeText(v.description);
-  if (description.length > 300) fieldErrors.description = "Keep the description under 300 characters.";
-  if (Object.keys(fieldErrors).length) return { ok: false, message: "Check the highlighted fields.", fieldErrors };
+  if (description.length > 300) fieldErrors.description = t.descriptionTooLong;
+  if (Object.keys(fieldErrors).length) return { ok: false, message: c.checkFields, fieldErrors };
 
   const supabase = await createClient();
   const { error } = await supabase.from("expenses").insert({
@@ -62,17 +71,18 @@ export async function createExpense(input: z.input<typeof expenseInput>): Promis
     description: description || null,
     source: "manual",
   });
-  if (error) return { ok: false, message: "We could not save the expense." };
+  if (error) return { ok: false, message: t.expenseSaveFailed };
   refresh();
   return { ok: true };
 }
 
 export async function deleteExpense(id: string): Promise<Result> {
   const ws = await requireStore();
-  if (!uuid.safeParse(id).success) return { ok: false, message: "Invalid request." };
+  const { t, c } = await messages();
+  if (!uuid.safeParse(id).success) return { ok: false, message: c.invalidRequest };
   const supabase = await createClient();
   const { data, error } = await supabase.from("expenses").delete().eq("id", id).eq("store_id", ws.activeStore.id).select("id");
-  if (error || !data?.length) return { ok: false, message: "We could not delete the expense." };
+  if (error || !data?.length) return { ok: false, message: t.expenseDeleteFailed };
   refresh();
   return { ok: true };
 }
@@ -89,28 +99,28 @@ const refundInput = z.object({
 
 /** Records a refund, excluding tax. Linked to an order when its number is given, so product margins include it. */
 export async function createRefund(input: z.input<typeof refundInput>): Promise<Result> {
-  const { ws, error: blocked } = await writeContext("refund");
+  const { ws, locale, t, c, error: blocked } = await writeContext("refund");
   if (blocked) return { ok: false, message: blocked };
   const parsed = refundInput.safeParse(input);
-  if (!parsed.success) return { ok: false, message: "Check the form." };
+  if (!parsed.success) return { ok: false, message: c.checkForm };
   const v = parsed.data;
   const fieldErrors: Record<string, string> = {};
-  if (!isValidDateString(v.date)) fieldErrors.date = "Enter a valid date.";
-  const amount = parseUserAmount(v.amount, ws.activeStore.currency);
+  if (!isValidDateString(v.date)) fieldErrors.date = c.validDate;
+  const amount = parseUserAmount(v.amount, ws.activeStore.currency, { locale });
   if (!amount.ok) fieldErrors.amount = amount.message;
-  else if (amount.value === 0) fieldErrors.amount = "Enter an amount greater than zero.";
+  else if (amount.value === 0) fieldErrors.amount = t.amountPositive;
   const reason = normalizeText(v.reason);
-  if (reason.length > 300) fieldErrors.reason = "Keep the reason under 300 characters.";
+  if (reason.length > 300) fieldErrors.reason = t.reasonTooLong;
 
   const supabase = await createClient();
   let orderId: string | null = null;
   const orderNumber = normalizeText(v.orderNumber);
   if (orderNumber) {
     const { data: order } = await supabase.from("orders").select("id").eq("store_id", ws.activeStore.id).eq("external_id", orderNumber).maybeSingle();
-    if (!order) fieldErrors.orderNumber = `No order ${orderNumber} in this store. Leave empty for a refund not tied to an order.`;
+    if (!order) fieldErrors.orderNumber = t.noOrderInStore(orderNumber);
     else orderId = order.id;
   }
-  if (Object.keys(fieldErrors).length) return { ok: false, message: "Check the highlighted fields.", fieldErrors };
+  if (Object.keys(fieldErrors).length) return { ok: false, message: c.checkFields, fieldErrors };
 
   const { error } = await supabase.from("refunds").insert({
     organization_id: ws.organization.id,
@@ -121,17 +131,18 @@ export async function createRefund(input: z.input<typeof refundInput>): Promise<
     reason: reason || null,
     source: "manual",
   });
-  if (error) return { ok: false, message: "We could not save the refund." };
+  if (error) return { ok: false, message: t.refundSaveFailed };
   refresh();
   return { ok: true };
 }
 
 export async function deleteRefund(id: string): Promise<Result> {
   const ws = await requireStore();
-  if (!uuid.safeParse(id).success) return { ok: false, message: "Invalid request." };
+  const { t, c } = await messages();
+  if (!uuid.safeParse(id).success) return { ok: false, message: c.invalidRequest };
   const supabase = await createClient();
   const { data, error } = await supabase.from("refunds").delete().eq("id", id).eq("store_id", ws.activeStore.id).select("id");
-  if (error || !data?.length) return { ok: false, message: "We could not delete the refund." };
+  if (error || !data?.length) return { ok: false, message: t.refundDeleteFailed };
   refresh();
   return { ok: true };
 }
@@ -143,16 +154,16 @@ const costsInput = z.object({ shippingCost: z.string().max(40), fees: z.string()
 
 /** Records actual shipping cost and payment fees for an order. Empty means "use the store's estimate rule". */
 export async function updateOrderCosts(orderId: string, input: z.input<typeof costsInput>): Promise<Result> {
-  const { ws, error: blocked } = await writeContext("order");
+  const { ws, locale, t, c, error: blocked } = await writeContext("order");
   if (blocked) return { ok: false, message: blocked };
   const parsed = costsInput.safeParse(input);
-  if (!uuid.safeParse(orderId).success || !parsed.success) return { ok: false, message: "Invalid request." };
-  const shipping = parseUserAmount(parsed.data.shippingCost, ws.activeStore.currency, { optional: true });
-  const fees = parseUserAmount(parsed.data.fees, ws.activeStore.currency, { optional: true });
+  if (!uuid.safeParse(orderId).success || !parsed.success) return { ok: false, message: c.invalidRequest };
+  const shipping = parseUserAmount(parsed.data.shippingCost, ws.activeStore.currency, { optional: true, locale });
+  const fees = parseUserAmount(parsed.data.fees, ws.activeStore.currency, { optional: true, locale });
   const fieldErrors: Record<string, string> = {};
   if (!shipping.ok) fieldErrors.shippingCost = shipping.message;
   if (!fees.ok) fieldErrors.fees = fees.message;
-  if (Object.keys(fieldErrors).length) return { ok: false, message: "Check the highlighted fields.", fieldErrors };
+  if (Object.keys(fieldErrors).length) return { ok: false, message: c.checkFields, fieldErrors };
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("orders")
@@ -160,17 +171,18 @@ export async function updateOrderCosts(orderId: string, input: z.input<typeof co
     .eq("id", orderId)
     .eq("store_id", ws.activeStore.id)
     .select("id");
-  if (error || !data?.length) return { ok: false, message: "We could not save the costs." };
+  if (error || !data?.length) return { ok: false, message: t.costsSaveFailed };
   refresh();
   return { ok: true };
 }
 
 export async function deleteOrder(orderId: string): Promise<Result> {
   const ws = await requireStore();
-  if (!uuid.safeParse(orderId).success) return { ok: false, message: "Invalid request." };
+  const { t, c } = await messages();
+  if (!uuid.safeParse(orderId).success) return { ok: false, message: c.invalidRequest };
   const supabase = await createClient();
   const { data, error } = await supabase.from("orders").delete().eq("id", orderId).eq("store_id", ws.activeStore.id).select("id");
-  if (error || !data?.length) return { ok: false, message: "We could not delete the order." };
+  if (error || !data?.length) return { ok: false, message: t.orderDeleteFailed };
   return { ok: true };
 }
 
@@ -192,19 +204,19 @@ const orderInput = z.object({
  * removed exactly as during imports.
  */
 export async function createManualOrder(input: z.input<typeof orderInput>): Promise<Result<{ orderId: string }>> {
-  const { ws, error: blocked } = await writeContext("order");
+  const { ws, locale, t, c, error: blocked } = await writeContext("order");
   if (blocked) return { ok: false, message: blocked };
   const parsed = orderInput.safeParse(input);
-  if (!parsed.success) return { ok: false, message: "Check the form." };
+  if (!parsed.success) return { ok: false, message: c.checkForm };
   const v = parsed.data;
   const store = ws.activeStore;
   const currency = store.currency;
   const fieldErrors: Record<string, string> = {};
 
   const orderNumber = normalizeText(v.orderNumber);
-  if (!orderNumber) fieldErrors.orderNumber = "Enter an order number.";
-  else if (orderNumber.length > 100) fieldErrors.orderNumber = "Keep it under 100 characters.";
-  if (!isValidDateString(v.date)) fieldErrors.date = "Enter a valid date.";
+  if (!orderNumber) fieldErrors.orderNumber = t.orderNumberRequired;
+  else if (orderNumber.length > 100) fieldErrors.orderNumber = t.orderNumberTooLong;
+  if (!isValidDateString(v.date)) fieldErrors.date = c.validDate;
   const time = TIME_RE.test(v.time) ? v.time : "12:00";
 
   const supabase = await createClient();
@@ -218,37 +230,37 @@ export async function createManualOrder(input: z.input<typeof orderInput>): Prom
     const product = productById.get(l.productId);
     const name = normalizeText(product?.name ?? l.name);
     const sku = normalizeText(product?.sku ?? l.sku) || null;
-    if (!name) fieldErrors[`lines.${i}.name`] = "Choose a product or enter a name.";
-    const qty = parseUserInteger(l.quantity, { min: 1, max: 1_000_000 });
+    if (!name) fieldErrors[`lines.${i}.name`] = t.lineNameRequired;
+    const qty = parseUserInteger(l.quantity, { min: 1, max: 1_000_000, locale });
     if (!qty.ok) fieldErrors[`lines.${i}.quantity`] = qty.message;
-    const price = parseUserAmount(l.unitPrice, currency);
+    const price = parseUserAmount(l.unitPrice, currency, { locale });
     if (!price.ok) fieldErrors[`lines.${i}.unitPrice`] = price.message;
-    const discount = parseUserAmount(l.discount, currency, { optional: true });
+    const discount = parseUserAmount(l.discount, currency, { optional: true, locale });
     if (!discount.ok) fieldErrors[`lines.${i}.discount`] = discount.message;
-    const cost = parseUserUnitCost(l.unitCost, { optional: true });
+    const cost = parseUserUnitCost(l.unitCost, { optional: true, locale });
     if (!cost.ok) fieldErrors[`lines.${i}.unitCost`] = cost.message;
     const gross = qty.ok && price.ok ? (qty.value as number) * (price.value as number) : 0;
-    if (gross > MAX_AMOUNT_MINOR) fieldErrors[`lines.${i}.unitPrice`] = "The line amount is too large.";
+    if (gross > MAX_AMOUNT_MINOR) fieldErrors[`lines.${i}.unitPrice`] = t.lineTooLarge;
     const disc = discount.ok ? (discount.value ?? 0) : 0;
-    if (disc > gross) fieldErrors[`lines.${i}.discount`] = "The discount is larger than the line amount.";
+    if (disc > gross) fieldErrors[`lines.${i}.discount`] = t.discountTooLarge;
     return { productId: product?.id ?? null, name, sku, quantity: qty.ok ? (qty.value as number) : 0, gross, discount: disc, unitCostE4: cost.ok ? cost.value : null };
   });
-  const shippingCharged = parseUserAmount(v.shippingCharged, currency, { optional: true });
-  const taxes = parseUserAmount(v.taxes, currency, { optional: true });
-  const shippingCost = parseUserAmount(v.shippingCost, currency, { optional: true });
-  const fees = parseUserAmount(v.fees, currency, { optional: true });
+  const shippingCharged = parseUserAmount(v.shippingCharged, currency, { optional: true, locale });
+  const taxes = parseUserAmount(v.taxes, currency, { optional: true, locale });
+  const shippingCost = parseUserAmount(v.shippingCost, currency, { optional: true, locale });
+  const fees = parseUserAmount(v.fees, currency, { optional: true, locale });
   if (!shippingCharged.ok) fieldErrors.shippingCharged = shippingCharged.message;
   if (!taxes.ok) fieldErrors.taxes = taxes.message;
   if (!shippingCost.ok) fieldErrors.shippingCost = shippingCost.message;
   if (!fees.ok) fieldErrors.fees = fees.message;
-  if (Object.keys(fieldErrors).length) return { ok: false, message: "Check the highlighted fields.", fieldErrors };
+  if (Object.keys(fieldErrors).length) return { ok: false, message: c.checkFields, fieldErrors };
 
   let lineAmounts = lines.map((l) => ({ gross: l.gross, discount: l.discount }));
   let shipping = shippingCharged.ok ? (shippingCharged.value ?? 0) : 0;
   const tax = taxes.ok ? (taxes.value ?? 0) : 0;
   if (store.prices_include_tax) {
     const converted = removeIncludedTax({ lines: lineAmounts, orderDiscount: 0, shippingCharged: shipping, refunds: [], taxes: tax });
-    if (!converted.ok) return { ok: false, message: "Check the amounts.", fieldErrors: { taxes: "Taxes cannot be larger than the order total." } };
+    if (!converted.ok) return { ok: false, message: t.checkAmounts, fieldErrors: { taxes: t.taxesTooLarge } };
     lineAmounts = converted.order.lines;
     shipping = converted.order.shippingCharged;
   }
@@ -271,8 +283,8 @@ export async function createManualOrder(input: z.input<typeof orderInput>): Prom
     .single();
   if (error || !order) {
     return error?.code === "23505"
-      ? { ok: false, message: "Check the highlighted fields.", fieldErrors: { orderNumber: "An order with this number already exists." } }
-      : { ok: false, message: "We could not save the order." };
+      ? { ok: false, message: c.checkFields, fieldErrors: { orderNumber: t.duplicateOrder } }
+      : { ok: false, message: t.orderSaveFailed };
   }
 
   // Lines without a chosen product are matched by SKU or name, creating the product if needed.
@@ -302,7 +314,7 @@ export async function createManualOrder(input: z.input<typeof orderInput>): Prom
   );
   if (linesError) {
     await supabase.from("orders").delete().eq("id", order.id);
-    return { ok: false, message: "We could not save the order lines." };
+    return { ok: false, message: t.linesSaveFailed };
   }
   refresh();
   return { ok: true, orderId: order.id };

@@ -291,3 +291,15 @@ export const settingsActions = defineMessages({
     loginDeleteFailed: "Vos données ont été supprimées, mais l'identifiant de connexion n'a pas pu être supprimé. Contactez le support pour terminer.",
   },
 });
+
+/** Errors of the full data export (src/app/api/account/export/route.ts). The JSON file itself stays in English. */
+export const accountExportErrors = defineMessages({
+  en: {
+    signIn: "Sign in required",
+    tooMany: "Too many exports. Try again in an hour.",
+  },
+  fr: {
+    signIn: "Connexion requise",
+    tooMany: "Trop d'exports. Réessayez dans une heure.",
+  },
+});

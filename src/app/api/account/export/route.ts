@@ -1,3 +1,5 @@
+import { accountExportErrors } from "@/i18n/messages/account-settings";
+import { getRequestLocale } from "@/i18n/request";
 import { audit } from "@/lib/audit";
 import { getWorkspace } from "@/lib/auth/workspace";
 import { fileSlug } from "@/lib/csv";
@@ -35,8 +37,9 @@ const TABLES: { name: TableName; key: string; columns: string; order: string }[]
 
 export async function GET() {
   const ws = await getWorkspace().catch(() => null);
-  if (!ws) return new Response("Sign in required", { status: 401 });
-  if (!(await consumeRateLimit(`account-export:${ws.user.id}`, 5, 3600))) return new Response("Too many exports. Try again in an hour.", { status: 429 });
+  const errors = accountExportErrors[await getRequestLocale()];
+  if (!ws) return new Response(errors.signIn, { status: 401 });
+  if (!(await consumeRateLimit(`account-export:${ws.user.id}`, 5, 3600))) return new Response(errors.tooMany, { status: 429 });
   const supabase = await createClient();
   const { data: profile } = await supabase.from("profiles").select("full_name, created_at").eq("id", ws.user.id).maybeSingle();
   const encoder = new TextEncoder();

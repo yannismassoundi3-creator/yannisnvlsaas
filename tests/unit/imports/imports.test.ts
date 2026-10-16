@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { detectDateOrder, parseDateTime, parseLocalDate } from "@/lib/imports/dates";
-import { autoMap, detectSource, extractMapped, missingRequired, normalizeHeader } from "@/lib/imports/mapping";
+import { autoMap, detectSource, extractMapped, missingRequired, normalizeHeader, sourceLabel } from "@/lib/imports/mapping";
 import { mapCategory, mapPlatform, matchKey, normalizeRows, normalizeText, type RawRow } from "@/lib/imports/normalize";
-import { DEFAULT_OPTIONS, type ImportOptions } from "@/lib/imports/schema";
+import { parseCsvText, uniqueHeaders } from "@/lib/imports/parse-file";
+import { DEFAULT_OPTIONS, fieldCopy, IMPORT_KINDS, KIND_ORDER, kindCopy, type ImportOptions } from "@/lib/imports/schema";
 
 const ctx = { currency: "EUR", timezone: "Europe/Paris" };
 const opts = (o: Partial<ImportOptions> = {}): ImportOptions => ({ ...DEFAULT_OPTIONS, ...o });
@@ -253,5 +254,61 @@ describe("ad spend and expenses", () => {
     expect(out[2].status).toBe("invalid");
     expect(out[3].status).toBe("invalid");
     expect(mapCategory("payment_fees")).toBe("payment_fees");
+  });
+});
+
+describe("messages in the interface language", () => {
+  it("keeps English by default and the exact wording the interface relies on", () => {
+    const [r] = normalizeRows("orders", rows([{ order_number: "#1", ordered_at: "2026-03-02", line_name: "A", quantity: "two", unit_price: "10" }]), opts(), ctx);
+    expect(r.errors[0].message).toBe('Quantity is not a number: "two".');
+    expect(DEFAULT_OPTIONS.locale).toBe("en");
+  });
+
+  it("writes row errors and warnings in French when the options say so", () => {
+    const out = normalizeRows(
+      "orders",
+      rows([
+        { order_number: "#1", ordered_at: "2026-03-02", line_name: "A", quantity: "two", unit_price: "10" },
+        { order_number: "#2", ordered_at: "31/02/2026", line_name: "B", quantity: "1", unit_price: "10" },
+        { order_number: "#3", ordered_at: "2026-03-02", line_name: "C", quantity: "1", unit_price: "10", refunded_amount: "5" },
+      ]),
+      opts({ locale: "fr" }),
+      ctx,
+    );
+    expect(out[0].errors[0].message).toBe("Quantité : « two » n'est pas un nombre.");
+    expect(out[1].errors[0].message).toMatch(/^Cette date n'existe pas/);
+    expect(out[2].warnings[0].message).toMatch(/^Pas de date de remboursement/);
+  });
+
+  it("lets an explicit locale override the options", () => {
+    const [r] = normalizeRows("expenses", rows([{ date: "", amount: "10" }]), opts({ locale: "en" }), ctx, "fr");
+    expect(r.errors[0].message).toBe("Date : valeur manquante.");
+    const [e] = normalizeRows("expenses", rows([{ date: "", amount: "10" }]), opts(), ctx);
+    expect(e.errors[0].message).toBe("Date is missing.");
+  });
+
+  it("parses dates with French messages", () => {
+    expect(parseLocalDate("", "ymd", "fr")).toEqual({ ok: false, message: "Saisissez une date." });
+    expect(parseDateTime("31/02/2026", "dmy", "UTC", "fr")).toMatchObject({ ok: false, message: expect.stringMatching(/^Cette date n'existe pas/) });
+  });
+
+  it("reports file problems, missing fields and recognised exports in French", () => {
+    expect(parseCsvText("Order number\n", "orders", 100, "fr")).toEqual({ ok: false, message: "Le fichier contient des noms de colonnes mais aucune ligne de données." });
+    expect(uniqueHeaders(["", "a"], "fr")).toEqual(["Colonne 1", "a"]);
+    expect(missingRequired("expenses", autoMap("expenses", ["Date"]), "fr")).toEqual(["Montant"]);
+    expect(sourceLabel("shopify_orders")).toBe("Shopify order export");
+    expect(sourceLabel("shopify_orders", "fr")).toBe("Export de commandes Shopify");
+  });
+
+  it("has French copy for every import kind and field", () => {
+    for (const kind of KIND_ORDER) {
+      expect(kindCopy(kind, "fr").label).not.toBe(IMPORT_KINDS[kind].label);
+      for (const field of IMPORT_KINDS[kind].fields) {
+        const fr = fieldCopy(kind, field.key, "fr");
+        expect(fr.label, `${kind}.${field.key}`).toBeTruthy();
+        expect(Boolean(fr.description), `${kind}.${field.key}`).toBe(Boolean(field.description));
+        expect(fieldCopy(kind, field.key)).toEqual({ label: field.label, description: field.description });
+      }
+    }
   });
 });

@@ -62,7 +62,7 @@ export const importUi = defineMessages({
       privacy:
         "The file is read in this browser. Only the columns you match in the next step are sent to Narixia; customer names, emails and addresses in your export are never uploaded.",
       back: "Back",
-      fileSummary: (rows: string, columns: number, _rowCount: number) => `${rows} rows · ${columns} columns`,
+      fileSummary: (rows: string, columns: number) => `${rows} rows · ${columns} columns`,
       recognised: (source: string) => `${source} recognised`,
       windowsEncoding: "Windows encoding",
       skippedLines: (n: number) =>
@@ -197,8 +197,7 @@ export const importUi = defineMessages({
       privacy:
         "Le fichier est lu dans ce navigateur. Seules les colonnes que vous associez à l'étape suivante sont envoyées à Narixia ; les noms, e-mails et adresses des clients présents dans votre export ne sont jamais envoyés.",
       back: "Retour",
-      fileSummary: (rows: string, columns: number, rowCount: number) =>
-        `${rows} ${plural("fr", rowCount, "ligne", "lignes")} · ${columns} ${plural("fr", columns, "colonne", "colonnes")}`,
+      fileSummary: (rows: string, columns: number) => `Lignes : ${rows} · colonnes : ${columns}`,
       recognised: (source: string) => `${source} reconnu`,
       windowsEncoding: "Encodage Windows",
       skippedLines: (n: number) =>

@@ -50,4 +50,28 @@ describe("PDF reports", () => {
     expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(5_000);
   });
+
+  it("renders a French report with campaigns and French number formatting", async () => {
+    const metrics = deriveMetrics({ ...EMPTY_TOTALS, orders: 120, units: 300, grossSales: 1_234_567, cogs: 400_000, productSalesAfterDiscounts: 1_234_567, adSpend: 150_000 });
+    const pdf = await renderPdfReport({
+      kind: "advertising",
+      locale: "fr",
+      storeName: "Boutique exemple",
+      isDemo: true,
+      currency: "EUR",
+      timezone: "Europe/Paris",
+      range: { from: "2026-09-01", to: "2026-09-30" },
+      comparison: { from: "2026-08-02", to: "2026-08-31" },
+      generatedAt: "1 oct. 2026, 09:00",
+      metrics,
+      previous: metrics,
+      products: [],
+      campaigns: [{ campaignId: "c1", name: "Rentrée", platform: "meta", productId: null, spend: 150_000, impressions: 0, clicks: 0, conversions: 0, conversionValue: 600_000, platformRoas: 4 }],
+      insights: [],
+      notes: [],
+      unallocatedAdSpend: 0,
+    });
+    expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+    expect(pdf.length).toBeGreaterThan(5_000);
+  });
 });

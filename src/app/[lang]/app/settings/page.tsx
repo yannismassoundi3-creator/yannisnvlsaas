@@ -7,11 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Alert, Skeleton } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
+import { INTL_LOCALE } from "@/i18n/config";
 import { settingsPage } from "@/i18n/messages/account-settings";
 import { getLocale } from "@/i18n/server";
 import { requireWorkspace } from "@/lib/auth/workspace";
 import { currencyName } from "@/lib/finance/currency";
-import { INTL_LOCALE } from "@/i18n/config";
 import { platformName, type PlatformId } from "@/lib/onboarding/constants";
 import { cn } from "@/lib/utils";
 

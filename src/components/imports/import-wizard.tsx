@@ -369,7 +369,7 @@ export function ImportWizard({ initialKind, store, maxRows, canWrite }: Props) {
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-2 text-sm text-ink-2">
                 <Badge tone="outline">{file?.name}</Badge>
-                <span className="tabular">{t.fileSummary(f.count(csv.rows.length), csv.headers.length, csv.rows.length)}</span>
+                <span className="tabular">{t.fileSummary(f.count(csv.rows.length), csv.headers.length)}</span>
                 {source ? <Badge tone="positive">{t.recognised(sourceLabel(source, locale))}</Badge> : null}
                 {csv.encoding === "windows-1252" ? <Badge tone="info">{t.windowsEncoding}</Badge> : null}
               </div>

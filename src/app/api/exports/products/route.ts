@@ -5,15 +5,18 @@ import { getWorkspace } from "@/lib/auth/workspace";
 import { fileSlug, toCsv } from "@/lib/csv";
 import { listCatalogAll } from "@/lib/data/products";
 import { reportPeriod } from "@/lib/data/reports";
-import { costCell, csvResponse, moneyCell, rateCell } from "@/lib/exports";
+import { costCell, csvResponse, moneyCell, rateCell, textResponse } from "@/lib/exports";
 import { consumeRateLimit } from "@/lib/rate-limit";
+import { exportsMessages } from "@/i18n/messages/catalog-exports";
+import { getRequestLocale } from "@/i18n/request";
 
-/** Product profitability for a period as CSV (Pro). Amounts exclude tax; text cells are formula-safe. */
+/** Product profitability for a period as CSV (Pro). Amounts exclude tax; text cells are formula-safe. Headers follow the request language. */
 export async function GET(request: NextRequest) {
-  const ws = await getWorkspace().catch(() => null);
-  if (!ws?.organization || !ws.activeStore) return new Response("Sign in required", { status: 401 });
-  if (!ws.entitlements.limits.exports) return new Response("CSV exports are part of the Pro plan.", { status: 403 });
-  if (!(await consumeRateLimit(`export:${ws.user.id}`, 60, 3600))) return new Response("Too many exports. Try again later.", { status: 429 });
+  const [ws, locale] = await Promise.all([getWorkspace().catch(() => null), getRequestLocale()]);
+  const t = exportsMessages[locale];
+  if (!ws?.organization || !ws.activeStore) return textResponse(t.signInRequired, 401);
+  if (!ws.entitlements.limits.exports) return textResponse(t.proOnly, 403);
+  if (!(await consumeRateLimit(`export:${ws.user.id}`, 60, 3600))) return textResponse(t.tooManyExports, 429);
 
   const store = ws.activeStore;
   const params = Object.fromEntries(request.nextUrl.searchParams.entries());
@@ -21,11 +24,11 @@ export async function GET(request: NextRequest) {
   const rows = await listCatalogAll(store, period.range, "all");
   const c = store.currency;
   const csv = toCsv(
-    ["Product", "SKU", "Archived", "Unit cost", "Units", "Gross sales", "Discounts", "Refunds", "Net sales", "Shipping charged", "Net revenue", "COGS", "Lines without cost", "Shipping costs", "Payment fees", "Linked ad spend", "Contribution margin", "Contribution margin %"],
+    t.productColumns,
     rows.map((r) => [
       r.name,
       r.sku,
-      r.archived,
+      r.archived ? t.yes : t.no,
       costCell(r.unitCostE4),
       r.units,
       moneyCell(r.grossSales, c),
