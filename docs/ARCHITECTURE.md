@@ -1,3 +1,5 @@
+**English** · [Français](fr/ARCHITECTURE.md)
+
 # Architecture
 
 Narixia is a single Next.js application backed by Supabase (PostgreSQL and Auth) and Stripe. It is designed to be

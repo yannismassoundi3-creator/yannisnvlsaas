@@ -1,3 +1,5 @@
+**English** · [Français](fr/SECURITY.md)
+
 # Security and privacy
 
 This document describes the controls that exist in the code, how they were verified, and the gaps that remain.

@@ -1,3 +1,5 @@
+**English** · [Français](fr/DEPLOYMENT.md)
+
 # Deployment and operations
 
 The reference deployment is **Vercel** (application and daily cron) with a **hosted Supabase project** and

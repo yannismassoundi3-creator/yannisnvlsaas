@@ -1,3 +1,5 @@
+**English** · [Français](fr/DESIGN.md)
+
 # Design system
 
 Narixia should read like a carefully made financial product: calm, precise and legible. Figures come first, and

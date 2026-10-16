@@ -1,3 +1,5 @@
+**English** · [Français](fr/IMPORTS.md)
+
 # CSV imports
 
 CSV import is Narixia's first data integration. It covers four kinds of data, each with a downloadable

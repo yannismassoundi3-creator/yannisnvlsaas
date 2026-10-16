@@ -1,3 +1,5 @@
+**English** · [Français](README.fr.md)
+
 # Narixia
 
 **Understand your real margins. Make better business decisions.**
@@ -126,6 +128,8 @@ billing. Step-by-step instructions, migrations workflow, backups and recovery, a
 | [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Supabase, Vercel, Stripe, migrations, backups, recovery, operations |
 | [TESTING.md](docs/TESTING.md) | Test layers and how to run them |
 | [LAUNCH.md](docs/LAUNCH.md) | Launch checklist, known limitations, incomplete features, next features |
+
+French versions of every document are in [docs/fr/](docs/fr/).
 
 ## Status
 

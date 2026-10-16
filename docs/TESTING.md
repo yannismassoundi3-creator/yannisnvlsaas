@@ -1,3 +1,5 @@
+**English** · [Français](fr/TESTING.md)
+
 # Testing
 
 Four layers, from fastest to slowest. Run the fast checks before every commit; run everything before a release.

@@ -50,3 +50,6 @@ next-env.d.ts
 
 # local tooling
 .claude/settings.local.json
+
+# local screenshots
+/screenshots/

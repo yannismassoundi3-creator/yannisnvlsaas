@@ -1,3 +1,5 @@
+**English** · [Français](fr/METRICS.md)
+
 # Metrics and calculation rules
 
 Narixia is an analytics and decision-support tool, not accounting software. This

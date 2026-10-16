@@ -1,3 +1,5 @@
+**English** · [Français](fr/BILLING.md)
+
 # Billing, trial and entitlements
 
 Narixia uses **Stripe Billing** with Stripe-hosted Checkout and the Stripe customer portal. Card details are entered

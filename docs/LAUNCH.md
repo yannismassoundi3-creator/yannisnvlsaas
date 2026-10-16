@@ -1,3 +1,5 @@
+**English** · [Français](fr/LAUNCH.md)
+
 # Launch checklist, limitations and what is not built yet
 
 ## Launch checklist
