@@ -130,7 +130,7 @@ async function Advertising({ searchParams }: { searchParams: PageProps<"/[lang]/
     entry[d.platform as Platform] = (entry[d.platform as Platform] ?? 0) + d.spend;
     byDay.set(d.day, entry);
   }
-  const series = bucketDailyValues([...byDay.entries()].map(([day, values]) => ({ day, values })), chartPlatforms, period.range);
+  const series = bucketDailyValues([...byDay.entries()].map(([day, values]) => ({ day, values })), chartPlatforms, period.range, locale);
   const campaigns = platform ? data.campaigns.filter((c) => c.platform === platform) : data.campaigns;
   const context = period.comparison ? t.vsPrevious(period.days) : undefined;
   const hasAnyAds = campaignOptions.length > 0 || data.daily.length > 0;

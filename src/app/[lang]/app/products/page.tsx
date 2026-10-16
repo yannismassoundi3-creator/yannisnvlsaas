@@ -185,24 +185,24 @@ async function Products({ searchParams }: { searchParams: PageProps<"/[lang]/app
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <nav aria-label={t.filterNav} className="flex flex-wrap gap-1">
-          {tabs.map((t) =>
-            t.pro ? (
-              <Link key={t.id} href="/app/billing" className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-ink-3 hover:bg-hover" title={t.advancedPro}>
-                {t.label}
+          {tabs.map((tab) =>
+            tab.pro ? (
+              <Link key={tab.id} href="/app/billing" className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-ink-3 hover:bg-hover" title={t.advancedPro}>
+                {tab.label}
                 <Badge tone="outline">Pro</Badge>
               </Link>
             ) : (
               <Link
-                key={t.id}
-                href={href({ filter: t.id, page: 0 })}
-                aria-current={filter === t.id ? "page" : undefined}
+                key={tab.id}
+                href={href({ filter: tab.id, page: 0 })}
+                aria-current={filter === tab.id ? "page" : undefined}
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium",
-                  filter === t.id ? "bg-navy-800 text-white" : "text-ink-2 hover:bg-hover",
+                  filter === tab.id ? "bg-navy-800 text-white" : "text-ink-2 hover:bg-hover",
                 )}
               >
-                {t.label}
-                {t.count ? <span className={cn("rounded-sm px-1 text-xs tabular", filter === t.id ? "bg-white/15" : "bg-caution-50 text-caution-800")}>{t.count}</span> : null}
+                {tab.label}
+                {tab.count ? <span className={cn("rounded-sm px-1 text-xs tabular", filter === tab.id ? "bg-white/15" : "bg-caution-50 text-caution-800")}>{tab.count}</span> : null}
               </Link>
             ),
           )}

@@ -132,6 +132,7 @@ async function ProductDetail({ params, searchParams }: Pick<PageProps<"/[lang]/a
     daily.map((d) => ({ day: d.day, values: { sales: d.sales, units: d.units } })),
     ["sales", "units"] as const,
     period.range,
+    locale,
   );
   const b = t.breakdown;
   const breakdown: { label: string; amount: number | null; sign: "+" | "−" | "="; note?: string; strong?: boolean }[] = [
