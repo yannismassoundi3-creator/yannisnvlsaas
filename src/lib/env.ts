@@ -43,6 +43,12 @@ export function serverEnv() {
     /** Explicit operator opt-in before live keys may start checkouts (see docs/BILLING.md). */
     stripeLiveEnabled: process.env.STRIPE_LIVE_ENABLED === "true",
     cronSecret: process.env.CRON_SECRET ?? "",
+    /** Password of the inbound email webhook (HTTP basic auth, user "narixia"). */
+    inboundWebhookSecret: process.env.INBOUND_WEBHOOK_SECRET ?? "",
+    /** Inbound address with a {token} placeholder, e.g. "abc123+{token}@inbound.postmarkapp.com". */
+    inboundEmailAddressTemplate: process.env.INBOUND_EMAIL_ADDRESS_TEMPLATE ?? "",
+    /** Alternative to the template: your own inbound domain (address "ventes+<token>@<domain>"). */
+    inboundEmailDomain: process.env.INBOUND_EMAIL_DOMAIN ?? "",
   };
 }
 

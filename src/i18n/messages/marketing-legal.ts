@@ -60,6 +60,12 @@ export const marketingLegal = defineMessages({
             "Events such as “import completed” with the date, linked to your account. They never contain financial amounts or file contents.",
           why: "To understand and improve the product (legitimate interest)",
         },
+        {
+          category: "Sale emails you forward (optional)",
+          examples:
+            "Only if you forward them: sender, subject and date, the detected platform, amount and item name, and an excerpt of at most 2,000 characters from which email addresses and phone numbers are removed",
+          why: "To prepare the sales you confirm (contract)",
+        },
         { category: "Support messages", examples: "Messages and feedback you send us", why: "To answer you (contract or legitimate interest)" },
       ],
       csvTitle: "CSV files",
@@ -76,6 +82,7 @@ export const marketingLegal = defineMessages({
         "When you delete your account, your organisation’s data is deleted from the live database immediately. Copies in encrypted backups expire with the backup rotation of our database provider.",
         "Billing records: as long as accounting and tax law requires.",
         "Security logs and usage events: up to 12 months.",
+        "Forwarded sale emails: deleted 30 days after you confirm or ignore them, and after 90 days at most otherwise.",
       ],
       cookiesTitle: "Cookies",
       cookiesText:
@@ -211,6 +218,12 @@ export const marketingLegal = defineMessages({
           why: "Comprendre et améliorer le produit (intérêt légitime)",
         },
         {
+          category: "E-mails de vente que vous transférez (facultatif)",
+          examples:
+            "Seulement si vous les transférez : expéditeur, objet et date, plateforme, montant et nom d'article détectés, et un extrait de 2 000 caractères au plus dont les adresses e-mail et numéros de téléphone sont retirés",
+          why: "Préparer les ventes que vous validez (contrat)",
+        },
+        {
           category: "Messages d'assistance",
           examples: "Les messages et retours que vous nous envoyez",
           why: "Vous répondre (contrat ou intérêt légitime)",
@@ -230,6 +243,7 @@ export const marketingLegal = defineMessages({
         "Lorsque vous supprimez votre compte, les données de votre organisation sont immédiatement supprimées de la base de données en production. Les copies présentes dans les sauvegardes chiffrées expirent selon le cycle de rotation des sauvegardes de notre fournisseur de base de données.",
         "Données de facturation : aussi longtemps que l'exige la législation comptable et fiscale.",
         "Journaux de sécurité et événements d'utilisation : jusqu'à 12 mois.",
+        "E-mails de vente transférés : supprimés 30 jours après que vous les avez validés ou ignorés, et au plus tard au bout de 90 jours sinon.",
       ],
       cookiesTitle: "Cookies",
       cookiesText:

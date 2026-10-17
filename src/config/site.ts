@@ -32,6 +32,12 @@ export const site = {
     { id: "email", name: process.env.NEXT_PUBLIC_EMAIL_PROVIDER || "Brevo", purpose: "Delivery of account emails (confirmation, sign-in codes, password reset)", location: process.env.NEXT_PUBLIC_EMAIL_REGION || "European Union" },
     { id: "payments", name: "Stripe", purpose: "Subscription payments, invoices and the billing portal", location: "European Union and United States" },
     { id: "hosting", name: process.env.NEXT_PUBLIC_HOSTING_PROVIDER || "Vercel", purpose: "Application hosting and delivery", location: process.env.NEXT_PUBLIC_HOSTING_REGION || "Region chosen at deployment" },
+    {
+      id: "inbound",
+      name: process.env.NEXT_PUBLIC_INBOUND_EMAIL_PROVIDER || "Postmark",
+      purpose: "Receiving the sale emails you forward to us",
+      location: process.env.NEXT_PUBLIC_INBOUND_EMAIL_REGION || "United States",
+    },
   ],
 } as const;
 
@@ -58,6 +64,10 @@ const PROCESSORS_FR: Record<ProcessorId, { purpose: string; location: string }> 
   hosting: {
     purpose: "Hébergement et diffusion de l'application",
     location: process.env.NEXT_PUBLIC_HOSTING_REGION || "Région choisie au déploiement",
+  },
+  inbound: {
+    purpose: "Réception des e-mails de vente que vous nous transférez",
+    location: process.env.NEXT_PUBLIC_INBOUND_EMAIL_REGION || "États-Unis",
   },
 };
 

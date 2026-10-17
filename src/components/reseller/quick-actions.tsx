@@ -455,6 +455,7 @@ function SellContent({
               date: values.date,
               shippingCost: values.shippingCost,
               platformFee: values.platformFee,
+              inboundEmailId: prefill?.inboundEmailId ?? "",
             }).catch(() => null);
             if (!r) return setFormError(resellerMessages[locale].actions.saleSaveFailed);
             if (!r.ok) {

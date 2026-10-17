@@ -121,6 +121,12 @@ billing_events (Stripe event log, service role only)       private.rate_limits
   `writeOrder` (`src/lib/transactions/write.ts`, aussi utilisé par les commandes manuelles) ; les lectures par
   `src/lib/data/reseller.ts` et les fonctions SQL `reseller_items`, `reseller_stock_summary` et
   `report_channel_breakdown`. L'accueil, la navigation et l'onboarding s'adaptent au mode.
+- **Ventes reçues par e-mail.** Les vendeurs transfèrent leurs e-mails de notification de vente à une adresse privée
+  (`stores.inbound_token`) ; le prestataire d'e-mails entrants les transmet à `/api/inbound/email`, qui vérifie
+  l'authentification basique, les analyse de façon heuristique (`src/lib/inbound/parse.ts`) et enregistre une ligne
+  en attente dans `inbound_emails` avec le rôle de service. Valider ouvre la fenêtre de vente préremplie ; la vente
+  est enregistrée par la même action de vente rapide, qui marque l'e-mail comme validé. Voir
+  [DEPLOYMENT.md](DEPLOYMENT.md) et [SECURITY.md](SECURITY.md).
 
 Les types TypeScript générés pour le schéma se trouvent dans `src/lib/supabase/database.types.ts`
 (`npm run db:types`).

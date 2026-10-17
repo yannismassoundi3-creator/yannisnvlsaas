@@ -145,6 +145,15 @@ export async function sellItem(input: SaleInput): Promise<Result<{ orderId: stri
       lines: [{ productId: product.id, name: product.name, sku: null, quantity: 1, gross: v.priceMinor, discount: 0, unitCostE4: product.unit_cost_e4 }],
     });
     if (written.ok) {
+      if (v.inboundEmailId) {
+        // The forwarded sale email is now confirmed (RLS: members of this organisation only).
+        await supabase
+          .from("inbound_emails")
+          .update({ status: "confirmed", order_id: written.orderId })
+          .eq("id", v.inboundEmailId)
+          .eq("store_id", store.id)
+          .eq("status", "pending");
+      }
       refresh();
       return { ok: true, orderId: written.orderId, productId: product.id };
     }

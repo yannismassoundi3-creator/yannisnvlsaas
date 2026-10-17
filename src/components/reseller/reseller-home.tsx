@@ -1,12 +1,12 @@
-import { ArrowRight, Hourglass, PackageCheck } from "lucide-react";
+import { ArrowRight, Hourglass, Mail, PackageCheck } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { AnalyticsPaused } from "@/components/app/analytics-paused";
 import { DateRangePicker } from "@/components/app/date-range-picker";
 import { KpiTile } from "@/components/dashboard/kpi-tile";
 import { AddItemButton, QuickActionsProvider, SellButton } from "@/components/reseller/quick-actions";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableContainer, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -14,13 +14,16 @@ import type { Locale } from "@/i18n/config";
 import type { Format } from "@/i18n/format";
 import { kpiMessages } from "@/i18n/messages/dashboard-kpis";
 import { overviewMessages } from "@/i18n/messages/dashboard-overview";
+import { inboundMessages } from "@/i18n/messages/inbound";
 import { resellerMessages } from "@/i18n/messages/reseller";
 import { rangeQuery } from "@/lib/analytics/range";
 import type { ReadyWorkspace, Store } from "@/lib/auth/workspace";
+import { countPendingInbound } from "@/lib/data/inbound";
 import { getResellerHome, getSellContext } from "@/lib/data/reseller";
 import { ReportsPausedError, type ReportPeriod } from "@/lib/data/reports";
 import { definitionsFor, METRIC_POLARITY, type Metrics } from "@/lib/finance/metrics";
 import { e4ToMinor } from "@/lib/finance/money";
+import { inboundConfig } from "@/lib/inbound/config";
 import { isPlatformId, platformName } from "@/lib/onboarding/constants";
 import { daysBetween } from "@/lib/reseller/logic";
 import { cn } from "@/lib/utils";
@@ -37,14 +40,14 @@ type Props = {
   initial: "add" | "sell" | null;
   locale: Locale;
   f: Format;
-  /** Slot under the actions, e.g. sale emails waiting for confirmation. */
-  notice?: ReactNode;
 };
 
-function relative(f: Format, current: number, previous: number | null | undefined) {
-  if (previous === undefined || previous === null || previous === 0) return { value: null, text: "" };
-  const value = (current - previous) / Math.abs(previous);
-  return { value: Math.abs(value) < 0.0005 ? 0 : value, text: f.percent(Math.abs(value) < 0.0005 ? 0 : value, { signDisplay: "exceptZero" }) };
+/** Change against the previous period; none when the previous value is zero (a first sale is not "+∞ %"). */
+function relative(f: Format, current: number, previous: number, polarity: "up" | "down" | null) {
+  if (previous === 0) return null;
+  const raw = (current - previous) / Math.abs(previous);
+  const value = Math.abs(raw) < 0.0005 ? 0 : raw;
+  return { value, text: f.percent(value, { signDisplay: "exceptZero" }), polarity };
 }
 
 function channelLabel(channel: string | null, locale: Locale) {
@@ -52,7 +55,7 @@ function channelLabel(channel: string | null, locale: Locale) {
   return resellerMessages[locale].home.channelUnknown;
 }
 
-export async function ResellerHome({ ws, period, initial, locale, f, notice }: Props) {
+export async function ResellerHome({ ws, period, initial, locale, f }: Props) {
   const t = resellerMessages[locale].home;
   const store = ws.activeStore;
   const header = (
@@ -76,9 +79,9 @@ export async function ResellerHome({ ws, period, initial, locale, f, notice }: P
   );
   if (!ws.entitlements.canViewAnalytics) return paused;
 
-  let data, sell;
+  let data, sell, pendingEmails;
   try {
-    [data, sell] = await Promise.all([getResellerHome(store, period.range, period.comparison, period.today), getSellContext(store)]);
+    [data, sell, pendingEmails] = await Promise.all([getResellerHome(store, period.range, period.comparison, period.today), getSellContext(store), countPendingInbound(store)]);
   } catch (error) {
     if (error instanceof ReportsPausedError) return paused;
     throw error;
@@ -86,6 +89,30 @@ export async function ResellerHome({ ws, period, initial, locale, f, notice }: P
 
   const money = (v: number) => f.money(v, store.currency);
   const canWrite = ws.entitlements.canWrite;
+  const inboundEnabled = inboundConfig().enabled;
+  // Sale emails waiting for confirmation (forwarded by the seller, see /app/inbox).
+  const notice =
+    pendingEmails > 0 ? (
+      <Card aria-labelledby="inbox-card-heading" className="border-info-100 bg-info-50">
+        <CardBody className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <Mail className="mt-0.5 size-5 shrink-0 text-info-700" aria-hidden />
+            <div className="min-w-0">
+              <h2 id="inbox-card-heading" className="text-md font-semibold text-ink">
+                {t.inboxCard(pendingEmails)}
+              </h2>
+              <p className="text-sm text-ink-2">{t.inboxCardText}</p>
+            </div>
+          </div>
+          <Button asChild size="lg" className="w-full sm:w-auto">
+            <Link href={"/app/inbox" as Route}>
+              {t.inboxOpen}
+              <ArrowRight aria-hidden />
+            </Link>
+          </Button>
+        </CardBody>
+      </Card>
+    ) : null;
   const actions = (
     <div className="grid grid-cols-2 gap-3">
       <AddItemButton className="h-14 w-full text-lg" />
@@ -188,7 +215,13 @@ export async function ResellerHome({ ws, period, initial, locale, f, notice }: P
               {data.storeWideExpenses > 0 ? <p className="border-t border-line px-5 py-3 text-xs text-ink-3">{t.storeWideNote(money(data.storeWideExpenses))}</p> : null}
             </Card>
           </div>
-          <p className="text-right">
+          <p className="flex flex-wrap justify-end gap-x-5 gap-y-2">
+            {inboundEnabled ? (
+              <Link href={"/app/inbox" as Route} className="inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:underline">
+                {inboundMessages[locale].guide.title}
+                <ArrowRight className="size-3.5" aria-hidden />
+              </Link>
+            ) : null}
             <Link href={`/app/items?${rangeQuery(period)}` as Route} className="inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:underline">
               {resellerMessages[locale].items.title}
               <ArrowRight className="size-3.5" aria-hidden />
@@ -236,7 +269,7 @@ function HeadlineFigures({
           label={t.kept}
           value={<span className={metrics.contributionMargin < 0 ? "text-negative-700" : undefined}>{money(metrics.contributionMargin)}</span>}
           definition={{ term: D.contributionMargin.term, text: `${D.contributionMargin.short} ${D.contributionMargin.formula}.` }}
-          delta={previous ? { ...relative(f, metrics.contributionMargin, previous.contributionMargin), polarity: METRIC_POLARITY.contributionMargin } : null}
+          delta={previous ? relative(f, metrics.contributionMargin, previous.contributionMargin, METRIC_POLARITY.contributionMargin) : null}
           deltaContext={context}
           status={status}
           footnote={metrics.contributionMarginRate !== null ? t.keptFootnote(f.percent(metrics.contributionMarginRate)) : null}
@@ -245,7 +278,7 @@ function HeadlineFigures({
           label={t.sales}
           value={money(metrics.netRevenue)}
           definition={{ term: D.netRevenue.term, text: `${D.netRevenue.short} ${D.netRevenue.formula}.` }}
-          delta={previous ? { ...relative(f, metrics.netRevenue, previous.netRevenue), polarity: METRIC_POLARITY.netRevenue } : null}
+          delta={previous ? relative(f, metrics.netRevenue, previous.netRevenue, METRIC_POLARITY.netRevenue) : null}
           deltaContext={context}
         />
         <KpiTile label={t.itemsSold} value={f.count(metrics.units)} definition={{ term: t.itemsSold, text: t.itemsSoldDefinition }} footnote={t.ordersFootnote(metrics.orders)} />
@@ -286,10 +319,12 @@ function StockCard({ data, store, locale, f, today }: { data: Awaited<ReturnType
         {data.stock.itemsWithoutCost > 0 ? <p className="col-span-2 text-xs text-caution-700">{t.withoutCost(data.stock.itemsWithoutCost)}</p> : null}
       </CardBody>
       <div className="border-t border-line">
-        <div className="flex items-center gap-2 px-5 pt-4">
-          <Hourglass className="size-4 text-ink-3" aria-hidden />
-          <h3 className="text-md font-semibold tracking-tight text-ink">{t.staleTitle}</h3>
-          <span className="text-sm text-ink-3">· {t.staleDescription}</span>
+        <div className="px-5 pt-4">
+          <h3 className="flex items-center gap-2 text-md font-semibold tracking-tight text-ink">
+            <Hourglass className="size-4 text-ink-3" aria-hidden />
+            {t.staleTitle}
+          </h3>
+          <p className="text-sm text-ink-3">{t.staleDescription}</p>
         </div>
         {data.stale.length === 0 ? (
           <p className="px-5 pt-2 pb-4 text-sm text-ink-3">{t.staleNone}</p>

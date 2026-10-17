@@ -120,7 +120,7 @@ describe("sale validation", () => {
   it("records a stock item sold with a comma price", () => {
     expect(parse({ productId })).toEqual({
       ok: true,
-      value: { productId, newItem: null, priceMinor: 1850, channel: "vinted", date: "2026-10-17", shippingCostMinor: null, platformFeeMinor: null },
+      value: { productId, newItem: null, priceMinor: 1850, channel: "vinted", date: "2026-10-17", shippingCostMinor: null, platformFeeMinor: null, inboundEmailId: null },
     });
   });
 
@@ -146,6 +146,8 @@ describe("sale validation", () => {
     expect(parse({ productId, price: "1e3" })).toMatchObject({ ok: false, fieldErrors: { price: expect.any(String) } });
     expect(parse({ productId, shippingCost: "-1" })).toMatchObject({ ok: false, fieldErrors: { shippingCost: expect.any(String) } });
     expect(parse({ productId, date: "2026-10-18" })).toMatchObject({ ok: false, fieldErrors: { date: expect.any(String) } });
+    expect(parse({ productId, inboundEmailId: "x" })).toMatchObject({ ok: false, fieldErrors: { inboundEmailId: expect.any(String) } });
+    expect(parse({ productId, inboundEmailId: productId })).toMatchObject({ ok: true, value: { inboundEmailId: productId } });
   });
 
   it("allows a zero price (an item given away still leaves its cost)", () => {

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page } from "@playwright/test";
 
@@ -67,6 +68,18 @@ export async function onboard(page: Page, opts: { storeName: string; pricesInclu
 
 /** Fails the test on WCAG 2.2 AA violations detected by axe. */
 export async function expectAccessible(page: Page) {
+  // Metadata can stream in just after a client-side refresh: wait for the page title first.
+  await expect(page).toHaveTitle(/\S/);
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
   expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
+}
+
+/** A variable from the environment, else from .env.local (local stack only; never committed). */
+export function localEnv(name: string): string | undefined {
+  if (process.env[name]) return process.env[name];
+  try {
+    return new RegExp(`^${name}=(.*)$`, "m").exec(readFileSync(".env.local", "utf8"))?.[1].trim() || undefined;
+  } catch {
+    return undefined;
+  }
 }

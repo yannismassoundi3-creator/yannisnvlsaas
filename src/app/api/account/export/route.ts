@@ -25,6 +25,7 @@ const TABLES: { name: TableName; key: string; columns: string; order: string }[]
   { name: "expenses", key: "expenses", columns: "*", order: "id" },
   { name: "ad_campaigns", key: "ad_campaigns", columns: "*", order: "id" },
   { name: "ad_spend_daily", key: "ad_spend_daily", columns: "*", order: "id" },
+  { name: "inbound_emails", key: "inbound_emails", columns: "*", order: "id" },
   {
     name: "import_jobs",
     key: "imports",

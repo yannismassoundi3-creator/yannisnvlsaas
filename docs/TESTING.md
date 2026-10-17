@@ -24,7 +24,8 @@ Pure logic, no network or database. `npm run test:unit`.
 | Date ranges and series | Presets, custom ranges clipped to the plan's history, comparison periods, weekly/monthly buckets and partial buckets, SQL row mapping |
 | Imports | Header recognition (Shopify, Meta, Google Ads), timestamps with offsets, local times across DST, day/month order detection and ambiguity, order grouping, order-discount split, tax-inclusive orders and refunds, whole-order hold-back, cancelled orders, other currencies, conflicting order-level values, Shopify variants, product matching like the database, ad and expense rows |
 | Reseller mode | Sale numbers and item references (format, no ambiguous letters, uniqueness), the 60-day "lingering" rule, mode suggested by the platform, sales channels, default platform, loose name matching, item and sale validation (comma decimals, required fields, future dates, bounds, messages in both languages) |
-| Entitlements | Access levels, trial countdown, grace period, plan limits, history start |
+| Inbound emails | Synthetic French and English sale emails (direct, Gmail, Apple Mail and Outlook forward wrappers, HTML only), platform detection, amount heuristics (notations, thousands, preferring sale words, avoiding fees), titles, Gmail forwarding confirmations (link and code), no amount found, non-euro stores, excerpt cleaning (no email addresses, phone numbers or postal addresses, 2,000 characters), inbound addresses and tokens |
+ Access levels, trial countdown, grace period, plan limits, history start |
 | Auth redirects | Only same-site relative `next` paths are accepted |
 | Exports | CSV formula-injection neutralisation, BOM and CRLF, decimal cells, file names; PDF report renders (sample-store label included) |
 
@@ -52,7 +53,8 @@ These run real SQL, RLS policies and functions as the `authenticated`, `anon` an
 | `imports.test.ts` | Staging, finalize and duplicate rules for each kind (skip and update strategies), whole-order hold-back, batched commit, undo restoring replaced records, "only the latest import can be undone", access control |
 | `billing.test.ts` | Pro only from a verified checkout event; grace period start and expiry; recovery after a retried payment; stale events ignored; cancellation; unknown organisations ignored; billing periods from subscription items; webhook signature verification (unsigned and wrongly signed requests rejected) and idempotent replays, using Stripe's own test signature helper |
 | `reseller.test.ts` | Onboarding with the reseller mode (zero fee and shipping rules) and the old seven-argument call; mode, sales channel and purchase date constraints; unique sale numbers; a quick sale feeds the daily totals, the product report, the per-platform breakdown and the items list; refunds per platform; undoing a sale returns the item to stock; other tenants and anonymous callers see nothing; expired accounts cannot switch the mode |
-| `stores.test.ts` | Store limit per plan enforced by the database; the sample store does not count |
+| `inbound.test.ts` | Inbound tokens (random, readable by members, never writable directly, rotated by owners only); the webhook route handler (503 until configured, basic auth required, unknown tokens answered like accepted ones, parsed pending rows, idempotent message ids, token in the recipient address, malformed and oversized payloads, Gmail confirmations); RLS on `inbound_emails` (members read and confirm or dismiss only, no inserts or deletes, same-store orders, read-only after expiry); 30/90-day retention |
+ Store limit per plan enforced by the database; the sample store does not count |
 
 The billing tests stub only the call that re-reads a subscription from Stripe; signatures are produced and verified
 with the real Stripe SDK. They do not contact Stripe.
@@ -70,7 +72,9 @@ Supabase stack (sign-up confirmation emails are read from its Mailpit inbox at `
 - **Reseller mode** (in French): sign up → onboarding with Vinted, which selects the reseller mode → add two items in a
   row → record a sale with « Vendu ! » and a comma price (18,50) → the home page shows the sale, what is left and one
   item in stock → My items shows it sold; axe checks on the home page and both dialogs, and no horizontal overflow at
-  a 390 px phone width.
+  a 390 px phone width. Then sales received by email (when `INBOUND_*` is set in `.env.local`): a synthetic
+  Postmark payload posted to the local webhook (wrong password refused) appears on the home page and in the inbox
+  with a Gmail confirmation code; « Valider » opens the prefilled sale dialog and records the sale.
 - **Accessibility:** axe-core (WCAG 2.0/2.1/2.2 A and AA rules) runs on the public pages, the dashboard and the
   import review and must report no violations.
 

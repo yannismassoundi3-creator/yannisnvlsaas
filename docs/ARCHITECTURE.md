@@ -113,6 +113,11 @@ billing_events (Stripe event log, service role only)       private.rate_limits
   `writeOrder` path (`src/lib/transactions/write.ts`, also used by manual orders); reads through
   `src/lib/data/reseller.ts` and the SQL functions `reseller_items`, `reseller_stock_summary` and
   `report_channel_breakdown`. The home page, navigation and onboarding adapt to the mode.
+- **Sales received by email.** Sellers forward their sale-notification emails to a private address
+  (`stores.inbound_token`); the inbound provider posts them to `/api/inbound/email`, which verifies basic-auth
+  credentials, parses them heuristically (`src/lib/inbound/parse.ts`) and stores a pending row in `inbound_emails`
+  with the service role. Confirming opens the sale dialog prefilled; the sale is recorded through the same quick-sale
+  action, which marks the email confirmed. See [DEPLOYMENT.md](DEPLOYMENT.md) and [SECURITY.md](SECURITY.md).
 
 Generated TypeScript types for the schema live in `src/lib/supabase/database.types.ts` (`npm run db:types`).
 

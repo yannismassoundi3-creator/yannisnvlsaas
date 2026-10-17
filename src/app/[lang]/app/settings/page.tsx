@@ -2,6 +2,7 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { SampleStoreButton } from "@/components/app/sample-store-button";
+import { InboundGuide } from "@/components/inbound/inbound-guide";
 import { BusinessModelForm } from "@/components/reseller/business-model-form";
 import { AddStoreDialog, DataControls, DeleteStoreButton, ProfileForms, StoreSettingsForm } from "@/components/settings/settings-forms";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,7 @@ import { resellerMessages } from "@/i18n/messages/reseller";
 import { getLocale } from "@/i18n/server";
 import { requireWorkspace } from "@/lib/auth/workspace";
 import { currencyName } from "@/lib/finance/currency";
+import { storeInboundAddress } from "@/lib/inbound/config";
 import { isReseller, platformName, type PlatformId } from "@/lib/onboarding/constants";
 import { cn } from "@/lib/utils";
 
@@ -106,6 +108,10 @@ async function Settings({ searchParams }: { searchParams: PageProps<"/[lang]/app
               <BusinessModelForm key={store.business_model} current={isReseller(store) ? "reseller" : "ecommerce"} disabled={!canWrite} />
             </CardBody>
           </Card>
+        ) : null}
+
+        {section === "store" && store && isReseller(store) ? (
+          <InboundGuide address={storeInboundAddress(store.inbound_token)} locale={locale} canRegenerate={ws.role !== "member"} disabled={!canWrite} showInboxLink />
         ) : null}
 
         {section === "stores" ? (

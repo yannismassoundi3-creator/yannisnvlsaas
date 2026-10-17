@@ -51,7 +51,8 @@ with `npx supabase`), and the Stripe CLI for local webhook testing.
    are sent automatically on HTTPS.
 5. **Cron:** `vercel.json` schedules `GET /api/cron/maintenance` daily at 03:17 UTC. Set `CRON_SECRET` (e.g.
    `openssl rand -hex 32`); Vercel sends it as a bearer token. The job prunes expired rate-limit windows and deletes
-   staged rows of uploads abandoned for more than two days. On another host, call the endpoint daily with
+   staged rows of uploads abandoned for more than two days, and forwarded sale emails (confirmed or dismissed after 30
+   days, pending after 90). On another host, call the endpoint daily with
    `Authorization: Bearer $CRON_SECRET`.
 
 ## 3. Stripe
@@ -59,7 +60,38 @@ with `npx supabase`), and the Stripe CLI for local webhook testing.
 Follow [BILLING.md](BILLING.md): product and price, customer portal, webhook endpoint
 `https://<your-domain>/api/stripe/webhook`, and the launch checklist before live payments.
 
-## 4. Smoke test after each production deployment
+## 4. Inbound email (optional): sales received by email
+
+Sellers in reseller mode can forward their own sale-notification emails (Vinted, Leboncoin, eBay, Vestiaire
+Collective) to a private address; each email becomes a pending entry they confirm in one tap. Narixia never scrapes
+or calls these platforms. The documented provider is **Postmark inbound**, which works without owning a domain.
+Without the variables below, the feature shows "coming soon" and `/api/inbound/email` answers 503.
+
+1. Create a Postmark account, then **Servers → Create server** (for example "Narixia inbound").
+2. In that server, open **Message Streams → Default Inbound Stream** (the inbound stream exists by default).
+3. Generate a secret: `openssl rand -hex 32`. In the inbound stream's **Settings**, set the **Webhook URL** to
+   `https://narixia:<secret>@<your-domain>/api/inbound/email` (HTTP basic auth: user `narixia`, password the secret;
+   if your Postmark screen has separate basic-auth fields, put them there and use the plain URL). Postmark's menu
+   names may vary slightly over time. Leave "Include raw email content in JSON payload" unchecked.
+4. Copy the stream's inbound address (`<inboundhash>@inbound.postmarkapp.com`) and set
+   `INBOUND_EMAIL_ADDRESS_TEMPLATE=<inboundhash>+{token}@inbound.postmarkapp.com`. Each store's address puts its
+   private token after the `+`; Postmark passes it as `MailboxHash`.
+5. Set `INBOUND_WEBHOOK_SECRET=<secret>` in Vercel, and `NEXT_PUBLIC_INBOUND_EMAIL_PROVIDER` /
+   `NEXT_PUBLIC_INBOUND_EMAIL_REGION` for the privacy policy (Postmark processes data in the United States: keep the
+   region accurate). Redeploy.
+6. Check: Postmark's webhook **Check** button gets `200 {"ok":true}` (no store matches, nothing is stored). Then send
+   an email to a store's address (Settings → Store, in reseller mode) and find it under « Ventes reçues par e-mail ».
+
+Optional own domain: point an MX record of a subdomain to `inbound.postmarkapp.com`, add it as the server's inbound
+domain in Postmark, and set `INBOUND_EMAIL_DOMAIN=<subdomain>` instead of the template (addresses become
+`ventes+<token>@<subdomain>`).
+
+What the endpoint does: constant-time credential check (401 otherwise), 5 MB body limit, store lookup by token
+(unknown tokens get the same answer as stored messages), 120 messages per store per hour, idempotent per
+`MessageID`, no email content in logs. Excerpts are capped at 2,000 characters and purged by the daily maintenance job
+(see [SECURITY.md](SECURITY.md)).
+
+## 5. Smoke test after each production deployment
 
 1. `/`, `/pricing`, `/privacy` load; response headers include `content-security-policy` and
    `strict-transport-security`.
@@ -67,7 +99,9 @@ Follow [BILLING.md](BILLING.md): product and price, customer portal, webhook end
 3. Import `tests/e2e/fixtures/shopify-orders.csv` into the real store, confirm, check the overview, undo the import.
 4. Billing shows the expected price and mode (test or live) and opens Checkout.
 5. `curl -H "Authorization: Bearer $CRON_SECRET" https://<your-domain>/api/cron/maintenance` returns `{"ok":true,…}`.
-6. Delete the test account from Settings → Data.
+6. If inbound email is configured: `curl -u narixia:$INBOUND_WEBHOOK_SECRET -H 'content-type: application/json' -d '{}'
+   https://<your-domain>/api/inbound/email` returns `{"ok":true}`, and the same request without `-u` returns 401.
+7. Delete the test account from Settings → Data.
 
 ## Database migrations
 
@@ -137,7 +171,8 @@ select event, count(*) from public.product_events where created_at > now() - int
 
 **Rotating credentials** (after a suspected leak, or when someone with access leaves): create a new Supabase
 secret key and revoke the old one; roll the Stripe secret key and the webhook signing secret; generate a new
-`CRON_SECRET`. Update the host's environment and redeploy. Sessions are not affected by these rotations.
+`CRON_SECRET` and a new `INBOUND_WEBHOOK_SECRET` (update the Postmark webhook URL with it). Update the host's
+environment and redeploy. Sessions are not affected by these rotations.
 
 **Requests from users:** account export and deletion are self-service in Settings → Data. For a request received
 by email, verify the requester controls the account's email address before acting.

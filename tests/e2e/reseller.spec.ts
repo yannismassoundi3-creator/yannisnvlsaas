@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { expectAccessible, signUp, uniqueEmail } from "./helpers";
+import { expectAccessible, localEnv, signUp, uniqueEmail } from "./helpers";
 
 /**
  * Reseller mode, in French (the first testers resell on Vinted and Leboncoin):
@@ -131,5 +131,66 @@ test.describe.serial("Reseller mode", () => {
     await expect(page.getByRole("heading", { name: "Comment vendez-vous ?" })).toBeVisible();
     await expect(page.getByRole("radio", { name: /Je revends des articles/ })).toBeChecked();
     await expectAccessible(page);
+
+    // Sales received by email: the seller's forwarded sale email becomes a pending entry, confirmed in one tap.
+    const secret = localEnv("INBOUND_WEBHOOK_SECRET");
+    test.skip(!secret || !localEnv("INBOUND_EMAIL_ADDRESS_TEMPLATE"), "Set INBOUND_WEBHOOK_SECRET and INBOUND_EMAIL_ADDRESS_TEMPLATE in .env.local to test sales received by email.");
+    await expect(page.getByRole("heading", { name: "Recevoir mes ventes automatiquement" })).toBeVisible();
+    const address = (await page.getByTestId("inbound-address").textContent()) ?? "";
+    const token = /\+([a-z0-9]+)@/.exec(address)?.[1] ?? "";
+    expect(token).toMatch(/^[a-f0-9]{32}$/);
+    const post = (data: object, password = secret!) =>
+      page.request.post("/api/inbound/email", { headers: { authorization: `Basic ${Buffer.from(`narixia:${password}`).toString("base64")}` }, data });
+    expect((await post({ MailboxHash: token, Subject: "x" }, "wrong-secret")).status()).toBe(401);
+    const sale = await post({
+      From: "vendeuse@gmail.com",
+      FromFull: { Email: "vendeuse@gmail.com", Name: "Vendeuse", MailboxHash: "" },
+      To: address,
+      OriginalRecipient: address,
+      MailboxHash: token,
+      Subject: "Fwd: Votre article « Robe fleurie » a été vendu !",
+      TextBody: "---------- Forwarded message ---------\nFrom: Vinted <no-reply@vinted.fr>\nSubject: Votre article « Robe fleurie » a été vendu !\n\nBonne nouvelle !\nPrix : 25,00 €\nFrais de port : 2,99 €",
+      HtmlBody: "",
+      Date: "Sat, 17 Oct 2026 10:00:00 +0200",
+      MessageID: `e2e-${token}-sale`,
+    });
+    expect(sale.status()).toBe(200);
+    const gmail = await post({
+      From: "forwarding-noreply@google.com",
+      FromFull: { Email: "forwarding-noreply@google.com" },
+      To: address,
+      MailboxHash: token,
+      Subject: "(#123456789) Gmail Forwarding Confirmation - Receive Mail from vendeuse@gmail.com",
+      TextBody: "Confirmation code: 123456789\nhttps://mail-settings.google.com/mail/vf-e2e",
+      MessageID: `e2e-${token}-gmail`,
+    });
+    expect(gmail.status()).toBe(200);
+
+    await page.goto("/app");
+    await expect(page.getByRole("heading", { name: "Ventes reçues par e-mail (2 à valider)" })).toBeVisible();
+    await page.getByRole("link", { name: "Vérifier les ventes" }).click();
+    await page.waitForURL(/\/app\/inbox$/);
+    await expect(page.getByText("Code de confirmation :")).toBeVisible();
+    await expect(page.getByText("123456789", { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Ouvrir le lien de confirmation Gmail" })).toHaveAttribute("href", "https://mail-settings.google.com/mail/vf-e2e");
+    await expect(page.getByText("Correspond à « Robe fleurie » dans votre stock")).toBeVisible();
+    await expectAccessible(page);
+    await page.getByRole("button", { name: "Valider : Robe fleurie" }).click();
+    const confirm = page.getByRole("dialog", { name: "Vendu !" });
+    await expect(confirm.getByText("Prérempli depuis un e-mail de vente : vérifiez avant d'enregistrer.")).toBeVisible();
+    await expect(confirm.getByText("Robe fleurie", { exact: true })).toBeVisible();
+    await expect(confirm.getByLabel("Prix de vente")).toHaveValue("25,00");
+    await expect(confirm.getByLabel("Plateforme", { exact: true })).toHaveValue("vinted");
+    await expectAccessible(page);
+    await confirm.getByRole("button", { name: "Enregistrer la vente" }).click();
+    await expect(page.getByText("Vente enregistrée")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Valider : Robe fleurie" })).toHaveCount(0);
+    await page.getByRole("button", { name: "C'est fait" }).click();
+    await expect(page.getByText("E-mail ignoré")).toBeVisible();
+    await expect(page.getByText("Aucun e-mail à vérifier.")).toBeVisible();
+    await page.goto("/app/items?tab=sold");
+    const confirmed = page.getByRole("main").getByRole("listitem").filter({ hasText: "Robe fleurie", visible: true });
+    await expect(confirmed).toContainText(/25,00\s€/);
+    await expect(confirmed).toContainText(/13,00\s€/);
   });
 });

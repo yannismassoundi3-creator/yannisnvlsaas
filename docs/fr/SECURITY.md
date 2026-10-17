@@ -16,6 +16,9 @@ subsistent. Il ne s'agit pas d'une certification : aucun audit externe ni test d
     sorte qu'un compte expiré est en lecture seule, même via l'API ;
   - `billing_customers`, `billing_events` et `product_events` n'ont aucune politique : seul le rôle de service peut
     les lire ou y écrire ;
+  - `inbound_emails` (e-mails de vente transférés) peut être lue par les membres et modifiée uniquement sur `status`
+    et `order_id` (valider ou ignorer) ; seul le rôle de service y insère des lignes, après vérification des
+    identifiants du webhook entrant, et personne ne les supprime via l'API ;
   - des clés étrangères composites maintiennent les lignes enfants dans l'organisation de leur parent, et des
     déclencheurs les maintiennent dans la même boutique (une ligne de commande ne peut pas pointer vers le produit
     d'un autre client (locataire) ou d'une autre boutique).
@@ -31,7 +34,7 @@ subsistent. Il ne s'agit pas d'une certification : aucun audit externe ni test d
   imports dans les actions d'import, les exports et rapports dans leurs routes, l'accès aux analyses dans les fonctions
   de rapport (`private.assert_report_request`).
 - **Clé privilégiée.** `SUPABASE_SECRET_KEY` contourne la RLS. Elle n'est utilisée que dans des modules serveur
-  marqués `import "server-only"`, pour : les webhooks Stripe vérifiés, la suppression de compte et de boutique, les
+  marqués `import "server-only"`, pour : les webhooks Stripe vérifiés, le webhook d'e-mails entrants authentifié, la suppression de compte et de boutique, les
   événements d'audit et d'analyse, les limites de requêtes, la création de la boutique d'exemple et la lecture de
   l'identifiant client Stripe. Chaque appelant autorise d'abord l'utilisateur.
 
@@ -88,6 +91,9 @@ utilisateur :
 | Changement de mot de passe, changement d'e-mail, suppression de compte | 5 / heure chacun |
 | Suppression de boutique | 10 / heure |
 | Messages de retour | 10 / heure |
+| E-mails de vente entrants | 120 / heure par boutique |
+| Validation ou rejet des e-mails entrants | 300 / heure |
+| Changement de l'adresse de réception | 10 / heure |
 
 Les fenêtres expirées sont purgées chaque jour par `/api/cron/maintenance`.
 
@@ -111,8 +117,9 @@ avec des données utilisateur) et ne charge aucun script tiers. Passer aux nonce
 mesure de durcissement envisageable si l'application devait un jour utiliser des scripts tiers.
 
 Les server actions sont protégées contre les requêtes intersites par Next.js (comparaison Origin/Host). Les seuls
-route handlers qui modifient un état sont le webhook Stripe (signature) et la tâche de maintenance (secret bearer
-comparé en temps constant).
+route handlers qui modifient un état sont le webhook Stripe (signature), la tâche de maintenance (secret bearer
+comparé en temps constant) et le webhook d'e-mails entrants (authentification HTTP basique comparée en temps
+constant).
 
 ## Secrets
 
@@ -128,7 +135,7 @@ comparé en temps constant).
 ## Journalisation
 
 Les journaux contiennent des types d'événements, des codes d'erreur et des identifiants, jamais de montants, de
-contenus de fichiers, de noms de produits, de mots de passe, de jetons ni de clés. Les événements d'analyse
+contenus de fichiers, de noms de produits, de contenus d'e-mails, de mots de passe, de jetons ni de clés. Les événements d'analyse
 (`product_events`) sont internes (first-party), n'utilisent aucun cookie et suppriment toute propriété dont le nom
 évoque de l'argent ou des données personnelles (`src/lib/analytics/track.ts`).
 
@@ -153,7 +160,32 @@ organisation ; personne ne peut les modifier via l'API. Les événements Stripe 
   d'analyse ou publicitaire, donc aucun bandeau de consentement n'est requis à leur égard au titre des règles
   ePrivacy ; ajoutez-en un avant d'introduire tout traceur non essentiel.
 - **Les sous-traitants** sont listés dans la politique de confidentialité à partir de `src/config/site.ts` (Supabase,
-  Stripe, hébergeur).
+  Stripe, hébergeur, prestataire d'e-mails du compte et prestataire d'e-mails entrants).
+
+### Ventes reçues par e-mail
+
+Les vendeurs peuvent transférer leurs propres e-mails de notification de vente à une adresse privée
+(`<hash>+<jeton>@inbound.postmarkapp.com`) ; Postmark transmet chaque message à `/api/inbound/email`. Rien n'est
+aspiré (scraping) et aucun compte de plateforme n'est consulté.
+
+- **Adresse.** Chaque boutique possède un jeton aléatoire de 32 caractères (`stores.inbound_token`, 122 bits
+  aléatoires). Les membres peuvent le lire pour afficher l'adresse ; les propriétaires et administrateurs peuvent le
+  remplacer (`regenerate_inbound_token`), ce qui désactive aussitôt l'ancienne adresse. Quiconque connaît une adresse
+  ne peut créer que des entrées *en attente* pour cette boutique : rien n'est enregistré comme vente sans la
+  validation d'un membre.
+- **Point de terminaison.** Authentification HTTP basique (utilisateur `narixia`, mot de passe
+  `INBOUND_WEBHOOK_SECRET`) comparée en temps constant, corps limité à 5 Mo, jetons inconnus traités comme des
+  messages acceptés (pas d'énumération), 120 messages par boutique et par heure, idempotence par identifiant de
+  message. Sans configuration, il répond 503 et l'interface affiche « bientôt disponible ».
+- **Ce qui est stocké** (`inbound_emails`) : date de réception, identifiant du message chez le prestataire, adresse
+  de l'expéditeur d'origine, objet, plateforme, montant et titre d'article détectés, pour les confirmations Gmail le
+  code et le lien, un extrait de 2 000 caractères au plus dont les adresses e-mail, numéros de téléphone et lignes
+  d'adresse postale sont retirés, le statut et la commande créée. L'e-mail complet, les pièces jointes et les en-têtes
+  ne sont pas conservés.
+- **Conservation.** La maintenance quotidienne supprime les e-mails validés ou ignorés au bout de 30 jours, et ceux
+  en attente au bout de 90 jours. Ils figurent dans l'export du compte et sont supprimés avec la boutique ou le compte.
+- **Sous-traitant.** Postmark (nom et région configurables : `NEXT_PUBLIC_INBOUND_EMAIL_PROVIDER`,
+  `NEXT_PUBLIC_INBOUND_EMAIL_REGION`) reçoit les e-mails, aux États-Unis par défaut.
 
 Ces fonctionnalités préparent la conformité au RGPD ; elles ne rendent pas à elles seules le service conforme. Voir les
 points juridiques dans [LAUNCH.md](LAUNCH.md).
@@ -180,3 +212,7 @@ uniquement par le linter sur les propres fichiers du dépôt ; le seul correctif
 - Pas d'analyse antimalware automatisée des fichiers importés (les fichiers sont analysés comme du texte dans le
   navigateur et ne sont jamais stockés).
 - Pas de test d'intrusion externe.
+- Les e-mails transférés passent par le prestataire d'e-mails entrants (Postmark, aux États-Unis par défaut) avant
+  d'arriver chez Narixia ; les vendeurs les transfèrent par choix et la politique de confidentialité mentionne ce
+  prestataire. Le filtrage de l'extrait est heuristique : une adresse au format inhabituel pourrait subsister dans un
+  extrait jusqu'à la purge à 30 ou 90 jours.

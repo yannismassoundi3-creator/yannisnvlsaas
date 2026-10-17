@@ -25,7 +25,8 @@ Logique pure, sans réseau ni base de données. `npm run test:unit`.
 | Plages de dates et séries | Préréglages, plages personnalisées tronquées à l'historique de l'offre, périodes de comparaison, regroupements hebdomadaires/mensuels et regroupements partiels, correspondance des lignes SQL |
 | Imports | Reconnaissance des en-têtes (Shopify, Meta, Google Ads), horodatages avec décalage, heures locales lors des changements d'heure, détection de l'ordre jour/mois et des ambiguïtés, regroupement des commandes, répartition des remises de commande, commandes et remboursements TTC, mise en attente de la commande entière, commandes annulées, autres devises, valeurs contradictoires au niveau de la commande, variantes Shopify, correspondance des produits identique à celle de la base de données, lignes de publicité et de dépenses |
 | Mode revendeur | Numéros de vente et références d'articles (format, sans lettres ambiguës, unicité), règle des 60 jours (« articles qui traînent »), mode suggéré selon la plateforme, plateformes de vente, plateforme par défaut, rapprochement approximatif des noms, validation des articles et des ventes (décimales à virgule, champs obligatoires, dates futures, limites, messages dans les deux langues) |
-| Droits d'accès | Niveaux d'accès, compte à rebours de l'essai, période de grâce, limites de l'offre, début de l'historique |
+| E-mails entrants | E-mails de vente synthétiques en français et en anglais (directs, transférés via Gmail, Apple Mail et Outlook, HTML seul), détection de la plateforme, heuristiques de montant (notations, milliers, préférence pour les mots de vente, frais écartés), titres, confirmations de transfert Gmail (lien et code), aucun montant trouvé, boutiques hors euro, nettoyage de l'extrait (ni adresses e-mail, ni téléphones, ni adresses postales, 2 000 caractères), adresses et jetons entrants |
+ Niveaux d'accès, compte à rebours de l'essai, période de grâce, limites de l'offre, début de l'historique |
 | Redirections d'authentification | Seuls les chemins `next` relatifs du même site sont acceptés |
 | Exports | Neutralisation de l'injection de formules CSV, BOM et CRLF, cellules décimales, noms de fichiers ; rendu des rapports PDF (libellé de la boutique d'exemple inclus) |
 
@@ -54,7 +55,8 @@ Ces tests exécutent du vrai SQL, des politiques RLS et des fonctions avec les r
 | `imports.test.ts` | Règles de mise en attente (staging), de finalisation et de doublons pour chaque type (stratégies d'ignorance et de mise à jour), mise en attente de la commande entière, validation par lots, annulation restaurant les enregistrements remplacés, « seul le dernier import peut être annulé », contrôle d'accès |
 | `billing.test.ts` | Pro uniquement à partir d'un événement de checkout vérifié ; début et fin de la période de grâce ; rétablissement après un paiement réessayé ; événements obsolètes ignorés ; résiliation ; organisations inconnues ignorées ; périodes de facturation issues des éléments d'abonnement ; vérification de la signature du webhook (requêtes non signées ou mal signées rejetées) et rejeux idempotents, à l'aide de l'outil de signature de test fourni par Stripe |
 | `reseller.test.ts` | Onboarding en mode revendeur (règles de frais et d'expédition nulles) et ancien appel à sept arguments ; contraintes sur le mode, la plateforme de vente et la date d'achat ; numéros de vente uniques ; une vente rapide alimente les totaux quotidiens, le rapport produits, la répartition par plateforme et la liste des articles ; remboursements par plateforme ; annuler une vente remet l'article en stock ; les autres clients et les visiteurs anonymes ne voient rien ; un compte expiré ne peut pas changer de mode |
-| `stores.test.ts` | Limite de boutiques par offre appliquée par la base de données ; la boutique d'exemple n'est pas comptée |
+| `inbound.test.ts` | Jetons d'adresse entrante (aléatoires, lisibles par les membres, jamais modifiables directement, renouvelés par les propriétaires seulement) ; le route handler du webhook (503 tant qu'il n'est pas configuré, authentification basique obligatoire, jetons inconnus traités comme des messages acceptés, lignes en attente analysées, identifiants de message idempotents, jeton dans l'adresse du destinataire, contenus mal formés ou trop volumineux, confirmations Gmail) ; RLS sur `inbound_emails` (les membres lisent, valident ou ignorent seulement, ni insertion ni suppression, commandes de la même boutique, lecture seule après expiration) ; conservation à 30/90 jours |
+ Limite de boutiques par offre appliquée par la base de données ; la boutique d'exemple n'est pas comptée |
 
 Les tests de facturation ne simulent que l'appel qui relit un abonnement depuis Stripe ; les signatures sont produites
 et vérifiées avec le vrai SDK Stripe. Ils ne contactent pas Stripe.
@@ -75,7 +77,10 @@ tests nécessitent la pile Supabase locale (les e-mails de confirmation d'inscri
 - **Mode revendeur** (en français) : inscription → onboarding avec Vinted, qui sélectionne le mode revendeur → ajout
   de deux articles à la suite → vente enregistrée avec « Vendu ! » et un prix à virgule (18,50) → l'accueil affiche la
   vente, ce qui reste et un article en stock → Mes articles l'affiche comme vendu ; contrôles axe sur l'accueil et les
-  deux fenêtres, et aucun débordement horizontal à 390 px de large (téléphone).
+  deux fenêtres, et aucun débordement horizontal à 390 px de large (téléphone). Puis les ventes reçues par e-mail
+  (si `INBOUND_*` est défini dans `.env.local`) : un contenu Postmark synthétique envoyé au webhook local (mauvais mot
+  de passe refusé) apparaît sur l'accueil et dans la boîte de réception avec un code de confirmation Gmail ;
+  « Valider » ouvre la fenêtre de vente préremplie et enregistre la vente.
 - **Accessibilité :** axe-core (règles WCAG 2.0/2.1/2.2 de niveaux A et AA) s'exécute sur les pages publiques, le
   tableau de bord et l'examen de l'import, et ne doit signaler aucune violation.
 

@@ -34,6 +34,8 @@ export const saleInput = z.object({
   date: text(10),
   shippingCost: optionalText(40),
   platformFee: optionalText(40),
+  /** Forwarded sale email this sale confirms, if any. */
+  inboundEmailId: optionalText(40),
 });
 export type SaleInput = z.input<typeof saleInput>;
 
@@ -74,6 +76,7 @@ export type ParsedSale = {
   date: string;
   shippingCostMinor: number | null;
   platformFeeMinor: number | null;
+  inboundEmailId: string | null;
 };
 
 /**
@@ -105,6 +108,8 @@ export function parseSale(input: z.output<typeof saleInput>, ctx: { currency: st
   const fee = parseUserAmount(input.platformFee, ctx.currency, { optional: true, locale: ctx.locale });
   if (!fee.ok) errors.platformFee = fee.message;
   if (!isValidDateString(input.date) || input.date > ctx.today || input.date < "2000-01-01") errors.date = catalogCommon[ctx.locale].validDate;
+  const inboundEmailId = input.inboundEmailId.trim() || null;
+  if (inboundEmailId && !uuid.safeParse(inboundEmailId).success) errors.inboundEmailId = catalogCommon[ctx.locale].invalidRequest;
   if (Object.keys(errors).length) return { ok: false, fieldErrors: errors };
   return {
     ok: true,
@@ -116,6 +121,7 @@ export function parseSale(input: z.output<typeof saleInput>, ctx: { currency: st
       date: input.date,
       shippingCostMinor: shipping.ok ? shipping.value : null,
       platformFeeMinor: fee.ok ? fee.value : null,
+      inboundEmailId,
     },
   };
 }

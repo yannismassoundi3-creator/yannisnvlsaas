@@ -615,6 +615,99 @@ export type Database = {
           },
         ];
       };
+      inbound_emails: {
+        Row: {
+          created_at: string;
+          from_address: string | null;
+          id: string;
+          kind: string;
+          message_id: string;
+          order_id: string | null;
+          organization_id: string;
+          parsed_amount_minor: number | null;
+          parsed_title: string | null;
+          platform: string | null;
+          received_at: string;
+          status: string;
+          store_id: string;
+          subject: string | null;
+          text_excerpt: string | null;
+          updated_at: string;
+          verification_code: string | null;
+          verification_url: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          from_address?: string | null;
+          id?: string;
+          kind: string;
+          message_id: string;
+          order_id?: string | null;
+          organization_id: string;
+          parsed_amount_minor?: number | null;
+          parsed_title?: string | null;
+          platform?: string | null;
+          received_at?: string;
+          status?: string;
+          store_id: string;
+          subject?: string | null;
+          text_excerpt?: string | null;
+          updated_at?: string;
+          verification_code?: string | null;
+          verification_url?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          from_address?: string | null;
+          id?: string;
+          kind?: string;
+          message_id?: string;
+          order_id?: string | null;
+          organization_id?: string;
+          parsed_amount_minor?: number | null;
+          parsed_title?: string | null;
+          platform?: string | null;
+          received_at?: string;
+          status?: string;
+          store_id?: string;
+          subject?: string | null;
+          text_excerpt?: string | null;
+          updated_at?: string;
+          verification_code?: string | null;
+          verification_url?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "inbound_emails_order_id_organization_id_fkey";
+            columns: ["order_id", "organization_id"];
+            isOneToOne: false;
+            referencedRelation: "orders";
+            referencedColumns: ["id", "organization_id"];
+          },
+          {
+            foreignKeyName: "inbound_emails_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organization_entitlements";
+            referencedColumns: ["organization_id"];
+          },
+          {
+            foreignKeyName: "inbound_emails_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "inbound_emails_store_id_organization_id_fkey";
+            columns: ["store_id", "organization_id"];
+            isOneToOne: false;
+            referencedRelation: "stores";
+            referencedColumns: ["id", "organization_id"];
+          },
+        ];
+      };
       order_items: {
         Row: {
           discount_minor: number;
@@ -1082,6 +1175,7 @@ export type Database = {
           fee_rule_bps: number | null;
           fee_rule_fixed_minor: number | null;
           id: string;
+          inbound_token: string | null;
           is_demo: boolean;
           minor_digits: number;
           name: string;
@@ -1100,6 +1194,7 @@ export type Database = {
           fee_rule_bps?: number | null;
           fee_rule_fixed_minor?: number | null;
           id?: string;
+          inbound_token?: string | null;
           is_demo?: boolean;
           minor_digits: number;
           name: string;
@@ -1117,6 +1212,7 @@ export type Database = {
           fee_rule_bps?: number | null;
           fee_rule_fixed_minor?: number | null;
           id?: string;
+          inbound_token?: string | null;
           is_demo?: boolean;
           minor_digits?: number;
           name?: string;
@@ -1258,7 +1354,9 @@ export type Database = {
       import_finalize: { Args: { p_job: string }; Returns: Json };
       import_rollback: { Args: { p_job: string }; Returns: Json };
       prune_abandoned_imports: { Args: Record<PropertyKey, never>; Returns: number };
+      prune_inbound_emails: { Args: Record<PropertyKey, never>; Returns: number };
       prune_rate_limits: { Args: Record<PropertyKey, never>; Returns: number };
+      regenerate_inbound_token: { Args: { p_store_id: string }; Returns: string };
       report_ad_daily: {
         Args: { p_from: string; p_store_id: string; p_to: string };
         Returns: {

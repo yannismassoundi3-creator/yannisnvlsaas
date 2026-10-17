@@ -59,7 +59,7 @@ export const resellerMessages = defineMessages({
       emptyStep2: "When it sells, tap “Sold!” and enter the sale price. Narixia works out what you keep.",
       inboxCard: (n: number) => `Sales received by email (${n} to confirm)`,
       inboxCardText: "Check the amount, then confirm in one tap.",
-      inboxOpen: "Review",
+      inboxOpen: "Review the sales",
     },
     add: {
       title: "Add an item",
@@ -227,7 +227,7 @@ export const resellerMessages = defineMessages({
       emptyStep2: "Quand il est vendu, appuyez sur « Vendu ! » et saisissez le prix de vente. Narixia calcule ce qu'il vous reste.",
       inboxCard: (n: number) => `Ventes reçues par e-mail (${n} à valider)`,
       inboxCardText: "Vérifiez le montant, puis validez en un geste.",
-      inboxOpen: "Voir",
+      inboxOpen: "Vérifier les ventes",
     },
     add: {
       title: "Ajouter un article",

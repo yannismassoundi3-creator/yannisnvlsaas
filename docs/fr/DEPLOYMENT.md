@@ -54,7 +54,8 @@ développement, exécutée avec `npx supabase`) et la CLI Stripe pour tester les
    `upgrade-insecure-requests` sont envoyés automatiquement en HTTPS.
 5. **Cron :** `vercel.json` planifie `GET /api/cron/maintenance` chaque jour à 03:17 UTC. Définissez `CRON_SECRET`
    (par exemple `openssl rand -hex 32`) ; Vercel l'envoie comme jeton bearer. La tâche purge les fenêtres de limite de
-   requêtes expirées et supprime les lignes en attente (staging) des imports abandonnés depuis plus de deux jours. Sur
+   requêtes expirées et supprime les lignes en attente (staging) des imports abandonnés depuis plus de deux jours, ainsi que les e-mails de
+   vente transférés (validés ou ignorés depuis 30 jours, en attente depuis 90 jours). Sur
    un autre hébergeur, appelez le point de terminaison chaque jour avec `Authorization: Bearer $CRON_SECRET`.
 
 ## 3. Stripe
@@ -62,7 +63,40 @@ développement, exécutée avec `npx supabase`) et la CLI Stripe pour tester les
 Suivez [BILLING.md](BILLING.md) : produit et prix, portail client, point de terminaison du webhook
 `https://<your-domain>/api/stripe/webhook`, et la liste de contrôle de lancement avant d'accepter des paiements réels.
 
-## 4. Test de fumée après chaque déploiement en production
+## 4. E-mails entrants (facultatif) : ventes reçues par e-mail
+
+En mode revendeur, les vendeurs peuvent transférer leurs propres e-mails de notification de vente (Vinted, Leboncoin,
+eBay, Vestiaire Collective) à une adresse privée ; chaque e-mail devient une entrée en attente qu'ils valident en un
+geste. Narixia n'aspire (scraping) ni n'appelle jamais ces plateformes. Le prestataire documenté est **Postmark
+(inbound)**, qui fonctionne sans posséder de nom de domaine. Sans les variables ci-dessous, la fonction affiche
+« bientôt disponible » et `/api/inbound/email` répond 503.
+
+1. Créez un compte Postmark, puis **Servers → Create server** (par exemple « Narixia inbound »).
+2. Dans ce serveur, ouvrez **Message Streams → Default Inbound Stream** (le flux entrant existe par défaut).
+3. Générez un secret : `openssl rand -hex 32`. Dans les **Settings** du flux entrant, renseignez la **Webhook URL**
+   `https://narixia:<secret>@<your-domain>/api/inbound/email` (authentification HTTP basique : utilisateur `narixia`,
+   mot de passe le secret ; si votre écran Postmark propose des champs d'authentification séparés, utilisez-les avec
+   l'URL simple). Les noms des menus de Postmark peuvent varier légèrement. Laissez « Include raw email content in JSON payload » décoché.
+4. Copiez l'adresse entrante du flux (`<inboundhash>@inbound.postmarkapp.com`) et définissez
+   `INBOUND_EMAIL_ADDRESS_TEMPLATE=<inboundhash>+{token}@inbound.postmarkapp.com`. L'adresse de chaque boutique place
+   son jeton privé après le `+` ; Postmark le transmet dans `MailboxHash`.
+5. Définissez `INBOUND_WEBHOOK_SECRET=<secret>` dans Vercel, ainsi que `NEXT_PUBLIC_INBOUND_EMAIL_PROVIDER` /
+   `NEXT_PUBLIC_INBOUND_EMAIL_REGION` pour la politique de confidentialité (Postmark traite les données aux
+   États-Unis : gardez la région exacte). Redéployez.
+6. Vérifiez : le bouton **Check** du webhook dans Postmark reçoit `200 {"ok":true}` (aucune boutique ne correspond,
+   rien n'est enregistré). Envoyez ensuite un e-mail à l'adresse d'une boutique (Paramètres → Boutique, en mode
+   revendeur) et retrouvez-le dans « Ventes reçues par e-mail ».
+
+Domaine personnel (facultatif) : faites pointer un enregistrement MX d'un sous-domaine vers `inbound.postmarkapp.com`,
+déclarez-le comme domaine entrant du serveur dans Postmark et définissez `INBOUND_EMAIL_DOMAIN=<sous-domaine>` à la
+place du modèle (les adresses deviennent `ventes+<jeton>@<sous-domaine>`).
+
+Ce que fait le point de terminaison : vérification des identifiants en temps constant (401 sinon), corps limité à
+5 Mo, recherche de la boutique par jeton (un jeton inconnu reçoit la même réponse qu'un message enregistré),
+120 messages par boutique et par heure, idempotence par `MessageID`, aucun contenu d'e-mail dans les journaux. Les
+extraits sont limités à 2 000 caractères et purgés par la maintenance quotidienne (voir [SECURITY.md](SECURITY.md)).
+
+## 5. Test de fumée après chaque déploiement en production
 
 1. `/`, `/pricing` et `/privacy` se chargent ; les en-têtes de réponse incluent `content-security-policy` et
    `strict-transport-security`.
@@ -72,7 +106,9 @@ Suivez [BILLING.md](BILLING.md) : produit et prix, portail client, point de term
    annulez l'import.
 4. La facturation affiche le prix et le mode attendus (test ou live) et ouvre Checkout.
 5. `curl -H "Authorization: Bearer $CRON_SECRET" https://<your-domain>/api/cron/maintenance` renvoie `{"ok":true,…}`.
-6. Supprimez le compte de test depuis Settings → Data.
+6. Si les e-mails entrants sont configurés : `curl -u narixia:$INBOUND_WEBHOOK_SECRET -H 'content-type: application/json'
+   -d '{}' https://<your-domain>/api/inbound/email` renvoie `{"ok":true}`, et la même requête sans `-u` renvoie 401.
+7. Supprimez le compte de test depuis Settings → Data.
 
 ## Migrations de base de données
 
@@ -151,7 +187,8 @@ select event, count(*) from public.product_events where created_at > now() - int
 
 **Rotation des identifiants** (après une fuite présumée, ou lorsqu'une personne disposant d'un accès s'en va) : créez
 une nouvelle clé secrète Supabase et révoquez l'ancienne ; renouvelez la clé secrète Stripe et le secret de signature
-du webhook ; générez un nouveau `CRON_SECRET`. Mettez à jour l'environnement de l'hébergeur et redéployez. Les sessions
+du webhook ; générez un nouveau `CRON_SECRET` et un nouveau `INBOUND_WEBHOOK_SECRET` (mettez aussi à jour l'URL du webhook
+dans Postmark). Mettez à jour l'environnement de l'hébergeur et redéployez. Les sessions
 ne sont pas affectées par ces rotations.
 
 **Demandes des utilisateurs :** l'export et la suppression du compte sont en libre-service dans Settings → Data. Pour
