@@ -84,15 +84,15 @@ export const insightMessages = defineMessages({
     joinAnd: (items: string[]) => (items.length > 1 ? `${items.slice(0, -1).join(", ")} et ${items[items.length - 1]}` : items.join("")),
     joinNames: (items: string[]) => items.join(", "),
     negativeContribution: {
-      title: "La marge sur coûts variables est négative sur cette période",
+      title: "Ce qui vous reste est négatif sur cette période",
       body: (amount: string) =>
-        `Après le coût des produits et les coûts variables, la période affiche ${amount}. Les coûts variables ont dépassé ce que les ventes laissaient après le coût des produits.`,
+        `Après le coût d'achat des produits et les coûts variables, la période affiche ${amount}. Les coûts variables ont dépassé ce que les ventes laissaient après le coût d'achat des produits.`,
       netRevenue: "Chiffre d'affaires net",
-      costs: "Coût des produits et coûts variables",
+      costs: "Coût d'achat des produits et coûts variables",
     },
     missingCosts: {
       title: (pct: string) => `Le coût est manquant pour ${pct} des ventes de produits`,
-      body: (products: string) => `La marge sur coûts variables est surestimée tant que ces coûts ne sont pas renseignés${products ? ` : ${products}` : ""}.`,
+      body: (products: string) => `Ce qui vous reste est surestimé tant que ces coûts ne sont pas renseignés${products ? ` : ${products}` : ""}.`,
       salesWithoutCost: "Ventes sans coût unitaire",
       linesWithoutCost: "Lignes de commande sans coût unitaire",
       action: "Ajouter les coûts des produits",
@@ -120,7 +120,7 @@ export const insightMessages = defineMessages({
       discounts: "Remises",
     },
     productMarginDown: {
-      title: (name: string, from: string, to: string) => `${name} : le taux de marge sur coûts variables est passé de ${from} à ${to}`,
+      title: (name: string, from: string, to: string) => `${name} : ce qui vous reste est passé de ${from} à ${to} de ses ventes`,
       reasonAds: "les dépenses publicitaires liées ont augmenté",
       reasonDiscounts: "les remises ont pris une part plus importante",
       reasonRefunds: "les remboursements ont pris une part plus importante",
@@ -128,14 +128,14 @@ export const insightMessages = defineMessages({
         `Sur la même période, ${reasons}. Ces évolutions coïncident avec la baisse de la marge ; ce n'est pas une cause prouvée.`,
       bodyNoReasons: "Comparez ses coûts, ses prix et ses remises avec la période précédente pour comprendre cette évolution.",
       netRevenue: "Chiffre d'affaires net",
-      contributionMargin: "Marge sur coûts variables",
+      contributionMargin: "Ce qui vous reste",
       action: "Ouvrir le produit",
     },
     campaignsBelowBreakEven: {
       titleOne: (name: string) => `« ${name} » affiche un ROAS inférieur à votre seuil de rentabilité`,
       titleMany: (count: number) => `${count} campagnes affichent un ROAS inférieur à votre seuil de rentabilité`,
       body: (breakEven: string) =>
-        `Votre ROAS de rentabilité est de ${breakEven} : en dessous, la publicité coûte plus que la marge restant après le coût des produits et les coûts variables. Le ROAS des plateformes repose sur l'attribution propre à chacune et peut surestimer ou sous-estimer les ventes.`,
+        `Le seuil de rentabilité de votre pub (ROAS) est de ${breakEven} : en dessous, la publicité coûte plus que la marge que les ventes vous laissent après le coût d'achat des produits et les coûts variables. Le ROAS annoncé par les plateformes repose sur leurs propres règles d'attribution et peut surestimer ou sous-estimer les ventes.`,
       campaignValue: (roas: string, spend: string) => `${roas} pour ${spend}`,
       spend: "Dépenses dans ces campagnes",
       action: "Examiner les campagnes",

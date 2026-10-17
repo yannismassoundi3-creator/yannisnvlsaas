@@ -39,7 +39,7 @@ export const uniqueEmail = (prefix: string) => `${prefix}-${Date.now()}-${Math.r
 export async function signUp(page: Page, email: string, password = "margins2026ok") {
   await page.goto("/sign-up", { waitUntil: "networkidle" });
   await page.getByLabel("Your name").fill("E2E Founder");
-  await page.getByLabel("Work email").fill(email);
+  await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: /create account/i }).click();

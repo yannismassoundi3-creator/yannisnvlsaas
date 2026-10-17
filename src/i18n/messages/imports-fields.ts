@@ -21,7 +21,7 @@ export const importKindsFr: Record<ImportKind, KindCopyFr> = {
         description: "Date et heure de la commande. Le décalage horaire est utilisé s'il est indiqué ; sinon, le fuseau horaire de votre boutique.",
       },
       line_name: { label: "Nom du produit", description: "Nom du produit sur cette ligne." },
-      line_sku: { label: "SKU", description: "Sert à relier la ligne à un produit. Sans SKU, les produits sont reliés par leur nom." },
+      line_sku: { label: "Référence (SKU)", description: "Sert à relier la ligne à un produit. Sans référence, les produits sont reliés par leur nom." },
       quantity: { label: "Quantité", description: "Nombre d'unités vendues sur cette ligne." },
       unit_price: { label: "Prix unitaire", description: "Prix de vente d'une unité, avant remises." },
       line_discount: { label: "Remise sur la ligne", description: "Remise totale sur cette ligne (et non par unité)." },
@@ -60,7 +60,7 @@ export const importKindsFr: Record<ImportKind, KindCopyFr> = {
     description: "Votre catalogue avec les coûts unitaires. Les exports de produits Shopify sont reconnus automatiquement.",
     fields: {
       name: { label: "Nom du produit", description: "Nom du produit (et de la variante)." },
-      sku: { label: "SKU", description: "Vivement recommandé : les lignes de commande sont reliées aux produits par leur SKU." },
+      sku: { label: "Référence (SKU)", description: "Vivement recommandé : les lignes de commande sont reliées aux produits par leur référence (SKU)." },
       unit_cost: { label: "Coût unitaire", description: "Ce qu'une unité vous coûte, HT. Jusqu'à quatre décimales." },
       price: { label: "Prix de vente", description: "Prix de vente actuel, pour information." },
       handle: { label: "Handle", description: "Handle du produit Shopify : nomme les lignes de variantes dont le titre est vide." },

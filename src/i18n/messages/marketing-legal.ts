@@ -218,7 +218,7 @@ export const marketingLegal = defineMessages({
       ],
       csvTitle: "Fichiers CSV",
       csvText:
-        "Lorsque vous importez un fichier CSV, il est lu dans votre navigateur. Seules les colonnes que vous associez à des champs Narixia sont envoyées à nos serveurs. Les modèles de Narixia ne demandent ni nom de client, ni adresse e-mail, ni adresse postale, et nous vous recommandons de ne pas mapper de telles colonnes.",
+        "Lorsque vous importez un fichier CSV, il est lu dans votre navigateur. Seules les colonnes que vous associez à des champs Narixia sont envoyées à nos serveurs. Les modèles de Narixia ne demandent ni nom de client, ni adresse e-mail, ni adresse postale, et nous vous recommandons de ne pas associer de telles colonnes.",
       providersTitle: "Prestataires",
       providersIntro: "Nous faisons appel aux sous-traitants suivants, liés par des accords de traitement des données :",
       providerHeaders: { provider: "Prestataire", purpose: "Finalité", location: "Localisation" },

@@ -95,10 +95,10 @@ export const importPages = defineMessages({
     history: {
       title: "Imports",
       description:
-        "Importez vos commandes, coûts produits, dépenses publicitaires et autres dépenses depuis des fichiers CSV. Chaque import est vérifié avant tout enregistrement et peut être annulé.",
+        "Importez vos commandes, le coût d'achat de vos produits, vos dépenses publicitaires et vos autres dépenses depuis des fichiers CSV. Chaque import est vérifié avant tout enregistrement et peut être annulé.",
       newImport: "Nouvel import",
-      templates: "Modèles",
-      templatesDescription: "Des mises en page de colonnes que Narixia lit sans association. Les lignes d'exemple sont fictives.",
+      templates: "Fichiers modèles à remplir",
+      templatesDescription: "Narixia les lit sans réglage. Les lignes d'exemple sont fictives.",
       history: "Historique",
       usage: (used: string, monthly: string, perFile: string) => `Lignes importées ce mois-ci : ${used} sur ${monthly} · jusqu'à ${perFile} lignes par fichier`,
       emptyTitle: "Aucun import pour l'instant",

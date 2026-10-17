@@ -133,11 +133,11 @@ export const marketingHome = defineMessages({
     },
   },
   fr: {
-    metaTitle: "Narixia — Maîtrisez vos marges. Développez-vous en confiance.",
+    metaTitle: "Narixia — Maîtrisez vos marges. Sachez enfin ce que vous gagnez vraiment.",
     hero: {
       eyebrow: "Analyse de rentabilité pour l'e-commerce",
       titleLine1: "Maîtrisez vos marges.",
-      titleLine2: "Développez-vous en confiance.",
+      titleLine2: "Sachez enfin ce que vous gagnez vraiment.",
       lead: "Une vue claire de vos ventes, du coût de vos produits et de la performance de vos publicités.",
       startTrial: "Commencer l'essai gratuit",
       explore: "Découvrir le tableau de bord",
@@ -149,14 +149,14 @@ export const marketingHome = defineMessages({
       eyebrow: "Le problème de la rentabilité",
       title: "Le chiffre d'affaires n'est pas ce qui vous reste.",
       intro:
-        "Votre plateforme e-commerce affiche les ventes. Vos comptes publicitaires affichent le retour sur dépenses publicitaires. Aucun ne montre ce qui reste une fois payés le coût des produits, l'expédition, les frais de paiement et la publicité. Narixia réunit tout au même endroit, avec chaque formule écrite noir sur blanc.",
+        "Votre plateforme e-commerce affiche les ventes. Vos comptes publicitaires affichent le retour sur dépenses publicitaires. Aucun ne montre ce qui vous reste une fois payés le coût d'achat des produits, l'expédition, les frais de paiement et la publicité. Narixia réunit tout au même endroit, avec chaque formule écrite noir sur blanc.",
       points: [
         { title: "De vraies marges par produit", text: "Voyez quels produits font vivre l'entreprise une fois les coûts, les frais et les retours pris en compte." },
-        { title: "La publicité face à la marge", text: "Comparez le ROAS des plateformes à votre seuil de rentabilité plutôt qu'à une règle empirique." },
+        { title: "La publicité face à la marge", text: "Comparez le ROAS annoncé par les plateformes au seuil de rentabilité de votre pub plutôt qu'à une règle empirique." },
         { title: "Des chiffres honnêtes", text: "Les coûts manquants et les estimations sont signalés, jamais complétés en silence." },
       ],
       rows: {
-        cogs: "Coût des produits",
+        cogs: "Coût d'achat des produits",
         shipping: "Expédition et logistique",
         advertising: "Publicité",
         fees: "Frais de paiement",
@@ -184,7 +184,7 @@ export const marketingHome = defineMessages({
       eyebrow: "Rentabilité par produit",
       title: "Sachez quels produits rapportent vraiment.",
       intro:
-        "La marge sur coûts variables de chaque produit inclut sa part de remises, de remboursements, d'expédition et de frais de paiement. Les dépenses publicitaires globales restent à part, sauf si une campagne promeut un seul produit : les marges ne sont jamais faussées par une répartition arbitraire.",
+        "Ce qui vous reste sur chaque produit (marge sur coûts variables) inclut sa part de remises, de remboursements, d'expédition et de frais de paiement. Les dépenses publicitaires globales restent à part, sauf si une campagne promeut un seul produit : les marges ne sont jamais faussées par une répartition arbitraire.",
       searchTitle: "Rechercher, trier et filtrer",
       searchText: "Trouvez les produits à faible marge, ceux sans coût ou vos meilleures ventes en quelques frappes.",
       costsTitle: "Des coûts que vous pouvez corriger",
@@ -200,17 +200,17 @@ export const marketingHome = defineMessages({
       eyebrow: "Performance publicitaire",
       title: "Jugez vos publicités à l'aune de votre marge, pas d'une règle empirique.",
       intro:
-        "Narixia calcule votre ROAS de rentabilité à partir de vos propres coûts : le retour en dessous duquel la publicité consomme plus de marge qu'elle n'en rapporte. Les chiffres des plateformes sont affichés tels que déclarés, avec leurs réserves d'attribution.",
-      breakEven: "ROAS de rentabilité",
+        "Narixia calcule le seuil de rentabilité de votre pub (ROAS) à partir de vos propres coûts : le montant de ventes que chaque euro de pub doit rapporter, au minimum, pour être rentable. En dessous, la publicité consomme plus de marge qu'elle n'en rapporte. Les chiffres des plateformes sont affichés tels que déclarés, avec leurs réserves d'attribution.",
+      breakEven: "Seuil de rentabilité de la pub (ROAS)",
       breakEvenNote: "Boutique exemple, 30 derniers jours",
-      blended: "ROAS global",
+      blended: "Ventes par euro de pub (ROAS)",
       blendedNote: "Chiffre d'affaires net ÷ dépenses publicitaires totales",
       adShare: "Part des dépenses publicitaires dans le chiffre d'affaires",
       adShareNote: "Publicité ÷ chiffre d'affaires net",
       campaigns: "Campagnes, 30 derniers jours",
-      breakEvenInline: (value: string) => `ROAS de rentabilité ${value}`,
+      breakEvenInline: (value: string) => `Seuil de rentabilité ${value}`,
       caveat:
-        "Le ROAS des plateformes repose sur l'attribution propre à chacune et peut compter plusieurs fois la même vente. Le ROAS global évite l'attribution mais inclut des ventes que la publicité n'a pas générées. Narixia affiche les deux et explique la différence au lieu de choisir à votre place.",
+        "Le ROAS annoncé par les plateformes repose sur leurs propres règles d'attribution et peut compter plusieurs fois la même vente. Les ventes par euro de pub (ROAS global) évitent l'attribution mais incluent des ventes que la publicité n'a pas générées. Narixia affiche les deux et explique la différence au lieu de choisir à votre place.",
     },
     csv: {
       eyebrow: "Import CSV",
@@ -219,12 +219,12 @@ export const marketingHome = defineMessages({
         "Importez commandes, produits et coûts, charges et dépenses publicitaires depuis des fichiers CSV. Narixia valide chaque ligne, montre exactement ce qui sera importé et n'écarte jamais une ligne sans vous le dire.",
       steps: [
         { title: "Déposer", text: "Déposez un export CSV. Il est lu dans votre navigateur." },
-        { title: "Mapper les colonnes", text: "Les colonnes Shopify sont reconnues automatiquement." },
+        { title: "Associer les colonnes", text: "Les colonnes Shopify sont reconnues automatiquement." },
         { title: "Valider", text: "Chaque ligne est vérifiée. Les erreurs sont listées ligne par ligne." },
         { title: "Confirmer", text: "Les doublons sont ignorés. Les imports peuvent être annulés." },
       ],
       step: (n: number) => `Étape ${n}`,
-      mappingTitle: "Mapping des colonnes",
+      mappingTitle: "Association des colonnes",
       mappingSubtitle: "Exemple : un export de commandes Shopify",
       mappingCaption: "Exemple de correspondance entre les colonnes Shopify et les champs Narixia",
       yourFile: "Votre fichier",
@@ -232,7 +232,7 @@ export const marketingHome = defineMessages({
       fields: {
         orderId: "N° de commande",
         orderDate: "Date de commande",
-        sku: "SKU",
+        sku: "Référence (SKU)",
         quantity: "Quantité",
         unitPrice: "Prix unitaire",
         orderDiscount: "Remise sur la commande",
@@ -240,15 +240,15 @@ export const marketingHome = defineMessages({
         tax: "Montant de taxe",
         notImported: "Non importé",
       },
-      privacy: "Les noms, e-mails et adresses des clients ne sont jamais envoyés : les colonnes non mappées restent sur votre ordinateur.",
+      privacy: "Les noms, e-mails et adresses des clients ne sont jamais envoyés : les colonnes non associées restent sur votre ordinateur.",
     },
     how: {
       eyebrow: "Comment ça marche",
       title: "Trois étapes vers une vision claire.",
       steps: [
-        { title: "Créez le profil de votre boutique", text: "Choisissez votre devise, votre fuseau horaire de reporting, et indiquez si vos prix sont TTC." },
-        { title: "Ajoutez vos données", text: "Importez commandes, coûts des produits et dépenses publicitaires depuis des fichiers CSV, ou saisissez-les à la main." },
-        { title: "Lisez vos vraies marges", text: "Visualisez la marge sur coûts variables par période et par produit, et les évolutions qui méritent votre attention." },
+        { title: "Créez le profil de votre boutique", text: "Choisissez votre devise, le fuseau horaire de vos rapports, et indiquez si vos prix sont TTC." },
+        { title: "Ajoutez vos données", text: "Importez vos commandes, le coût d'achat de vos produits et vos dépenses publicitaires depuis des fichiers CSV, ou saisissez-les à la main." },
+        { title: "Lisez vos vraies marges", text: "Visualisez ce qui vous reste (marge sur coûts variables) par période et par produit, et les évolutions qui méritent votre attention." },
       ],
     },
     pricing: {

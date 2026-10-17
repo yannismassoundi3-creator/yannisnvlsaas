@@ -44,7 +44,7 @@ describe("CSV export headers", () => {
     expect(exportsMessages.en.campaignColumns.at(-1)).toBe("Below break-even ROAS");
     expect(exportsMessages.fr.productColumns).toHaveLength(exportsMessages.en.productColumns.length);
     expect(exportsMessages.fr.campaignColumns).toHaveLength(exportsMessages.en.campaignColumns.length);
-    expect(exportsMessages.fr.productColumns).toContain("Marge sur coûts variables");
+    expect(exportsMessages.fr.productColumns).toContain("Ce qui vous reste (marge sur coûts variables)");
     expect(toCsv(exportsMessages.fr.campaignColumns.slice(0, 2), [[exportsMessages.fr.storeWide, exportsMessages.fr.yes]])).toBe(
       "\uFEFFCampagne,Plateforme\r\nPlusieurs produits / toute la boutique,oui\r\n",
     );

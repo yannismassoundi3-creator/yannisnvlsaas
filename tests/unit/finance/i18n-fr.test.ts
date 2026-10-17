@@ -21,11 +21,14 @@ describe("French metric definitions", () => {
   });
 
   it("uses the agreed terminology and says contribution margin is not net profit", () => {
-    expect(fr.contributionMargin.term).toBe("Marge sur coûts variables");
-    expect(fr.contributionMargin.short).toContain("Ce n'est pas le bénéfice net");
+    expect(fr.contributionMargin.term).toBe("Ce qui vous reste (marge sur coûts variables)");
+    expect(fr.contributionMargin.short).toMatch(/^Ce qui vous reste de vos ventes /);
+    expect(fr.contributionMargin.short).toContain("ce n'est pas votre bénéfice net");
+    expect(fr.cogs.term).toBe("Coût d'achat des produits");
     expect(fr.netRevenue.term).toBe("Chiffre d'affaires net");
-    expect(fr.breakEvenRoas.term).toBe("ROAS de rentabilité");
-    expect(fr.blendedRoas.term).toBe("ROAS global");
+    expect(fr.breakEvenRoas.term).toBe("Seuil de rentabilité de la pub (ROAS)");
+    expect(fr.blendedRoas.term).toBe("Ventes par euro de pub (ROAS)");
+    expect(fr.roas.term).toBe("ROAS annoncé par la plateforme");
     expect(fr.operatingProfit.term).toBe("Résultat d'exploitation (estimation)");
     expect(fr.netSales.formula).toBe("Ventes brutes − Remises − Remboursements");
   });
@@ -59,7 +62,8 @@ describe("French KPIs", () => {
     expect(plain(revenue.footnote!)).toBe("Ventes nettes 1 235 €");
     expect(revenue.definition.term).toBe("Chiffre d'affaires net");
     expect(plain(revenue.delta!.text)).toBe("+23,5 %");
-    expect(margin.label).toBe("Marge sur coûts variables");
+    expect(margin.label).toBe("Ce qui vous reste");
+    expect(margin.definition.term).toBe("Ce qui vous reste (marge sur coûts variables)");
     expect(margin.status).toEqual({ tone: "caution", label: "Coûts incomplets" });
     expect(plain(margin.footnote!)).toMatch(/^\d+,\d % du chiffre d'affaires net$/);
     expect(rate.delta!.text).toMatch(/pts$/);
@@ -70,7 +74,7 @@ describe("French KPIs", () => {
   it("agrees French plurals and keeps English wording unchanged", () => {
     const fr = buildSecondaryKpis(current, previous, "EUR", "fr");
     expect(fr.find((k) => k.key === "grossSales")!.footnote).toBe("1 unité vendue");
-    expect(fr.find((k) => k.key === "cogs")!.label).toBe("Coût des produits");
+    expect(fr.find((k) => k.key === "cogs")!.label).toBe("Coût d'achat des produits");
     const en = buildSecondaryKpis(current, previous, "EUR");
     expect(en.find((k) => k.key === "grossSales")!.footnote).toBe("1 units sold");
     expect(en.find((k) => k.key === "shippingAndFees")!.footnote).toBe("Shipping €50 · Fees €20");
@@ -78,7 +82,12 @@ describe("French KPIs", () => {
 
   it("translates the advertising figures", () => {
     const ads = buildAdvertisingKpis(current, previous, "EUR", "fr");
-    expect(ads.map((k) => k.label)).toEqual(["Dépenses publicitaires", "ROAS global", "ROAS de rentabilité", "Marge avant publicité"]);
+    expect(ads.map((k) => k.label)).toEqual([
+      "Dépenses publicitaires",
+      "Ventes par euro de pub (ROAS)",
+      "Seuil de rentabilité de la pub (ROAS)",
+      "Ce qui vous reste avant publicité",
+    ]);
     expect(plain(ads[1].value)).toMatch(/^\d+,\d\d×$/);
   });
 });
@@ -154,7 +163,7 @@ describe("French insights", () => {
   it("never claims causation in French", () => {
     const fr = buildInsights({ ...input, locale: "fr" });
     const drop = fr.find((i) => i.id.startsWith("product_margin_down"))!;
-    expect(drop.title).toMatch(/^Sac en lin : le taux de marge sur coûts variables est passé de /);
+    expect(drop.title).toMatch(/^Sac en lin : ce qui vous reste est passé de .+ de ses ventes$/);
     expect(drop.body).toContain("coïncident");
     expect(drop.body).toContain("ce n'est pas une cause prouvée");
     for (const i of fr) expect(`${i.title} ${i.body}`).not.toMatch(/\b(à cause de|en raison de|a causé|ont causé|provoqué)\b/i);

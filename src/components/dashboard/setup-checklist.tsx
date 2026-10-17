@@ -75,8 +75,8 @@ export function SetupChecklist({
   const locale = localeProp ?? contextLocale;
   const t = dashboardMessages[locale].setupChecklist;
   const steps = setupSteps(status, locale);
-  const required = steps.filter((s) => !s.optional);
-  const done = required.filter((s) => s.done).length;
+  // Progress counts every step listed, the optional one included, so "x of y" matches what is shown.
+  const done = steps.filter((s) => s.done).length;
 
   return (
     <section className={cn("rounded-lg border border-line bg-surface shadow-xs", className)} aria-labelledby="setup-heading">
@@ -84,10 +84,10 @@ export function SetupChecklist({
         <Heading id="setup-heading" className="text-md font-semibold tracking-tight text-ink">
           {t.heading}
         </Heading>
-        <p className="text-sm text-ink-3 tabular">{t.progress(done, required.length)}</p>
+        <p className="text-sm text-ink-3 tabular">{t.progress(done, steps.length)}</p>
       </div>
       <div className="mx-5 mt-3 h-1.5 overflow-hidden rounded-full bg-sunken" aria-hidden>
-        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${(done / required.length) * 100}%` }} />
+        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${(done / steps.length) * 100}%` }} />
       </div>
       <ol className="mt-2 divide-y divide-line">
         {steps.map((step) => (

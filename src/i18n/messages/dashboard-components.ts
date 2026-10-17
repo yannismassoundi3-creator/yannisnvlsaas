@@ -17,7 +17,7 @@ export const dashboardMessages = defineMessages({
       heading: "Data quality",
       cogsTitle: "Some sales have no product cost",
       cogsBody: (lines: string, n: number, amount: string, pct: string) =>
-        `${lines} order ${n === 1 ? "line" : "lines"} (${amount}, ${pct} of product sales) have no unit cost. Their cost is left out rather than guessed, so gross profit and contribution margin are overstated until you add it.`,
+        `${lines} order ${n === 1 ? "line" : "lines"} (${amount}, ${pct} of product sales) ${n === 1 ? "has" : "have"} no unit cost. ${n === 1 ? "Its" : "Their"} cost is left out rather than guessed, so gross profit and contribution margin are overstated until you add it.`,
       cogsAction: "Add product costs",
       shippingTitle: "Shipping costs are incomplete",
       shippingBody: (orders: string, n: number) =>
@@ -124,15 +124,15 @@ export const dashboardMessages = defineMessages({
       spend: "Dépenses",
       clicks: "Clics",
       conversionValue: "Valeur de conversion (plateforme)",
-      platformRoas: "ROAS plateforme",
+      platformRoas: "ROAS annoncé par la plateforme",
       promotes: (name: string) => `· Produit promu : ${name}`,
       belowBreakEven: "Sous le seuil de rentabilité",
     },
     dataNotices: {
       heading: "Qualité des données",
-      cogsTitle: "Certaines ventes n'ont pas de coût produit",
+      cogsTitle: "Certaines ventes n'ont pas de coût d'achat",
       cogsBody: (lines: string, n: number, amount: string, pct: string) =>
-        `${lines} ${plural("fr", n, "ligne de commande", "lignes de commande")} (${amount}, ${pct} des ventes de produits) ${plural("fr", n, "n'a", "n'ont")} pas de coût unitaire. Leur coût est exclu plutôt que deviné : la marge brute et la marge sur coûts variables sont donc surestimées tant que vous ne l'avez pas ajouté.`,
+        `${lines} ${plural("fr", n, "ligne de commande", "lignes de commande")} (${amount}, ${pct} des ventes de produits) ${plural("fr", n, "n'a", "n'ont")} pas de coût unitaire. ${plural("fr", n, "Son", "Leur")} coût est exclu plutôt que deviné : la marge brute et ce qui vous reste (marge sur coûts variables) sont donc surestimés tant que vous ne l'avez pas ajouté.`,
       cogsAction: "Ajouter les coûts des produits",
       shippingTitle: "Les coûts d'expédition sont incomplets",
       shippingBody: (orders: string, n: number) =>
@@ -162,12 +162,12 @@ export const dashboardMessages = defineMessages({
       unchanged: "Stable",
     },
     productMarginBars: {
-      title: "Marge sur coûts variables par produit",
-      description: "Après coût des produits, expédition et frais répartis, et campagnes liées.",
+      title: "Ce qui vous reste par produit",
+      description: "Après coût d'achat des produits, expédition et frais répartis, et campagnes liées.",
       product: "Produit",
       bar: "Barre",
-      margin: "Marge",
-      marginRate: "Marge %",
+      margin: "Ce qui vous reste",
+      marginRate: "En %",
       costMissing: "Coût manquant",
     },
     profitBreakdown: {
@@ -185,18 +185,18 @@ export const dashboardMessages = defineMessages({
         netSales: "Ventes nettes",
         shippingCharged: "Frais de port facturés",
         netRevenue: "Chiffre d'affaires net",
-        cogs: "Coût des marchandises vendues",
+        cogs: "Coût d'achat des produits",
         grossProfit: "Marge brute",
         shippingCosts: "Expédition et logistique",
         transactionFees: "Frais de paiement",
         adSpend: "Publicité",
         otherVariableCosts: "Autres coûts variables",
-        contributionMargin: "Marge sur coûts variables",
+        contributionMargin: "Ce qui vous reste",
         fixedCosts: "Coûts fixes",
         operatingProfit: "Résultat d'exploitation (estimation)",
       },
       footnote:
-        "Les pourcentages sont des parts du chiffre d'affaires net (ventes nettes plus frais de port facturés). La marge sur coûts variables n'est pas le bénéfice net : les coûts fixes, l'impôt sur les bénéfices, les intérêts et les amortissements ne sont pas déduits avant elle.",
+        "Les pourcentages sont des parts du chiffre d'affaires net (ventes nettes plus frais de port facturés). « Ce qui vous reste » (marge sur coûts variables) n'est pas votre bénéfice net : les coûts fixes, l'impôt sur les bénéfices, les intérêts et les amortissements n'y sont pas encore déduits.",
     },
     setupChecklist: {
       heading: "Complétez vos marges",
@@ -230,7 +230,8 @@ export const dashboardMessages = defineMessages({
       },
       expenses: {
         title: "Enregistrez les autres coûts",
-        description: "Emballage, commissions des places de marché ou abonnements, pour compléter la marge sur coûts variables et l'estimation du résultat d'exploitation.",
+        description:
+          "Emballage, commissions des places de marché ou abonnements, pour que ce qui vous reste et l'estimation du résultat d'exploitation soient complets.",
         action: "Ajouter des dépenses",
       },
     },

@@ -179,7 +179,7 @@ async function Products({ searchParams }: { searchParams: PageProps<"/[lang]/app
             </Link>
           }
         >
-          {t.missingCostBody}
+          {t.missingCostBody(status.productsWithoutCost)}
         </Alert>
       ) : null}
 
