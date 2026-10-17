@@ -54,6 +54,7 @@ export async function createWorkspace(input: WorkspaceInput): Promise<ActionResu
   }
 
   const supabase = await createClient();
+  const businessModel = v.businessModel ?? suggestedBusinessModel(v.platform);
   const { data, error } = await supabase.rpc("create_organization_with_store", {
     p_organization_name: v.organizationName || v.storeName,
     p_store_name: v.storeName,
@@ -62,7 +63,9 @@ export async function createWorkspace(input: WorkspaceInput): Promise<ActionResu
     p_minor_digits: currencyDigits(v.currency),
     p_timezone: v.timezone,
     p_prices_include_tax: pricesIncludeTaxFor(v.pricesIncludeTax),
-    p_business_model: v.businessModel ?? suggestedBusinessModel(v.platform),
+    // Sent only when needed, so e-commerce sign-ups also work against a database
+    // that does not have the reseller migration yet (the parameter defaults to ecommerce).
+    ...(businessModel === "reseller" ? { p_business_model: businessModel } : {}),
   });
 
   if (error) {
