@@ -50,6 +50,8 @@ next-env.d.ts
 
 # local tooling
 .claude/settings.local.json
+# Temporary git worktrees created by agents
+.claude/worktrees/
 
 # local screenshots
 /screenshots/
