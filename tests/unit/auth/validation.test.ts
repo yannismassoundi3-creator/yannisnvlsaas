@@ -21,6 +21,10 @@ describe("authErrorMessage", () => {
     expect(authErrorMessage({ code: "invalid_credentials" })).toBe("Email or password is incorrect.");
     expect(authErrorMessage({ status: 429 })).toBe("Too many attempts. Please wait a few minutes and try again.");
     expect(authErrorMessage(null)).toBe("Something went wrong. Please try again.");
+    expect(authErrorMessage({ code: "over_email_send_rate_limit", message: "For security purposes, you can only request this after 26 seconds." }, "fr")).toBe(
+      "Un e-mail vient d'être envoyé. Vous pourrez en demander un autre dans 26 secondes.",
+    );
+    expect(authErrorMessage({ code: "over_email_send_rate_limit", message: "Email rate limit exceeded" })).toBe("Too many attempts. Please wait a few minutes and try again.");
   });
 
   it("maps Supabase errors in French", () => {

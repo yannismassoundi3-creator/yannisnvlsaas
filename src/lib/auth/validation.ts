@@ -36,7 +36,11 @@ export function authErrorMessage(error: { code?: string; message?: string; statu
       return t.weakPassword;
     case "same_password":
       return t.samePassword;
-    case "over_email_send_rate_limit":
+    case "over_email_send_rate_limit": {
+      // Supabase allows one email per address per minute and says how long to wait.
+      const seconds = Number(/after (\d+) seconds?/.exec(error.message ?? "")?.[1]);
+      return seconds > 0 ? t.waitBeforeResend(seconds) : t.rateLimited;
+    }
     case "over_request_rate_limit":
       return t.rateLimited;
     case "user_already_exists":
