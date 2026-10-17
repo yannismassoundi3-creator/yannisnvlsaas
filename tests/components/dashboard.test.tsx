@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { DataNotices, dataNotices } from "@/components/dashboard/data-notices";
 import { KpiTile } from "@/components/dashboard/kpi-tile";
 import { ProfitBreakdown } from "@/components/dashboard/profit-breakdown";
+import { SetupChecklist } from "@/components/dashboard/setup-checklist";
 import { LocaleProvider } from "@/i18n/client";
 import { deriveMetrics, EMPTY_TOTALS } from "@/lib/finance/metrics";
 
@@ -100,10 +101,10 @@ describe("dashboard in French", () => {
     expect(screen.getByText("Aucune comparaison disponible")).toBeInTheDocument();
     expect(screen.getByText("Hausse")).toHaveClass("sr-only");
     expect(screen.getByRole("heading", { name: "Décomposition du résultat" })).toBeInTheDocument();
-    const row = screen.getByRole("rowheader", { name: /Marge sur coûts variables/ }).closest("tr")!;
+    const row = screen.getByRole("rowheader", { name: /^Ce qui vous reste/ }).closest("tr")!;
     expect(plain(row.textContent)).toContain("290,00 €");
     expect(screen.getByText("Incomplet")).toBeInTheDocument();
-    expect(screen.getByText(/La marge sur coûts variables n'est pas le bénéfice net/)).toBeInTheDocument();
+    expect(screen.getByText(/« Ce qui vous reste » \(marge sur coûts variables\) n'est pas votre bénéfice net/)).toBeInTheDocument();
   });
 
   it("writes data notices in French with French amounts", () => {
@@ -111,11 +112,31 @@ describe("dashboard in French", () => {
     const notices = dataNotices(metrics, store, "fr");
     expect(notices.map((n) => n.key)).toEqual(["cogs", "estimates"]);
     render(<DataNotices notices={notices} locale="fr" />);
-    expect(screen.getByText("Certaines ventes n'ont pas de coût produit")).toBeInTheDocument();
-    expect(plain(notices[0].body)).toMatch(/^1 ligne de commande \(50,00 €, 10,0 % des ventes de produits\) n'a pas de coût unitaire/);
+    expect(screen.getByText("Certaines ventes n'ont pas de coût d'achat")).toBeInTheDocument();
+    expect(plain(notices[0].body)).toMatch(/^1 ligne de commande \(50,00 €, 10,0 % des ventes de produits\) n'a pas de coût unitaire\. Son coût est exclu/);
     expect(plain(notices[1].body)).toContain("des frais de paiement estimés à 10,00 € (règle : 1,50 % + 0,25 € par commande)");
     expect(screen.getByRole("link", { name: "Ajouter les coûts des produits" })).toHaveAttribute("href", "/app/products?filter=missing-cost");
     expect(screen.getByRole("heading", { name: "Qualité des données" })).toBeInTheDocument();
+  });
+});
+
+describe("SetupChecklist", () => {
+  const status = {
+    orders: 12,
+    products: 4,
+    productsWithoutCost: 1,
+    adSpendDays: 0,
+    expenses: 0,
+    firstOrderDate: null,
+    lastOrderDate: null,
+    feeRuleSet: false,
+    shippingRuleSet: false,
+  };
+
+  it("counts every step it lists, the optional one included", () => {
+    render(<SetupChecklist status={status} locale="fr" />);
+    expect(screen.getAllByRole("listitem")).toHaveLength(5);
+    expect(screen.getByText("1 étape terminée sur 5")).toBeInTheDocument();
   });
 });
 

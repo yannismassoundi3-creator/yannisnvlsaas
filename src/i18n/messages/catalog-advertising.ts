@@ -102,14 +102,14 @@ export const advertisingMessages = defineMessages({
     spendByPlatform: "Dépenses publicitaires par plateforme",
     spendChartDescription: (g: Granularity) => `Dépenses ${g === "day" ? "quotidiennes" : g === "week" ? "hebdomadaires" : "mensuelles"}, HT.`,
     reading: "Comment lire ces chiffres",
-    platformRoas: "ROAS plateforme",
+    platformRoas: "ROAS annoncé par la plateforme",
     platformRoasText: " : ce que chaque plateforme attribue à ses propres publicités. Chaque plateforme compte selon ses propres règles, et une même vente peut être revendiquée deux fois.",
-    blendedRoas: "ROAS global",
+    blendedRoas: "Ventes par euro de pub (ROAS)",
     blendedRoasText: (value: string) =>
-      ` (${value}) : tout le chiffre d’affaires net divisé par toutes les dépenses publicitaires. Il ne dépend d’aucune attribution, mais inclut des ventes qui auraient eu lieu sans publicité.`,
-    breakEvenRoas: "ROAS de rentabilité",
+      ` (${value}) : tout votre chiffre d’affaires net divisé par toutes vos dépenses publicitaires. Ce chiffre ne dépend d’aucune attribution, mais inclut des ventes qui auraient eu lieu sans publicité.`,
+    breakEvenRoas: "Seuil de rentabilité de la pub (ROAS)",
     breakEvenRoasText: (value: string) =>
-      ` (${value}) : le niveau auquel la publicité consomme toute la marge restante après les coûts des produits, d’expédition et de paiement. Les campagnes en dessous coûtent plus de marge que n’en rapporte le chiffre d’affaires qui leur est attribué.`,
+      ` (${value}) : le montant de ventes que chaque euro de pub doit rapporter, au minimum, pour être rentable. En dessous, la publicité consomme toute la marge restante après le coût d’achat des produits, l’expédition et les frais de paiement. Les campagnes sous ce seuil coûtent plus de marge que n’en rapporte le chiffre d’affaires qui leur est attribué.`,
     linkedShare: (linked: string, total: string) =>
       `Sur ${total} de dépenses, ${linked} proviennent de campagnes liées à un seul produit et comptent dans la marge de ce produit. Le reste est conservé au niveau de la boutique.`,
     campaigns: "Campagnes",
@@ -123,7 +123,7 @@ export const advertisingMessages = defineMessages({
     colClicks: "Clics",
     colConversions: "Conversions",
     colConversionValue: "Valeur de conversion",
-    colPlatformRoas: "ROAS plateforme",
+    colPlatformRoas: "ROAS annoncé par la plateforme",
     belowBreakEven: "Sous le seuil de rentabilité",
 
     productPromotedBy: (campaign: string) => `Produit promu par ${campaign}`,

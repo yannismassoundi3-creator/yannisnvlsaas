@@ -223,7 +223,7 @@ export const importUi = defineMessages({
       firstDates: (values: string) => `Premières dates : ${values}`,
       decimalSeparator: "Séparateur décimal",
       point: "Point (1,234.50)",
-      comma: "Virgule (1.234,50)",
+      comma: "Virgule (1 234,50)",
       firstAmounts: (values: string) => `Premiers montants : ${values}`,
       existingLegend: "Quand un enregistrement existe déjà dans Narixia",
       skipIt: "L'ignorer",
@@ -248,7 +248,8 @@ export const importUi = defineMessages({
       usualKind: "Type habituel de chaque catégorie",
       variable: "Variable (augmente avec les ventes)",
       fixed: "Fixe",
-      kindHint: "Les coûts variables réduisent la marge sur coûts variables ; les coûts fixes, seulement l'estimation du résultat d'exploitation.",
+      kindHint:
+        "Les coûts variables réduisent ce qui vous reste (marge sur coûts variables) ; les coûts fixes, seulement l'estimation du résultat d'exploitation.",
       checkRows: "Vérifier les lignes",
       rowsInFile: "Lignes du fichier",
       ready: "Prêtes",

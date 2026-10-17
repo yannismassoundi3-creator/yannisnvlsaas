@@ -396,15 +396,15 @@ const DEFINITIONS_FR: Record<DefinitionKey, Definition> = {
     formula: "Ventes nettes + Frais de port facturés",
   },
   cogs: {
-    term: "Coût des marchandises vendues",
+    term: "Coût d'achat des produits",
     short:
-      "Ce que vous ont coûté les produits vendus. Utilise le coût enregistré sur la ligne de commande s'il existe, sinon le coût unitaire actuel du produit.",
+      "Ce que vous ont coûté les produits que vous avez vendus. Narixia utilise le coût enregistré sur la ligne de commande s'il existe, sinon le coût unitaire actuel du produit. En comptabilité, on parle de coût des marchandises vendues.",
     formula: "Coût unitaire × quantité vendue",
   },
   grossProfit: {
     term: "Marge brute",
-    short: "Chiffre d'affaires net moins le coût des marchandises vendues.",
-    formula: "Chiffre d'affaires net − Coût des marchandises vendues",
+    short: "Chiffre d'affaires net moins le coût d'achat des produits vendus.",
+    formula: "Chiffre d'affaires net − Coût d'achat des produits",
   },
   shippingCosts: {
     term: "Coûts d'expédition et de logistique",
@@ -428,15 +428,15 @@ const DEFINITIONS_FR: Record<DefinitionKey, Definition> = {
     formula: "Somme des dépenses marquées comme variables",
   },
   contributionMargin: {
-    term: "Marge sur coûts variables",
+    term: "Ce qui vous reste (marge sur coûts variables)",
     short:
-      "Ce qui reste du chiffre d'affaires net après le coût des produits et tous les coûts variables, pour couvrir les coûts fixes et dégager un bénéfice. Ce n'est pas le bénéfice net.",
-    formula: "Marge brute − Expédition − Frais de paiement − Publicité − Autres coûts variables",
+      "Ce qui vous reste de vos ventes une fois payés le coût d'achat des produits, l'expédition, les frais de paiement, la publicité et les autres coûts liés aux ventes (emballage, commissions…). Les charges fixes (loyer, abonnements…), les impôts et les intérêts ne sont pas déduits : ce n'est pas votre bénéfice net.",
+    formula: "Chiffre d'affaires net − Coût d'achat des produits − Expédition − Frais de paiement − Publicité − Autres coûts variables",
   },
   contributionMarginRate: {
-    term: "Taux de marge sur coûts variables",
-    short: "Marge sur coûts variables rapportée au chiffre d'affaires net.",
-    formula: "Marge sur coûts variables ÷ Chiffre d'affaires net",
+    term: "Ce qui vous reste, en % (taux de marge sur coûts variables)",
+    short: "La part de votre chiffre d'affaires net qui vous reste une fois payés les coûts liés aux ventes, avant les charges fixes.",
+    formula: "Ce qui vous reste ÷ Chiffre d'affaires net",
   },
   fixedCosts: {
     term: "Coûts fixes",
@@ -446,8 +446,8 @@ const DEFINITIONS_FR: Record<DefinitionKey, Definition> = {
   operatingProfit: {
     term: "Résultat d'exploitation (estimation)",
     short:
-      "Marge sur coûts variables moins les coûts fixes enregistrés dans Narixia. Exclut l'impôt sur les bénéfices, les intérêts, les amortissements et tout coût non saisi ici. Ne remplace pas votre comptabilité.",
-    formula: "Marge sur coûts variables − Coûts fixes",
+      "Ce qui vous reste (marge sur coûts variables) moins les coûts fixes enregistrés dans Narixia. Exclut l'impôt sur les bénéfices, les intérêts, les amortissements et tout coût non saisi ici. Ne remplace pas votre comptabilité.",
+    formula: "Ce qui vous reste − Coûts fixes",
   },
   netProfit: {
     term: "Bénéfice net",
@@ -472,27 +472,27 @@ const DEFINITIONS_FR: Record<DefinitionKey, Definition> = {
     formula: "(Ventes brutes − Remises) ÷ Commandes",
   },
   roas: {
-    term: "ROAS (déclaré par la plateforme)",
+    term: "ROAS annoncé par la plateforme",
     short:
-      "Chiffre d'affaires que la plateforme publicitaire attribue à une campagne pour chaque unité dépensée. Chaque plateforme applique ses propres règles d'attribution et surestime souvent.",
+      "Les ventes que la plateforme publicitaire attribue à une campagne pour chaque euro dépensé. Chaque plateforme applique ses propres règles d'attribution et surestime souvent.",
     formula: "Valeur de conversion de la plateforme ÷ Dépenses publicitaires",
   },
   blendedRoas: {
-    term: "ROAS global",
+    term: "Ventes par euro de pub (ROAS)",
     short:
-      "Chiffre d'affaires net de toute la boutique pour chaque unité de dépenses publicitaires. Ne dépend pas de l'attribution des plateformes, mais inclut des ventes que la publicité n'a pas générées.",
+      "Le chiffre d'affaires net de toute la boutique pour chaque euro dépensé en publicité. Ne dépend pas de l'attribution des plateformes, mais inclut des ventes que la publicité n'a pas générées.",
     formula: "Chiffre d'affaires net ÷ Dépenses publicitaires totales",
   },
   breakEvenRoas: {
-    term: "ROAS de rentabilité",
+    term: "Seuil de rentabilité de la pub (ROAS)",
     short:
-      "Le ROAS auquel la publicité absorbe toute la marge restant après les coûts des produits, d'expédition, de paiement et les autres coûts variables. En dessous, la publicité coûte plus que la marge qu'elle rapporte.",
-    formula: "1 ÷ (Marge avant publicité ÷ Chiffre d'affaires net)",
+      "Le montant de ventes que chaque euro de pub doit rapporter, au minimum, pour que la pub soit rentable. En dessous, la publicité coûte plus que la marge que ces ventes vous laissent après le coût d'achat des produits, l'expédition, les frais de paiement et les autres coûts variables.",
+    formula: "1 ÷ (Ce qui vous reste avant publicité ÷ Chiffre d'affaires net)",
   },
   roi: {
     term: "ROI",
     short:
-      "Le retour sur investissement compare le bénéfice à la somme investie. Contrairement au ROAS, il repose sur le bénéfice et non sur le chiffre d'affaires. Narixia affiche la marge sur coûts variables plutôt qu'un ROI, car les montants investis ne sont pas suivis.",
+      "Le retour sur investissement compare le bénéfice à la somme investie. Contrairement au ROAS, il repose sur le bénéfice et non sur le chiffre d'affaires. Narixia affiche ce qui vous reste (marge sur coûts variables) plutôt qu'un ROI, car les montants investis ne sont pas suivis.",
     formula: "(Gain − Coût) ÷ Coût",
   },
   refundRate: {

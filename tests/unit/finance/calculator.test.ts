@@ -166,7 +166,7 @@ describe("calculateProfitability", () => {
     expect(errors.find((e) => e.field === "quantity")?.message).toMatch(/^La quantité doit être un nombre entier compris entre 0 et 10\s000\s000\.$/);
     expect(errors.find((e) => e.field === "paymentFeeBasisPoints")?.message).toBe("Les frais de paiement doivent être compris entre 0 % et 100 %.");
     const r = calculateProfitability({ ...base, unitCostE4: null }, "fr");
-    expect(r.warnings).toContain("Ajoutez un coût unitaire pour calculer la marge sur coûts variables.");
+    expect(r.warnings).toContain("Ajoutez un coût unitaire pour calculer ce qui vous reste.");
     expect(validateCalculatorInput({ ...base, quantity: -2 })[0].message).toBe("Quantity must be a whole number between 0 and 10,000,000.");
   });
 });

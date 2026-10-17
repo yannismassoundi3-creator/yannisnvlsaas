@@ -42,7 +42,7 @@ export const calculatorRules = defineMessages({
     },
     warnDiscounts: "Les remises dépassent les ventes brutes.",
     warnRefunds: "Les remboursements dépassent le montant payé après remises.",
-    warnUnitCost: "Ajoutez un coût unitaire pour calculer la marge sur coûts variables.",
+    warnUnitCost: "Ajoutez un coût unitaire pour calculer ce qui vous reste.",
   },
 });
 
@@ -118,7 +118,7 @@ export const calculatorUi = defineMessages({
     unitsSold: "Unités vendues",
     orders: "Commandes",
     ordersHint: "Sert au calcul des frais fixes par commande. Par défaut, égal aux unités vendues.",
-    groupCost: "Coût du produit",
+    groupCost: "Coût d'achat du produit",
     unitCost: "Coût unitaire",
     unitCostHint: "Ce que vous coûte une unité. Jusqu'à quatre décimales.",
     groupDiscounts: "Remises et remboursements",
@@ -141,17 +141,17 @@ export const calculatorUi = defineMessages({
     resultHint: "Mis à jour pendant la saisie. Montants HT.",
     grossSales: "Ventes brutes",
     netSales: "Ventes nettes",
-    cogs: "Coût des marchandises vendues",
+    cogs: "Coût d'achat des produits",
     unitCostNeeded: "Coût unitaire requis",
     paymentFees: "Frais de paiement",
-    contributionMargin: "Marge sur coûts variables",
+    contributionMargin: "Ce qui vous reste",
     ofNetSales: (pct: string) => `${pct} des ventes nettes`,
     perUnitSuffix: (amount: string) => ` · ${amount} par unité`,
     fixErrors: "Corrigez les champs signalés pour afficher le résultat.",
     breakEvenTitle: "Prix de vente au seuil de rentabilité",
     perUnit: "par unité",
     breakEvenExplain:
-      "Le prix le plus bas pour lequel la marge sur coûts variables est nulle ou positive, en supposant que les unités, le coût unitaire, l'expédition, la publicité, les autres coûts et les montants fixes restent identiques, tandis que les remises, remboursements et frais en pourcentage évoluent avec le prix.",
+      "Le prix le plus bas pour lequel ce qui vous reste est nul ou positif, en supposant que les unités, le coût unitaire, l'expédition, la publicité, les autres coûts et les montants fixes restent identiques, tandis que les remises, remboursements et frais en pourcentage évoluent avec le prix.",
     breakEvenMissingCost: "Ajoutez un coût unitaire pour calculer le seuil de rentabilité.",
     breakEvenNoQuantity: "Indiquez le nombre d'unités vendues pour calculer le seuil de rentabilité.",
     breakEvenImpossible:
@@ -162,14 +162,14 @@ export const calculatorUi = defineMessages({
     formulaNet: "Ventes brutes − Remises − Remboursements",
     formulaCogs: "Coût unitaire × Unités vendues",
     formulaFees: "(Ventes brutes − Remises) × Frais % + Frais fixes × Commandes",
-    formulaMargin: "Ventes nettes − Coût des produits − Frais de paiement − Expédition − Publicité − Autres coûts variables",
-    marginRate: "Taux de marge sur coûts variables",
-    formulaMarginRate: "Marge sur coûts variables ÷ Ventes nettes",
+    formulaMargin: "Ventes nettes − Coût d'achat des produits − Frais de paiement − Expédition − Publicité − Autres coûts variables",
+    marginRate: "Ce qui vous reste (%)",
+    formulaMarginRate: "Ce qui vous reste ÷ Ventes nettes",
     feesNote:
       "Les prestataires de paiement conservent généralement leurs frais lorsqu'une commande est remboursée : les frais sont donc calculés sur le montant payé avant remboursements. Tous les montants sont arrondis à la plus petite unité de la devise, au plus proche (les demis s'éloignant de zéro).",
     notIncluded: "Non inclus",
     notIncludedBody:
-      "TVA et taxes sur les ventes, coûts fixes (loyer, salaires, abonnements logiciels), impôts sur les bénéfices, intérêts et amortissements. Le résultat est une marge sur coûts variables, pas un bénéfice net.",
+      "TVA et taxes sur les ventes, coûts fixes (loyer, salaires, abonnements logiciels), impôts sur les bénéfices, intérêts et amortissements. Le résultat est ce qui vous reste (marge sur coûts variables), pas un bénéfice net.",
   },
 });
 

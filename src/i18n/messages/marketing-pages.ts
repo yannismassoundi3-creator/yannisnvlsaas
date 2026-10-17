@@ -117,7 +117,7 @@ export const marketingPages = defineMessages({
     glossary: {
       metaTitle: "Glossaire de la rentabilité e-commerce",
       metaDescription:
-        "Définitions claires des ventes brutes, ventes nettes, marge brute, marge sur coûts variables, ROAS, ROAS de rentabilité, bénéfice net et trésorerie, telles qu'utilisées dans Narixia.",
+        "Définitions claires des ventes brutes, ventes nettes, marge brute, marge sur coûts variables (ce qui vous reste), ROAS, seuil de rentabilité de la pub, bénéfice net et trésorerie, telles qu'utilisées dans Narixia.",
       eyebrow: "Glossaire",
       title: "Les termes de la rentabilité, définis",
       intro: "Les définitions exactes utilisées par Narixia dans chaque tableau de bord, rapport et export. Les montants s'entendent toujours hors TVA et hors taxes.",
@@ -138,7 +138,7 @@ export const marketingPages = defineMessages({
         `Commencez par un essai gratuit de ${days} jours, sans carte bancaire. Narixia Pro coûte ${price} par mois.`,
       eyebrow: "Tarifs",
       title: "Des tarifs adaptés aux petites boutiques",
-      intro: (days: number) => `Essayez gratuitement le produit principal pendant ${days} jours. Sans carte bancaire, sans prélèvement automatique.`,
+      intro: (days: number) => `Essayez gratuitement les fonctions essentielles pendant ${days} jours. Sans carte bancaire, sans prélèvement automatique.`,
       history: (days: number) => (days >= 365 ? `${Math.round(days / 365)} dernières années` : `${days} derniers jours`),
       rows: {
         stores: "Boutiques",
@@ -181,7 +181,7 @@ export const marketingPages = defineMessages({
     calculator: {
       metaTitle: "Calculateur de marge pour l'e-commerce",
       metaDescription:
-        "Calculateur gratuit de marge sur coûts variables pour les boutiques en ligne : saisissez le prix, le coût unitaire, les remises, les remboursements, les frais de paiement, l'expédition et les dépenses publicitaires pour connaître votre marge et votre prix de rentabilité.",
+        "Calculateur de marge gratuit pour les boutiques en ligne : saisissez le prix, le coût unitaire, les remises, les remboursements, les frais de paiement, l'expédition et les dépenses publicitaires pour savoir ce qui vous reste (marge sur coûts variables) et votre prix de rentabilité.",
       eyebrow: "Outil gratuit",
       title: "Calculateur de marge",
       intro:

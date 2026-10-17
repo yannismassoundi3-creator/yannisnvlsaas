@@ -44,11 +44,12 @@ export const chartMessages = defineMessages({
         ? " Les barres plus claires sont des semaines partielles, tronquées par les dates choisies."
         : " Les barres plus claires sont des mois partiels, tronqués par les dates choisies.",
     netRevenue: "Chiffre d'affaires net",
-    contributionMargin: "Marge sur coûts variables",
-    marginRate: "Marge %",
-    revenueMarginTitle: "Chiffre d'affaires net et marge sur coûts variables",
+    contributionMargin: "Ce qui vous reste",
+    marginRate: "Ce qui vous reste (%)",
+    revenueMarginTitle: "Chiffre d'affaires net et ce qui vous reste",
     revenueMarginDescription: (granularity: Granularity) =>
-      `Totaux ${FR_TOTALS[granularity]}. La marge sur coûts variables correspond au chiffre d'affaires net moins le coût des produits et les coûts variables.`,
-    revenueMarginCaption: (granularity: Granularity) => `Chiffre d'affaires net et marge sur coûts variables ${FR_CAPTION[granularity]}`,
+      `Totaux ${FR_TOTALS[granularity]}. « Ce qui vous reste » (marge sur coûts variables) correspond au chiffre d'affaires net moins le coût d'achat des produits et les coûts variables.`,
+    revenueMarginCaption: (granularity: Granularity) =>
+      `Chiffre d'affaires net et ce qui vous reste (marge sur coûts variables), ${FR_CAPTION[granularity]}`,
   },
 });

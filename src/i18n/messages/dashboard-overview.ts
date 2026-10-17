@@ -78,7 +78,7 @@ export const overviewMessages = defineMessages({
     advertisingDetails: "Détails de la publicité",
     topCampaigns: "Principales campagnes par dépenses",
     topCampaignsDescription: "Les chiffres des plateformes reposent sur l'attribution propre à chacune et peuvent se recouper.",
-    noAdSpend: "Aucune dépense publicitaire enregistrée sur cette période. Ajoutez-la pour voir le ROAS global et le ROAS de rentabilité.",
+    noAdSpend: "Aucune dépense publicitaire enregistrée sur cette période. Ajoutez-la pour voir vos ventes par euro de pub et le seuil de rentabilité de votre pub.",
     addAdSpend: "Ajouter des dépenses publicitaires",
     loading: "Chargement de la vue d'ensemble",
   },

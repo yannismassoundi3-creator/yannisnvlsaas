@@ -155,19 +155,19 @@ export const marketingCommon = defineMessages({
     faq: {
       calculate: {
         q: "Que calcule Narixia ?",
-        a: "Narixia transforme vos commandes, coûts des produits, dépenses publicitaires et charges en une décomposition claire de votre rentabilité : ventes nettes, marge brute et marge sur coûts variables, au global et par produit. Chaque chiffre a une définition écrite, et les valeurs estimées ou manquantes sont signalées.",
+        a: "Narixia transforme vos commandes, le coût d'achat de vos produits, vos dépenses publicitaires et vos charges en une décomposition claire de votre rentabilité : ventes nettes, marge brute et ce qui vous reste (marge sur coûts variables), au global et par produit. Chaque chiffre a une définition écrite, et les valeurs estimées ou manquantes sont signalées.",
       },
       netProfit: {
-        q: "La marge sur coûts variables est-elle la même chose que le bénéfice net ?",
-        a: "Non. La marge sur coûts variables est ce qui reste après le coût des produits et les coûts variables comme l'expédition, les frais de paiement et la publicité. Le bénéfice net déduit en plus les coûts fixes, les impôts, les intérêts et les amortissements. Narixia affiche une estimation du résultat d'exploitation à partir des coûts fixes que vous enregistrez, mais ne remplace pas votre comptabilité.",
+        q: "« Ce qui vous reste » est-il la même chose que le bénéfice net ?",
+        a: "Non. « Ce qui vous reste » (la marge sur coûts variables) est ce qui reste après le coût d'achat des produits et les coûts variables comme l'expédition, les frais de paiement et la publicité. Le bénéfice net déduit en plus les coûts fixes, les impôts, les intérêts et les amortissements. Narixia affiche une estimation du résultat d'exploitation à partir des coûts fixes que vous enregistrez, mais ne remplace pas votre comptabilité.",
       },
       platforms: {
         q: "Depuis quelles plateformes puis-je importer ?",
-        a: "Narixia importe des fichiers CSV. Il reconnaît les noms de colonnes des exports de commandes et de produits Shopify et propose des modèles documentés pour les commandes, les produits, les charges et les campagnes publicitaires : les fichiers d'autres plateformes ou de tableurs se mappent donc en quelques clics. Des intégrations directes sont prévues mais pas encore disponibles.",
+        a: "Narixia importe des fichiers CSV. Il reconnaît les noms de colonnes des exports de commandes et de produits Shopify et propose des modèles documentés pour les commandes, les produits, les charges et les campagnes publicitaires : vous associez donc les colonnes des fichiers d'autres plateformes ou de tableurs en quelques clics. Des intégrations directes sont prévues mais pas encore disponibles.",
       },
       customerData: {
         q: "Que deviennent les données clients de mes exports de commandes ?",
-        a: "Les fichiers sont lus dans votre navigateur. Seules les colonnes que vous mappez sont envoyées à Narixia, et les modèles de commandes n'incluent ni nom, ni e-mail, ni adresse de client. Narixia n'en a pas besoin pour calculer vos marges.",
+        a: "Les fichiers sont lus dans votre navigateur. Seules les colonnes que vous associez sont envoyées à Narixia, et les modèles de commandes n'incluent ni nom, ni e-mail, ni adresse de client. Narixia n'en a pas besoin pour calculer vos marges.",
       },
       vat: {
         q: "Mes prix sont TTC. Cela fausse-t-il les chiffres ?",
@@ -176,11 +176,11 @@ export const marketingCommon = defineMessages({
       trial: {
         q: "Comment fonctionne l'essai gratuit ?",
         a: (days: number, price: string) =>
-          `Vous disposez de ${days} jours du produit principal sans saisir de carte bancaire. À la fin de l'essai, rien n'est prélevé : vous pouvez passer à Pro pour ${price} par mois, et vos données restent disponibles pour être exportées ou supprimées.`,
+          `Vous disposez de ${days} jours avec les fonctions essentielles, sans saisir de carte bancaire. À la fin de l'essai, rien n'est prélevé : vous pouvez passer à Pro pour ${price} par mois, et vos données restent disponibles pour être exportées ou supprimées.`,
       },
       attribution: {
         q: "Comment Narixia gère-t-il l'attribution publicitaire ?",
-        a: "Les plateformes publicitaires comptabilisent les conversions selon leurs propres règles d'attribution, qui se recoupent souvent. Narixia affiche le ROAS déclaré par chaque plateforme tel quel, le compare à votre ROAS de rentabilité et garde les dépenses publicitaires globales à l'écart des marges par produit, sauf si une campagne est explicitement liée à un seul produit.",
+        a: "Les plateformes publicitaires comptabilisent les conversions selon leurs propres règles d'attribution, qui se recoupent souvent. Narixia affiche le ROAS annoncé par chaque plateforme tel quel, le compare au seuil de rentabilité de votre pub et garde les dépenses publicitaires globales à l'écart des marges par produit, sauf si une campagne est explicitement liée à un seul produit.",
       },
       export: {
         q: "Puis-je exporter ou supprimer mes données ?",

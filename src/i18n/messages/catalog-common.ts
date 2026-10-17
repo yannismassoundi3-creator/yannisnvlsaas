@@ -39,7 +39,7 @@ export const catalogCommon = defineMessages({
     previous: "Précédent",
     next: "Suivant",
     incomplete: "Incomplet",
-    noSku: "Sans SKU",
+    noSku: "Sans référence",
     noCost: "Coût manquant",
     archived: "Archivé",
     actions: "Actions",
