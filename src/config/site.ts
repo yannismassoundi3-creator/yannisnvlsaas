@@ -22,13 +22,14 @@ export const site = {
     country: process.env.NEXT_PUBLIC_COMPANY_COUNTRY || null,
   },
   /** Date shown on the legal pages. Update whenever the documents change. */
-  legalLastUpdated: "2026-10-16",
+  legalLastUpdated: "2026-10-17",
   /**
    * Service providers that process personal data on Narixia's behalf. Keep this
    * list accurate for your deployment: it is published in the privacy policy.
    */
   processors: [
-    { id: "database", name: "Supabase", purpose: "Database, authentication and transactional authentication emails", location: process.env.NEXT_PUBLIC_DATA_REGION || "Region chosen at deployment" },
+    { id: "database", name: "Supabase", purpose: "Database and authentication", location: process.env.NEXT_PUBLIC_DATA_REGION || "Region chosen at deployment" },
+    { id: "email", name: process.env.NEXT_PUBLIC_EMAIL_PROVIDER || "Brevo", purpose: "Delivery of account emails (confirmation, sign-in codes, password reset)", location: process.env.NEXT_PUBLIC_EMAIL_REGION || "European Union" },
     { id: "payments", name: "Stripe", purpose: "Subscription payments, invoices and the billing portal", location: "European Union and United States" },
     { id: "hosting", name: process.env.NEXT_PUBLIC_HOSTING_PROVIDER || "Vercel", purpose: "Application hosting and delivery", location: process.env.NEXT_PUBLIC_HOSTING_REGION || "Region chosen at deployment" },
   ],
@@ -46,8 +47,12 @@ const COPY_FR = {
 
 const PROCESSORS_FR: Record<ProcessorId, { purpose: string; location: string }> = {
   database: {
-    purpose: "Base de données, authentification et e-mails transactionnels d'authentification",
+    purpose: "Base de données et authentification",
     location: process.env.NEXT_PUBLIC_DATA_REGION || "Région choisie au déploiement",
+  },
+  email: {
+    purpose: "Envoi des e-mails liés au compte (confirmation, codes de connexion, réinitialisation du mot de passe)",
+    location: process.env.NEXT_PUBLIC_EMAIL_REGION || "Union européenne",
   },
   payments: { purpose: "Paiement des abonnements, factures et portail de facturation", location: "Union européenne et États-Unis" },
   hosting: {
