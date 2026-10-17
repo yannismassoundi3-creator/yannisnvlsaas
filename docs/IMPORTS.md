@@ -16,6 +16,11 @@ Every field, its description and the header names recognised automatically are d
 `src/lib/imports/schema.ts`. Header matching ignores case, accents, punctuation and text in parentheses
 ("Amount spent (EUR)" matches "amount spent"), and includes common French headers.
 
+Templates follow the interface language. The French templates use French headers (all recognised automatically),
+day/month/year dates, decimal commas and semicolons, so Excel set to French opens them in columns; the English
+ones use commas and decimal points. Both are UTF-8 with a BOM and CRLF line ends, and the expense kind is read in
+either language ("fixed"/"variable", "fixe"/"variable").
+
 ## The pipeline
 
 | # | Step | Where | What happens |

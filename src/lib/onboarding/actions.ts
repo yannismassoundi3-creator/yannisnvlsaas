@@ -79,7 +79,8 @@ export async function createWorkspace(input: WorkspaceInput): Promise<ActionResu
 /** Creates (or recreates) the clearly labelled sample store with generated demo data. */
 export async function createDemoStore(): Promise<ActionResult> {
   const ws = await requireWorkspace();
-  const t = onboardingMessages[await getRequestLocale()].actions;
+  const locale = await getRequestLocale();
+  const t = onboardingMessages[locale].actions;
   if (!ws.entitlements.canWrite) return { ok: false, message: t.trialEnded };
   if (!(await consumeRateLimit(`demo:${ws.user.id}`, 5, 3600))) {
     return { ok: false, message: t.sampleRateLimited };
@@ -92,7 +93,8 @@ export async function createDemoStore(): Promise<ActionResult> {
   const existing = ws.stores.filter((s) => s.is_demo).map((s) => s.id);
   if (existing.length) await admin.from("stores").delete().in("id", existing).eq("organization_id", ws.organization.id);
 
-  const dataset = generateDemoDataset({ endDate: addDays(todayIn(timezone), -1), timezone });
+  // Product, campaign and expense names (and the store name) follow the interface language.
+  const dataset = generateDemoDataset({ endDate: addDays(todayIn(timezone), -1), timezone, locale });
   const { data: store, error } = await admin
     .from("stores")
     .insert({

@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { detectDecimalSeparator } from "@/lib/finance/decimal";
 import { detectDateOrder, parseDateTime, parseLocalDate } from "@/lib/imports/dates";
 import { autoMap, detectSource, extractMapped, missingRequired, normalizeHeader, sourceLabel } from "@/lib/imports/mapping";
-import { mapCategory, mapPlatform, matchKey, normalizeRows, normalizeText, type RawRow } from "@/lib/imports/normalize";
+import { mapCategory, mapKind, mapPlatform, matchKey, normalizeRows, normalizeText, type NormalizedRow, type RawRow } from "@/lib/imports/normalize";
 import { parseCsvText, uniqueHeaders } from "@/lib/imports/parse-file";
-import { DEFAULT_OPTIONS, fieldCopy, IMPORT_KINDS, KIND_ORDER, kindCopy, type ImportOptions } from "@/lib/imports/schema";
+import { DEFAULT_OPTIONS, fieldCopy, IMPORT_KINDS, KIND_ORDER, kindCopy, templateFile, type ImportKind, type ImportOptions } from "@/lib/imports/schema";
 
 const ctx = { currency: "EUR", timezone: "Europe/Paris" };
 const opts = (o: Partial<ImportOptions> = {}): ImportOptions => ({ ...DEFAULT_OPTIONS, ...o });
@@ -310,5 +311,125 @@ describe("messages in the interface language", () => {
         expect(fieldCopy(kind, field.key)).toEqual({ label: field.label, description: field.description });
       }
     }
+  });
+});
+
+describe("French headers and templates", () => {
+  it("maps French headers, including selling price and the expense type", () => {
+    expect(autoMap("products", ["Nom", "Référence", "Prix d'achat", "Prix de vente"])).toEqual({
+      name: 0,
+      sku: 1,
+      unit_cost: 2,
+      price: 3,
+      handle: null,
+      option1: null,
+      option2: null,
+      option3: null,
+    });
+    expect(autoMap("products", ["Nom du produit", "Prix de vente (TTC)"])).toMatchObject({ name: 0, price: 1 });
+    expect(autoMap("expenses", ["Date", "Catégorie", "Type", "Montant", "Description"])).toEqual({ date: 0, category: 1, kind: 2, amount: 3, description: 4 });
+    // A lone "Type" column is still read as the category, as before.
+    expect(autoMap("expenses", ["Date", "Type", "Montant"])).toMatchObject({ category: 1, kind: null, amount: 2 });
+    expect(autoMap("expenses", ["Date", "Fixed or variable", "Amount"])).toMatchObject({ kind: 1 });
+    expect(autoMap("ad_spend", ["Jour", "Campagne", "ID de campagne", "Plateforme", "Dépense", "Clics", "Valeur de conversion"])).toMatchObject({
+      date: 0,
+      campaign: 1,
+      campaign_id: 2,
+      platform: 3,
+      spend: 4,
+      clicks: 5,
+      conversion_value: 6,
+    });
+  });
+
+  it("accepts the expense kind in English and French", () => {
+    expect(mapKind("fixed")).toBe("fixed");
+    expect(mapKind("fixe")).toBe("fixed");
+    expect(mapKind("Fixes")).toBe("fixed");
+    expect(mapKind("Frais fixes")).toBe("fixed");
+    expect(mapKind("variable")).toBe("variable");
+    expect(mapKind("Variables")).toBe("variable");
+    expect(mapKind("parfois")).toBeNull();
+    const [r] = normalizeRows("expenses", rows([{ date: "15/03/2026", amount: "29,00", category: "logiciel", kind: "fixe" }]), opts({ decimalSeparator: ",", dateFormat: "dmy" }), ctx);
+    expect(r.status).toBe("valid");
+    expect(r.data).toMatchObject({ incurred_on: "2026-03-15", category: "software", kind: "fixed", amount_minor: 2900 });
+  });
+
+  it("maps every template column automatically, to the same field in both languages", () => {
+    for (const kind of KIND_ORDER) {
+      for (const template of [IMPORT_KINDS[kind].template, IMPORT_KINDS[kind].templateFr]) {
+        const header = template[0];
+        const mapping = autoMap(kind, header);
+        const columns = Object.values(mapping)
+          .filter((c): c is number => c !== null)
+          .sort((a, b) => a - b);
+        expect(columns, `${kind}: ${header.join(" | ")}`).toEqual(header.map((_, i) => i));
+        expect(missingRequired(kind, mapping)).toEqual([]);
+        expect(template.slice(1).every((row) => row.length === header.length)).toBe(true);
+      }
+      expect(autoMap(kind, IMPORT_KINDS[kind].templateFr[0])).toEqual(autoMap(kind, IMPORT_KINDS[kind].template[0]));
+    }
+  });
+
+  it("writes French templates for Excel: BOM, semicolons, decimal commas, CRLF", () => {
+    const fr = templateFile("expenses", "fr");
+    expect(fr.fileName).toBe("narixia-modele-depenses.csv");
+    expect(fr.csv).toBe(
+      "\uFEFFDate;Catégorie;Type;Montant;Description\r\n15/03/2026;logiciel;fixe;29,00;Outil d'e-mailing\r\n18/03/2026;emballage;variable;86,40;Cartons d'expédition, 200 pièces\r\n",
+    );
+    expect(templateFile("products", "fr").csv.split("\r\n")[0]).toBe("\uFEFFNom;Référence;Prix d'achat;Prix de vente");
+    expect(templateFile("orders", "fr").fileName).toBe("narixia-modele-commandes.csv");
+    expect(templateFile("ad_spend", "fr").fileName).toBe("narixia-modele-depenses-publicitaires.csv");
+
+    const en = templateFile("expenses");
+    expect(en.fileName).toBe("narixia-expenses-template.csv");
+    expect(en.csv.split("\r\n")[0]).toBe("\uFEFFDate,Category,Fixed or variable,Amount,Description");
+    expect(en.csv).toContain('"Mailer boxes, 200 pcs"');
+    expect(en.csv.endsWith("\r\n")).toBe(true);
+  });
+
+  it("reads the French templates back without any manual setting", () => {
+    const dateFields: Record<ImportKind, string[]> = { orders: ["ordered_at", "refunded_at"], products: [], ad_spend: ["date"], expenses: ["date"] };
+    const amountFields: Record<ImportKind, string[]> = {
+      orders: ["unit_price", "line_discount", "shipping_charged", "taxes", "shipping_cost", "transaction_fees", "refunded_amount"],
+      products: ["unit_cost", "price"],
+      ad_spend: ["spend", "conversion_value"],
+      expenses: ["amount"],
+    };
+    const read = (kind: ImportKind): NormalizedRow[] => {
+      const parsed = parseCsvText(templateFile(kind, "fr").csv, kind, 100, "fr");
+      if (!parsed.ok) throw new Error(parsed.message);
+      expect(parsed.csv.delimiter).toBe(";");
+      const mapping = autoMap(kind, parsed.csv.headers);
+      const samples = (fields: string[]) =>
+        fields.flatMap((f) => {
+          const column = mapping[f];
+          return column === null || column === undefined ? [] : parsed.csv.rows.map((r) => r.cells[column] ?? "");
+        });
+      const dates = detectDateOrder(samples(dateFields[kind]));
+      expect(dates.ambiguous).toBe(false);
+      const options = opts({ dateFormat: dates.order, decimalSeparator: detectDecimalSeparator(samples(amountFields[kind])), locale: "fr" });
+      const out = normalizeRows(kind, parsed.csv.rows.map((r) => ({ rowNumber: r.rowNumber, values: extractMapped(r.cells, mapping) })), options, ctx);
+      for (const row of out) expect(row.errors, `${kind} row ${row.rowNumber}`).toEqual([]);
+      expect(out.every((row) => row.status === "valid")).toBe(true);
+      return out;
+    };
+
+    const orders = read("orders");
+    expect(orders[0].data!.order).toMatchObject({ external_id: "#1001", ordered_at: "2026-03-14T09:15:00.000Z", shipping_charged_minor: 490 });
+    expect(orders[0].data!.line).toMatchObject({ name: "Tote bag en lin", sku: "TOTE-01", quantity: 2, gross_minor: 4800 });
+    expect(orders[1].data!.line).toMatchObject({ gross_minor: 2900, discount_minor: 290 });
+
+    const products = read("products");
+    expect(products[0].data).toMatchObject({ name: "Tote bag en lin", sku: "TOTE-01", unit_cost_e4: 68000, price_minor: 2400 });
+    expect(products[1].data).toMatchObject({ unit_cost_e4: 94500 });
+
+    const ads = read("ad_spend");
+    expect(ads[0].data).toMatchObject({ date: "2026-03-15", platform: "meta", campaign_name: "Prospection – audiences larges", spend_minor: 4210, impressions: 8120, conversion_value_minor: 9600 });
+    expect(ads[1].data).toMatchObject({ platform: "google", conversion_value_minor: 14150 });
+
+    const expenses = read("expenses");
+    expect(expenses[0].data).toMatchObject({ incurred_on: "2026-03-15", category: "software", kind: "fixed", amount_minor: 2900 });
+    expect(expenses[1].data).toMatchObject({ category: "packaging", kind: "variable", amount_minor: 8640, description: "Cartons d'expédition, 200 pièces" });
   });
 });

@@ -1,3 +1,4 @@
+import type { Locale } from "@/i18n/config";
 import { addDays, eachDay, zonedTimeToUtc } from "@/lib/dates";
 import type {
   AdCampaign,
@@ -19,6 +20,8 @@ import { allocateProportionally, applyBasisPoints } from "@/lib/finance/money";
  * expenses. Every value is synthetic and the store is always labelled as demo
  * data in the interface. The same seed and end date always produce the same
  * dataset, which also makes it a fixture for testing the database aggregates.
+ * The locale only changes the wording (product, campaign and expense names):
+ * SKUs, identifiers and every figure are identical in every language.
  */
 
 export type DemoOptions = {
@@ -27,6 +30,8 @@ export type DemoOptions = {
   days?: number;
   seed?: number;
   timezone?: string;
+  /** Language of the product, campaign and expense names (English by default). */
+  locale?: Locale;
 };
 
 export const DEMO_SETTINGS: Omit<StoreSettings, "timezone"> = {
@@ -37,30 +42,50 @@ export const DEMO_SETTINGS: Omit<StoreSettings, "timezone"> = {
   defaultShippingCostMinor: 550, // €5.50 estimate when no cost is recorded
 };
 
-type DemoProductSpec = { id: string; sku: string; name: string; price: number; cost: number | null; weight: number };
+type DemoProductSpec = { id: string; sku: string; name: string; nameFr: string; price: number; cost: number | null; weight: number };
 
 const PRODUCTS: DemoProductSpec[] = [
-  { id: "p01", sku: "TOTE-LIN-NAT", name: "Linen tote bag", price: 3400, cost: 1120, weight: 18 },
-  { id: "p02", sku: "POUR-CER-SET", name: "Ceramic pour-over set", price: 5800, cost: 2450, weight: 9 },
-  { id: "p03", sku: "BEAN-MER-CHR", name: "Merino beanie", price: 3900, cost: 1480, weight: 8 },
-  { id: "p04", sku: "TEE-ORG-WHT", name: "Organic cotton tee", price: 2900, cost: 940, weight: 16 },
-  { id: "p05", sku: "CARA-GLS-1L", name: "Recycled glass carafe", price: 4400, cost: 1690, weight: 7 },
-  { id: "p06", sku: "APRN-WAX-OLV", name: "Waxed canvas apron", price: 5200, cost: 1975, weight: 6 },
-  { id: "p07", sku: "CNDL-BEE-TRI", name: "Beeswax candle trio", price: 2600, cost: 710, weight: 12 },
-  { id: "p08", sku: "THRW-WOL-OAT", name: "Wool throw blanket", price: 12900, cost: 6100, weight: 3 },
-  { id: "p09", sku: "NAPK-LIN-4PK", name: "Linen napkins, set of 4", price: 2400, cost: null, weight: 9 },
-  { id: "p10", sku: "KEYR-LTH-TAN", name: "Leather key ring", price: 1800, cost: 460, weight: 12 },
+  { id: "p01", sku: "TOTE-LIN-NAT", name: "Linen tote bag", nameFr: "Tote bag en lin", price: 3400, cost: 1120, weight: 18 },
+  { id: "p02", sku: "POUR-CER-SET", name: "Ceramic pour-over set", nameFr: "Set café filtre en céramique", price: 5800, cost: 2450, weight: 9 },
+  { id: "p03", sku: "BEAN-MER-CHR", name: "Merino beanie", nameFr: "Bonnet en mérinos", price: 3900, cost: 1480, weight: 8 },
+  { id: "p04", sku: "TEE-ORG-WHT", name: "Organic cotton tee", nameFr: "T-shirt en coton bio", price: 2900, cost: 940, weight: 16 },
+  { id: "p05", sku: "CARA-GLS-1L", name: "Recycled glass carafe", nameFr: "Carafe en verre recyclé", price: 4400, cost: 1690, weight: 7 },
+  { id: "p06", sku: "APRN-WAX-OLV", name: "Waxed canvas apron", nameFr: "Tablier en toile cirée", price: 5200, cost: 1975, weight: 6 },
+  { id: "p07", sku: "CNDL-BEE-TRI", name: "Beeswax candle trio", nameFr: "Trio de bougies en cire d'abeille", price: 2600, cost: 710, weight: 12 },
+  { id: "p08", sku: "THRW-WOL-OAT", name: "Wool throw blanket", nameFr: "Plaid en laine", price: 12900, cost: 6100, weight: 3 },
+  { id: "p09", sku: "NAPK-LIN-4PK", name: "Linen napkins, set of 4", nameFr: "Serviettes en lin (lot de 4)", price: 2400, cost: null, weight: 9 },
+  { id: "p10", sku: "KEYR-LTH-TAN", name: "Leather key ring", nameFr: "Porte-clés en cuir", price: 1800, cost: 460, weight: 12 },
 ];
 
-type CampaignSpec = AdCampaign & { baseDaily: number; growth: number; lateRamp: number; roas: number; cpm: number; ctr: number; cvr: number };
+type CampaignSpec = AdCampaign & { nameFr: string; baseDaily: number; growth: number; lateRamp: number; roas: number; cpm: number; ctr: number; cvr: number };
 
 const CAMPAIGNS: CampaignSpec[] = [
-  { id: "c01", platform: "meta", externalId: "120211", name: "Prospecting – broad audiences", productId: null, baseDaily: 5460, growth: 0.25, lateRamp: 0.55, roas: 1.9, cpm: 750, ctr: 0.011, cvr: 0.018 },
-  { id: "c02", platform: "meta", externalId: "120214", name: "Retargeting – catalogue", productId: null, baseDaily: 2080, growth: 0.15, lateRamp: 0.1, roas: 5.2, cpm: 1100, ctr: 0.019, cvr: 0.041 },
-  { id: "c03", platform: "meta", externalId: "120219", name: "Merino beanie launch", productId: "p03", baseDaily: 1170, growth: 0.1, lateRamp: 0.8, roas: 1.35, cpm: 820, ctr: 0.012, cvr: 0.014 },
-  { id: "c04", platform: "google", externalId: "8812031", name: "Search – brand", productId: null, baseDaily: 910, growth: 0.2, lateRamp: 0.05, roas: 9.1, cpm: 2600, ctr: 0.074, cvr: 0.083 },
-  { id: "c05", platform: "google", externalId: "8812044", name: "Shopping – all products", productId: null, baseDaily: 2990, growth: 0.3, lateRamp: 0.15, roas: 3.8, cpm: 1300, ctr: 0.016, cvr: 0.027 },
+  { id: "c01", platform: "meta", externalId: "120211", name: "Prospecting – broad audiences", nameFr: "Prospection – audiences larges", productId: null, baseDaily: 5460, growth: 0.25, lateRamp: 0.55, roas: 1.9, cpm: 750, ctr: 0.011, cvr: 0.018 },
+  { id: "c02", platform: "meta", externalId: "120214", name: "Retargeting – catalogue", nameFr: "Reciblage – catalogue", productId: null, baseDaily: 2080, growth: 0.15, lateRamp: 0.1, roas: 5.2, cpm: 1100, ctr: 0.019, cvr: 0.041 },
+  { id: "c03", platform: "meta", externalId: "120219", name: "Merino beanie launch", nameFr: "Lancement du bonnet en mérinos", productId: "p03", baseDaily: 1170, growth: 0.1, lateRamp: 0.8, roas: 1.35, cpm: 820, ctr: 0.012, cvr: 0.014 },
+  { id: "c04", platform: "google", externalId: "8812031", name: "Search – brand", nameFr: "Recherche – marque", productId: null, baseDaily: 910, growth: 0.2, lateRamp: 0.05, roas: 9.1, cpm: 2600, ctr: 0.074, cvr: 0.083 },
+  { id: "c05", platform: "google", externalId: "8812044", name: "Shopping – all products", nameFr: "Shopping – tous les produits", productId: null, baseDaily: 2990, growth: 0.3, lateRamp: 0.15, roas: 3.8, cpm: 1300, ctr: 0.016, cvr: 0.027 },
 ];
+
+/** Expense descriptions, by language. */
+const EXPENSE_TEXT: Record<Locale, Record<"platform" | "email" | "accounting" | "storage" | "packaging" | "photography", string>> = {
+  en: {
+    platform: "E-commerce platform plan",
+    email: "Email marketing tool",
+    accounting: "Accounting software",
+    storage: "Storage space",
+    packaging: "Boxes, mailers and tissue",
+    photography: "Product photography",
+  },
+  fr: {
+    platform: "Abonnement à la plateforme e-commerce",
+    email: "Outil d'e-mailing",
+    accounting: "Logiciel de comptabilité",
+    storage: "Espace de stockage",
+    packaging: "Cartons, enveloppes et papier de soie",
+    photography: "Photos des produits",
+  },
+};
 
 /** Mulberry32: small, fast, deterministic PRNG. */
 function mulberry32(seed: number) {
@@ -74,8 +99,11 @@ function mulberry32(seed: number) {
   };
 }
 
-export function generateDemoDataset({ endDate, days = 180, seed = 20261016, timezone = "Europe/Paris" }: DemoOptions): Dataset {
+export function generateDemoDataset({ endDate, days = 180, seed = 20261016, timezone = "Europe/Paris", locale = "en" }: DemoOptions): Dataset {
   const rand = mulberry32(seed);
+  // Names never consume random numbers, so every language gets the same figures.
+  const localName = (spec: { name: string; nameFr: string }) => (locale === "fr" ? spec.nameFr : spec.name);
+  const text = EXPENSE_TEXT[locale];
   const between = (min: number, max: number) => min + (max - min) * rand();
   const int = (min: number, max: number) => Math.floor(between(min, max + 1));
   const jitter = (spread: number) => 1 + (rand() + rand() + rand() - 1.5) * spread;
@@ -97,7 +125,7 @@ export function generateDemoDataset({ endDate, days = 180, seed = 20261016, time
   const products: Product[] = PRODUCTS.map((p) => ({
     id: p.id,
     sku: p.sku,
-    name: p.name,
+    name: localName(p),
     unitCostE4: p.cost === null ? null : p.cost * 100,
     priceMinor: p.price,
   }));
@@ -131,7 +159,7 @@ export function generateDemoDataset({ endDate, days = 180, seed = 20261016, time
           position: lines.length,
           productId: spec.id,
           sku: spec.sku,
-          name: spec.name,
+          name: localName(spec),
           quantity,
           grossMinor: spec.price * quantity,
           discountMinor: 0,
@@ -187,7 +215,7 @@ export function generateDemoDataset({ endDate, days = 180, seed = 20261016, time
     }
   });
 
-  const campaigns: AdCampaign[] = CAMPAIGNS.map(({ id, platform, externalId, name, productId }) => ({ id, platform, externalId, name, productId }));
+  const campaigns: AdCampaign[] = CAMPAIGNS.map((c) => ({ id: c.id, platform: c.platform, externalId: c.externalId, name: localName(c), productId: c.productId }));
   const adSpend: AdSpendDay[] = [];
   allDays.forEach((day, dayIndex) => {
     const progress = dayIndex / Math.max(allDays.length - 1, 1);
@@ -209,18 +237,18 @@ export function generateDemoDataset({ endDate, days = 180, seed = 20261016, time
   for (let d = startDate; d <= endDate; d = addDays(d, 1)) {
     const dayOfMonth = d.slice(8, 10);
     if (dayOfMonth === "01") {
-      addExpense({ incurredOn: d, category: "software", kind: "fixed", amountMinor: 7900, description: "E-commerce platform plan" });
-      addExpense({ incurredOn: d, category: "software", kind: "fixed", amountMinor: 4500, description: "Email marketing tool" });
-      addExpense({ incurredOn: d, category: "software", kind: "fixed", amountMinor: 2400, description: "Accounting software" });
-      addExpense({ incurredOn: d, category: "fulfilment", kind: "fixed", amountMinor: 18000, description: "Storage space" });
+      addExpense({ incurredOn: d, category: "software", kind: "fixed", amountMinor: 7900, description: text.platform });
+      addExpense({ incurredOn: d, category: "software", kind: "fixed", amountMinor: 4500, description: text.email });
+      addExpense({ incurredOn: d, category: "software", kind: "fixed", amountMinor: 2400, description: text.accounting });
+      addExpense({ incurredOn: d, category: "fulfilment", kind: "fixed", amountMinor: 18000, description: text.storage });
     }
     if (dayOfMonth === "15") {
-      addExpense({ incurredOn: d, category: "packaging", kind: "variable", amountMinor: Math.round(between(19000, 26000)), description: "Boxes, mailers and tissue" });
+      addExpense({ incurredOn: d, category: "packaging", kind: "variable", amountMinor: Math.round(between(19000, 26000)), description: text.packaging });
     }
   }
   const photoDay = addDays(endDate, -62);
   if (photoDay >= startDate) {
-    addExpense({ incurredOn: photoDay, category: "professional_services", kind: "fixed", amountMinor: 65000, description: "Product photography" });
+    addExpense({ incurredOn: photoDay, category: "professional_services", kind: "fixed", amountMinor: 65000, description: text.photography });
   }
 
   return {

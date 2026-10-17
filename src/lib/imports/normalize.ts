@@ -497,10 +497,11 @@ export function mapCategory(value: string): ExpenseCategory | null {
   return null;
 }
 
+/** "fixed" / "variable", in English or French ("fixe", "frais fixes", "variables"). */
 export function mapKind(value: string): ExpenseKind | null {
   const v = normalizeHeader(value);
-  if (["fixed", "fixe", "fix", "f"].includes(v)) return "fixed";
-  if (["variable", "var", "v"].includes(v)) return "variable";
+  if (["fixed", "fixe", "fixes", "fix", "f", "fraisfixe", "fraisfixes", "coutfixe", "coutsfixes"].includes(v)) return "fixed";
+  if (["variable", "variables", "var", "v", "fraisvariable", "fraisvariables", "coutvariable", "coutsvariables"].includes(v)) return "variable";
   return null;
 }
 

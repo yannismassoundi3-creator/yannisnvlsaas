@@ -26,6 +26,15 @@ describe("CSV export safety", () => {
     expect(toCsv(["a", "b"], [[1, "x"]])).toBe("﻿a,b\r\n1,x\r\n");
     expect(fileSlug("Atelier Camille / Été 2026")).toBe("atelier-camille-ete-2026");
   });
+
+  it("writes semicolon files for Excel in French, leaving decimal commas unquoted", () => {
+    expect(escapeCsvCell("24,90", ";")).toBe("24,90");
+    expect(escapeCsvCell("a;b", ";")).toBe('"a;b"');
+    expect(escapeCsvCell('Tote "large"', ";")).toBe('"Tote ""large"""');
+    expect(escapeCsvCell("=1+1", ";")).toBe("'=1+1");
+    expect(escapeCsvCell("24,90")).toBe('"24,90"');
+    expect(toCsv(["Nom", "Prix de vente"], [["Tote bag en lin", "24,00"]], ";")).toBe("﻿Nom;Prix de vente\r\nTote bag en lin;24,00\r\n");
+  });
 });
 
 describe("CSV export headers", () => {

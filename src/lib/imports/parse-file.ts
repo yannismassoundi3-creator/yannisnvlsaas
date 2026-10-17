@@ -53,7 +53,11 @@ export function parseCsvText(text: string, kind: ImportKind, maxRows: number, lo
   if (/\u0000/.test(clean.slice(0, 10_000))) {
     return { ok: false, message: t.notCsv };
   }
-  const parsed = Papa.parse<string[]>(clean, { skipEmptyLines: false });
+  // Trailing line breaks are dropped first: Papa Parse counts the empty last
+  // line as a one-column row when it guesses the delimiter, which made short
+  // semicolon files with decimal commas (Excel in French) parse on commas.
+  // Blank rows are skipped below anyway, so row numbers do not change.
+  const parsed = Papa.parse<string[]>(clean.replace(/[\r\n]+$/, ""), { skipEmptyLines: false });
   const quoteError = parsed.errors.find((e) => e.type === "Quotes");
   if (quoteError) {
     return { ok: false, message: t.unclosedQuote((quoteError.row ?? 0) + 1) };

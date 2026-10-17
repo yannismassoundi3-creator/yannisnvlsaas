@@ -10,10 +10,17 @@
 
 export type CsvCell = string | number | boolean | null | undefined | { decimal: string };
 
+/** Column separator. Excel in French (and most of Europe) expects a semicolon. */
+export type CsvSeparator = "," | ";";
+
 const FORMULA_START = /^[=+\-@\t\r]/;
 const DECIMAL_RE = /^-?\d+(\.\d+)?$/;
 
-export function escapeCsvCell(cell: CsvCell): string {
+/**
+ * One cell. Cells holding the separator, a quote or a line break are quoted.
+ * With a semicolon separator, decimal commas ("24,90") stay unquoted.
+ */
+export function escapeCsvCell(cell: CsvCell, separator: CsvSeparator = ","): string {
   if (cell === null || cell === undefined) return "";
   if (typeof cell === "number") {
     if (!Number.isFinite(cell)) return "";
@@ -26,17 +33,18 @@ export function escapeCsvCell(cell: CsvCell): string {
   }
   let text = cell;
   if (FORMULA_START.test(text)) text = `'${text}`;
-  if (/[",\r\n;]/.test(text) || text !== text.trim()) text = `"${text.replace(/"/g, '""')}"`;
+  const needsQuotes = separator === ";" ? /[";\r\n]/ : /[",\r\n;]/;
+  if (needsQuotes.test(text) || text !== text.trim()) text = `"${text.replace(/"/g, '""')}"`;
   return text;
 }
 
-export function toCsvLine(cells: CsvCell[]): string {
-  return cells.map(escapeCsvCell).join(",");
+export function toCsvLine(cells: CsvCell[], separator: CsvSeparator = ","): string {
+  return cells.map((cell) => escapeCsvCell(cell, separator)).join(separator);
 }
 
 /** Full CSV document with a UTF-8 BOM (so Excel reads accents correctly) and CRLF line ends. */
-export function toCsv(header: string[], rows: CsvCell[][]): string {
-  return "﻿" + [toCsvLine(header), ...rows.map(toCsvLine)].join("\r\n") + "\r\n";
+export function toCsv(header: string[], rows: CsvCell[][], separator: CsvSeparator = ","): string {
+  return "﻿" + [toCsvLine(header, separator), ...rows.map((row) => toCsvLine(row, separator))].join("\r\n") + "\r\n";
 }
 
 /** Safe file name part: letters, digits and dashes only. */

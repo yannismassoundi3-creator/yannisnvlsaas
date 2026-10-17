@@ -1,5 +1,6 @@
 import type { Locale } from "@/i18n/config";
 import { importKindsFr } from "@/i18n/messages/imports-fields";
+import { toCsv, type CsvSeparator } from "@/lib/csv";
 import type { ExpenseCategory, ExpenseKind, Platform } from "@/lib/domain/types";
 
 /**
@@ -26,6 +27,11 @@ export type KindDef = {
   fields: FieldDef[];
   /** Template file: header row and example rows (fictional). */
   template: string[][];
+  /**
+   * French template: French headers (each one recognised by the synonyms),
+   * day/month/year dates and decimal commas, written with semicolons.
+   */
+  templateFr: string[][];
 };
 
 const f = (key: string, label: string, required: boolean, description: string, synonyms: string[]): FieldDef => ({
@@ -49,6 +55,8 @@ export const IMPORT_KINDS: Record<ImportKind, KindDef> = {
         "ordername",
         "order",
         "numerodecommande",
+        "numerocommande",
+        "ndecommande",
         "commande",
         "name",
       ]),
@@ -58,9 +66,22 @@ export const IMPORT_KINDS: Record<ImportKind, KindDef> = {
         "orderedat",
         "date",
         "datedecommande",
+        "datecommande",
         "processedat",
       ]),
-      f("line_name", "Product name", true, "Name of the product on this line.", ["lineitemname", "productname", "itemname", "product", "item", "title", "produit", "article"]),
+      f("line_name", "Product name", true, "Name of the product on this line.", [
+        "lineitemname",
+        "productname",
+        "itemname",
+        "product",
+        "item",
+        "title",
+        "produit",
+        "article",
+        "nomduproduit",
+        "nomproduit",
+        "designation",
+      ]),
       f("line_sku", "SKU", false, "Used to match the line to a product. Without it, products are matched by name.", [
         "lineitemsku",
         "sku",
@@ -69,13 +90,14 @@ export const IMPORT_KINDS: Record<ImportKind, KindDef> = {
         "ref",
       ]),
       f("quantity", "Quantity", true, "Units sold on this line.", ["lineitemquantity", "quantity", "qty", "quantite", "qte"]),
-      f("unit_price", "Unit price", true, "Selling price of one unit, before discounts.", ["lineitemprice", "unitprice", "itemprice", "price", "prixunitaire", "prix"]),
-      f("line_discount", "Line discount", false, "Total discount on this line (not per unit).", ["lineitemdiscount", "linediscount", "itemdiscount"]),
+      f("unit_price", "Unit price", true, "Selling price of one unit, before discounts.", ["lineitemprice", "unitprice", "itemprice", "price", "prixunitaire", "prixdevente", "prix"]),
+      f("line_discount", "Line discount", false, "Total discount on this line (not per unit).", ["lineitemdiscount", "linediscount", "itemdiscount", "remisesurlaligne", "remiseligne"]),
       f("order_discount", "Order discount", false, "Discount on the whole order. Used only when no line discounts are provided; split across lines by value.", [
         "discountamount",
         "orderdiscount",
         "discount",
         "remise",
+        "remisesurlacommande",
       ]),
       f("shipping_charged", "Shipping charged", false, "Shipping paid by the customer for the order.", [
         "shipping",
@@ -83,6 +105,8 @@ export const IMPORT_KINDS: Record<ImportKind, KindDef> = {
         "shippingprice",
         "shippingamount",
         "fraisdeport",
+        "fraisdeportfactures",
+        "livraisonfacturee",
         "livraison",
       ]),
       f("taxes", "Taxes", false, "Tax (VAT / sales tax) on the order. Needed to remove tax from tax-inclusive prices.", ["taxes", "tax", "totaltax", "vat", "tva"]),
@@ -92,6 +116,8 @@ export const IMPORT_KINDS: Record<ImportKind, KindDef> = {
         "fulfilmentcost",
         "postage",
         "coutdelivraison",
+        "coutdexpedition",
+        "coutdenvoi",
       ]),
       f("transaction_fees", "Payment fees", false, "Fees charged by the payment provider. Without them, your fee rule is used.", [
         "transactionfees",
@@ -105,6 +131,8 @@ export const IMPORT_KINDS: Record<ImportKind, KindDef> = {
       f("refunded_at", "Refund date", false, "When the refund was made. Without it, the refund is dated to the order and marked as estimated.", [
         "refundedat",
         "refunddate",
+        "dateduremboursement",
+        "datederemboursement",
       ]),
       f("unit_cost", "Unit cost", false, "What one unit cost you. Stored with the line, so later cost changes do not rewrite this order.", [
         "costperitem",
@@ -113,9 +141,10 @@ export const IMPORT_KINDS: Record<ImportKind, KindDef> = {
         "cost",
         "cogs",
         "coutunitaire",
+        "prixdachat",
       ]),
       f("currency", "Currency", false, "Checked against your store currency.", ["currency", "devise"]),
-      f("cancelled_at", "Cancelled at", false, "Cancelled orders can be skipped.", ["cancelledat", "canceledat", "cancelled", "canceled"]),
+      f("cancelled_at", "Cancelled at", false, "Cancelled orders can be skipped.", ["cancelledat", "canceledat", "cancelled", "canceled", "datedannulation"]),
     ],
     template: [
       ["Order number", "Order date", "Product name", "SKU", "Quantity", "Unit price", "Line discount", "Shipping charged", "Taxes", "Shipping cost", "Payment fees", "Refunded amount"],
@@ -123,13 +152,19 @@ export const IMPORT_KINDS: Record<ImportKind, KindDef> = {
       ["#1001", "2026-03-02 10:15", "Organic cotton tee", "TEE-01", "1", "29.00", "2.90", "", "", "", "", ""],
       ["#1002", "2026-03-02 16:40", "Ceramic pour-over set", "POUR-01", "1", "45.00", "0", "0", "0", "", "", "45.00"],
     ],
+    templateFr: [
+      ["Numéro de commande", "Date de commande", "Nom du produit", "Référence", "Quantité", "Prix unitaire", "Remise sur la ligne", "Frais de port facturés", "TVA", "Coût d'expédition", "Frais de paiement", "Montant remboursé"],
+      ["#1001", "14/03/2026 10:15", "Tote bag en lin", "TOTE-01", "2", "24,00", "0", "4,90", "0", "5,50", "1,10", "0"],
+      ["#1001", "14/03/2026 10:15", "T-shirt en coton bio", "TEE-01", "1", "29,00", "2,90", "", "", "", "", ""],
+      ["#1002", "14/03/2026 16:40", "Set café filtre en céramique", "POUR-01", "1", "45,00", "0", "0", "0", "", "", "45,00"],
+    ],
   },
   products: {
     kind: "products",
     label: "Products and costs",
     description: "Your catalogue with unit costs. Shopify product exports are recognised automatically.",
     fields: [
-      f("name", "Product name", true, "Product (and variant) name.", ["title", "productname", "name", "product", "nom", "produit"]),
+      f("name", "Product name", true, "Product (and variant) name.", ["title", "productname", "name", "product", "nom", "produit", "nomduproduit", "designation"]),
       f("sku", "SKU", false, "Strongly recommended: order lines are matched to products by SKU.", ["variantsku", "sku", "reference", "ref"]),
       f("unit_cost", "Unit cost", false, "What one unit costs you, excluding VAT. Up to four decimals.", [
         "costperitem",
@@ -140,7 +175,7 @@ export const IMPORT_KINDS: Record<ImportKind, KindDef> = {
         "prixdachat",
         "cout",
       ]),
-      f("price", "Selling price", false, "Current selling price, for reference.", ["variantprice", "price", "sellingprice", "prix"]),
+      f("price", "Selling price", false, "Current selling price, for reference.", ["variantprice", "price", "sellingprice", "prixdevente", "prix"]),
       f("handle", "Handle", false, "Shopify product handle: names variant rows that leave the title empty.", ["handle"]),
       f("option1", "Variant option 1", false, "Shopify variant option value, added to the name.", ["option1value"]),
       f("option2", "Variant option 2", false, "Shopify variant option value, added to the name.", ["option2value"]),
@@ -152,6 +187,12 @@ export const IMPORT_KINDS: Record<ImportKind, KindDef> = {
       ["Organic cotton tee", "TEE-01", "9.4500", "29.00"],
       ["Ceramic pour-over set", "POUR-01", "14.20", "45.00"],
     ],
+    templateFr: [
+      ["Nom", "Référence", "Prix d'achat", "Prix de vente"],
+      ["Tote bag en lin", "TOTE-01", "6,80", "24,00"],
+      ["T-shirt en coton bio", "TEE-01", "9,4500", "29,00"],
+      ["Set café filtre en céramique", "POUR-01", "14,20", "45,00"],
+    ],
   },
   ad_spend: {
     kind: "ad_spend",
@@ -160,9 +201,9 @@ export const IMPORT_KINDS: Record<ImportKind, KindDef> = {
     fields: [
       f("date", "Day", true, "The day of the spend. Export your report with a breakdown by day.", ["day", "date", "reportingstarts", "jour"]),
       f("campaign", "Campaign", true, "Campaign name.", ["campaignname", "campaign", "campagne", "nomdelacampagne"]),
-      f("campaign_id", "Campaign ID", false, "Platform campaign ID; keeps a campaign matched when it is renamed.", ["campaignid", "idcampagne"]),
+      f("campaign_id", "Campaign ID", false, "Platform campaign ID; keeps a campaign matched when it is renamed.", ["campaignid", "idcampagne", "iddecampagne", "iddelacampagne"]),
       f("platform", "Platform", false, "Meta, Google, TikTok… Without it, the platform chosen below is used.", ["platform", "network", "channel", "source", "plateforme"]),
-      f("spend", "Spend", true, "Amount spent that day, excluding VAT.", ["amountspent", "spend", "cost", "montantdepense", "depense", "cout"]),
+      f("spend", "Spend", true, "Amount spent that day, excluding VAT.", ["amountspent", "spend", "cost", "montantdepense", "depense", "depenses", "cout"]),
       f("impressions", "Impressions", false, "", ["impressions", "impr"]),
       f("clicks", "Clicks", false, "", ["linkclicks", "clicks", "clicksall", "clics"]),
       f("conversions", "Conversions", false, "As reported by the platform.", ["conversions", "purchases", "results", "conv", "websitepurchases", "achats"]),
@@ -181,6 +222,11 @@ export const IMPORT_KINDS: Record<ImportKind, KindDef> = {
       ["2026-03-01", "Prospecting – broad audiences", "Meta", "42.10", "8120", "164", "3", "96.00"],
       ["2026-03-01", "Search – brand", "Google", "12.80", "910", "77", "4", "141.50"],
     ],
+    templateFr: [
+      ["Jour", "Campagne", "Plateforme", "Dépense", "Impressions", "Clics", "Conversions", "Valeur de conversion"],
+      ["15/03/2026", "Prospection – audiences larges", "Meta", "42,10", "8120", "164", "3", "96,00"],
+      ["15/03/2026", "Recherche – marque", "Google", "12,80", "910", "77", "4", "141,50"],
+    ],
   },
   expenses: {
     kind: "expenses",
@@ -188,9 +234,20 @@ export const IMPORT_KINDS: Record<ImportKind, KindDef> = {
     description: "Other costs: packaging, subscriptions, marketplace commissions, rent.",
     fields: [
       f("date", "Date", true, "When the cost was incurred.", ["date", "incurredon", "day", "jour"]),
-      f("amount", "Amount", true, "Amount excluding VAT.", ["amount", "montant", "total", "cost", "cout"]),
+      f("amount", "Amount", true, "Amount excluding VAT.", ["amount", "montant", "montantht", "total", "cost", "cout"]),
       f("category", "Category", false, "Packaging, software, rent… Without it, the category chosen below is used.", ["category", "categorie", "type"]),
-      f("kind", "Fixed or variable", false, "'fixed' or 'variable'. Without it, each category's usual kind is used.", ["kind", "costtype", "nature", "fixedvariable"]),
+      // "type" comes after the category's own "type" synonym: a lone "Type" column is still read as the category.
+      f("kind", "Fixed or variable", false, "'fixed' or 'variable'. Without it, each category's usual kind is used.", [
+        "kind",
+        "costtype",
+        "nature",
+        "fixedvariable",
+        "fixedorvariable",
+        "fixeouvariable",
+        "typedecout",
+        "typededepense",
+        "type",
+      ]),
       f("description", "Description", false, "", ["description", "label", "memo", "libelle", "note", "details"]),
     ],
     template: [
@@ -198,8 +255,36 @@ export const IMPORT_KINDS: Record<ImportKind, KindDef> = {
       ["2026-03-01", "software", "fixed", "29.00", "Email marketing tool"],
       ["2026-03-04", "packaging", "variable", "86.40", "Mailer boxes, 200 pcs"],
     ],
+    templateFr: [
+      ["Date", "Catégorie", "Type", "Montant", "Description"],
+      ["15/03/2026", "logiciel", "fixe", "29,00", "Outil d'e-mailing"],
+      ["18/03/2026", "emballage", "variable", "86,40", "Cartons d'expédition, 200 pièces"],
+    ],
   },
 };
+
+const TEMPLATE_SLUGS_FR: Record<ImportKind, string> = {
+  orders: "commandes",
+  products: "produits",
+  ad_spend: "depenses-publicitaires",
+  expenses: "depenses",
+};
+
+/**
+ * Template file for an import kind. The English one uses commas and decimal
+ * points; the French one uses semicolons and decimal commas, so Excel set to
+ * French opens it in columns. Both start with a UTF-8 BOM and use CRLF.
+ */
+export function templateFile(kind: ImportKind, locale: Locale = "en"): { fileName: string; csv: string } {
+  const def = IMPORT_KINDS[kind];
+  const fr = locale === "fr";
+  const [header, ...rows] = fr ? def.templateFr : def.template;
+  const separator: CsvSeparator = fr ? ";" : ",";
+  return {
+    fileName: fr ? `narixia-modele-${TEMPLATE_SLUGS_FR[kind]}.csv` : `narixia-${kind.replace("_", "-")}-template.csv`,
+    csv: toCsv(header, rows, separator),
+  };
+}
 
 /** Label and description of an import kind in a language. */
 export function kindCopy(kind: ImportKind, locale: Locale = "en"): { label: string; description: string } {
