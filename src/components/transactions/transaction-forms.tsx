@@ -11,6 +11,7 @@ import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { toast } from "@/components/ui/toaster";
 import { EXPENSE_CATEGORIES, expenseCategoryLabel, expenseKindLabel, type ExpenseCategory, type ExpenseKind } from "@/lib/domain/types";
 import { currencySymbol } from "@/lib/finance/currency";
+import { toInputDecimal } from "@/lib/finance/input";
 import { minorToInputValue } from "@/lib/finance/money";
 import { createExpense, createManualOrder, createRefund, deleteExpense, deleteOrder, deleteRefund, updateOrderCosts } from "@/lib/transactions/actions";
 import { useLocale } from "@/i18n/client";
@@ -221,17 +222,21 @@ export function AddOrderDialog({
   pricesIncludeTax,
   products,
   disabled,
+  defaultOpen = false,
 }: {
   currency: string;
   defaultDate: string;
   pricesIncludeTax: boolean;
   products: { id: string; name: string; sku: string | null; price_minor: number | null }[];
   disabled: boolean;
+  /** Open on arrival, e.g. from the empty overview's "Enter a sale manually" (/app/transactions?tab=orders&new=1). */
+  defaultOpen?: boolean;
 }) {
   const id = useId();
-  const t = useMessages();
+  const locale = useLocale();
+  const t = transactionsMessages[locale];
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen && !disabled);
   const blank = { orderNumber: "", date: defaultDate, time: "12:00", shippingCharged: "", taxes: "", shippingCost: "", fees: "" };
   const [v, setV] = useState(blank);
   const [lines, setLines] = useState<Line[]>([blankLine()]);
@@ -305,7 +310,7 @@ export function AddOrderDialog({
                     value={l.productId}
                     onChange={(e) => {
                       const p = products.find((x) => x.id === e.target.value);
-                      setLine(i, { productId: e.target.value, unitPrice: p?.price_minor != null && !l.unitPrice ? minorToInputValue(p.price_minor, currency) : l.unitPrice });
+                      setLine(i, { productId: e.target.value, unitPrice: p?.price_minor != null && !l.unitPrice ? toInputDecimal(minorToInputValue(p.price_minor, currency), locale) : l.unitPrice });
                     }}
                   >
                     <option value="">{t.newProductOption}</option>
@@ -440,10 +445,11 @@ export function OrderCostsForm({
   disabled: boolean;
 }) {
   const id = useId();
-  const t = useMessages();
+  const locale = useLocale();
+  const t = transactionsMessages[locale];
   const [v, setV] = useState({
-    shippingCost: shippingCostMinor === null ? "" : minorToInputValue(shippingCostMinor, currency),
-    fees: feesMinor === null ? "" : minorToInputValue(feesMinor, currency),
+    shippingCost: shippingCostMinor === null ? "" : toInputDecimal(minorToInputValue(shippingCostMinor, currency), locale),
+    fees: feesMinor === null ? "" : toInputDecimal(minorToInputValue(feesMinor, currency), locale),
   });
   const { errors, formError, apply } = useFormState();
   const [pending, startTransition] = useTransition();

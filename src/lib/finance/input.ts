@@ -1,6 +1,6 @@
 import { INTL_LOCALE, type Locale } from "@/i18n/config";
 import { inputMessages } from "@/i18n/messages/catalog-input";
-import { detectDecimalSeparator, parseDecimal, rescale } from "./decimal";
+import { detectDecimalSeparator, parseDecimal, rescale, type DecimalSeparator } from "./decimal";
 import { parseAmountToMinor, parseUnitCostToE4 } from "./money";
 
 /**
@@ -59,4 +59,22 @@ export function parseUserInteger(value: string, options: { optional?: boolean; m
 /** Basis points to an editable percentage string: 290 -> "2.9". */
 export function bpsToInputValue(bps: number): string {
   return (bps / 100).toFixed(2).replace(/\.?0+$/, "");
+}
+
+const DECIMAL_SEPARATOR: Record<Locale, DecimalSeparator> = { en: ".", fr: "," };
+
+/**
+ * A stored decimal ("11.20", as returned by minorToInputValue, e4ToInputValue
+ * or bpsToInputValue) written with the interface language's decimal separator
+ * for an editable field: "11,20" in French. No thousands separators are added.
+ *
+ * Parsing is unchanged: the separator of a typed value is inferred, so the
+ * value reads back as the same number. A comma value that could pass for a
+ * thousands group ("1,125") gets a trailing zero ("1,1250") to stay
+ * unambiguous.
+ */
+export function toInputDecimal(value: string, locale: Locale): string {
+  if (DECIMAL_SEPARATOR[locale] === "." || !/^-?\d+\.\d+$/.test(value)) return value;
+  const comma = value.replace(".", ",");
+  return detectDecimalSeparator([comma]) === "," ? comma : `${comma}0`;
 }

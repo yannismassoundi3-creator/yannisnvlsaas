@@ -53,7 +53,20 @@ export function ForgotPasswordForm() {
     <form onSubmit={onSubmit} noValidate className="space-y-4">
       {error ? <Alert tone="negative">{error}</Alert> : null}
       <Field htmlFor="email" label={t.email}>
-        <Input id="email" type="email" autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+        <Input
+          id="email"
+          type="email"
+          autoComplete="email"
+          inputMode="email"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            // The validation message goes away once the address is valid.
+            if (isEmailValid(e.target.value.trim())) setError((current) => (current === t.invalidEmail ? null : current));
+          }}
+          required
+          autoFocus
+        />
       </Field>
       <Button type="submit" className="w-full" size="lg" loading={pending}>
         {t.forgot.submit}
@@ -78,6 +91,13 @@ export function ResetPasswordForm() {
       .auth.getUser()
       .then(({ data }) => setReady(data.user ? "ok" : "no-session"));
   }, []);
+
+  /** Removes a validation message shown on submit once the passwords satisfy it. */
+  function revalidate(nextPassword: string, nextConfirm: string) {
+    setError((current) =>
+      (current === t.passwordInvalid && isPasswordValid(nextPassword)) || (current === t.mismatch && nextPassword === nextConfirm) ? null : current,
+    );
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -108,7 +128,18 @@ export function ResetPasswordForm() {
     <form onSubmit={onSubmit} noValidate className="space-y-4">
       {error ? <Alert tone="negative">{error}</Alert> : null}
       <Field htmlFor="password" label={t.newPassword}>
-        <PasswordInput id="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} aria-describedby="password-rules" required autoFocus />
+        <PasswordInput
+          id="password"
+          autoComplete="new-password"
+          value={password}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            revalidate(e.target.value, confirm);
+          }}
+          aria-describedby="password-rules"
+          required
+          autoFocus
+        />
       </Field>
       <ul id="password-rules" className="-mt-1 space-y-1 text-xs">
         {checks.map((c) => (
@@ -119,7 +150,16 @@ export function ResetPasswordForm() {
         ))}
       </ul>
       <Field htmlFor="confirm" label={t.confirmPassword}>
-        <PasswordInput id="confirm" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+        <PasswordInput
+          id="confirm"
+          autoComplete="new-password"
+          value={confirm}
+          onChange={(e) => {
+            setConfirm(e.target.value);
+            revalidate(password, e.target.value);
+          }}
+          required
+        />
       </Field>
       <Button type="submit" className="w-full" size="lg" loading={pending}>
         {t.submit}
@@ -179,7 +219,17 @@ export function ResendConfirmation() {
       <form onSubmit={confirmWithCode} noValidate className="space-y-3 rounded-md border border-line bg-sunken/60 p-4">
         <p className="text-sm text-ink-2">{c.prompt}</p>
         <Field htmlFor="confirm-code" label={c.label} error={codeError}>
-          <CodeInput id="confirm-code" value={code} onValueChange={setCode} aria-invalid={codeError ? true : undefined} aria-describedby={codeError ? "confirm-code-error" : undefined} />
+          <CodeInput
+            id="confirm-code"
+            value={code}
+            onValueChange={(value) => {
+              setCode(value);
+              // An error about the previous code no longer applies once it is edited.
+              setCodeError(null);
+            }}
+            aria-invalid={codeError ? true : undefined}
+            aria-describedby={codeError ? "confirm-code-error" : undefined}
+          />
         </Field>
         <Button type="submit" className="w-full" loading={verifying}>
           {c.submit}

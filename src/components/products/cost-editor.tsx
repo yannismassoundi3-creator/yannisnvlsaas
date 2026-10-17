@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toaster";
 import { currencySymbol } from "@/lib/finance/currency";
+import { toInputDecimal } from "@/lib/finance/input";
 import { e4ToInputValue } from "@/lib/finance/money";
 import { updateProductCost } from "@/lib/products/actions";
 import { useFormat, useLocale } from "@/i18n/client";
@@ -17,13 +18,14 @@ type Props = { productId: string; productName: string; unitCostE4: number | null
 
 /** Unit cost shown in the products table, editable in place. Missing costs are always visible. */
 export function CostEditor({ productId, productName, unitCostE4, currency, disabled = false }: Props) {
+  const locale = useLocale();
+  const editValue = () => (unitCostE4 === null ? "" : toInputDecimal(e4ToInputValue(unitCostE4), locale));
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(unitCostE4 === null ? "" : e4ToInputValue(unitCostE4));
+  const [value, setValue] = useState(editValue);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const id = useId();
-  const locale = useLocale();
   const t = productsMessages[locale];
   const c = catalogCommon[locale];
   const f = useFormat();
@@ -48,7 +50,7 @@ export function CostEditor({ productId, productName, unitCostE4, currency, disab
         type="button"
         disabled={disabled}
         onClick={() => {
-          setValue(unitCostE4 === null ? "" : e4ToInputValue(unitCostE4));
+          setValue(editValue());
           setEditing(true);
         }}
         className="group inline-flex items-center gap-1.5 rounded-sm px-1 py-0.5 text-right hover:bg-hover focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:outline-none disabled:pointer-events-none"

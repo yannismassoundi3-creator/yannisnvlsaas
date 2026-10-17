@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { bpsToInputValue, parseUserAmount, parseUserInteger, parseUserPercentToBps, parseUserUnitCost } from "@/lib/finance/input";
+import { bpsToInputValue, parseUserAmount, parseUserInteger, parseUserPercentToBps, parseUserUnitCost, toInputDecimal } from "@/lib/finance/input";
+import { e4ToInputValue, minorToInputValue } from "@/lib/finance/money";
 
 describe("form input parsing", () => {
   it("accepts both decimal conventions", () => {
@@ -58,5 +59,43 @@ describe("form input parsing", () => {
     expect(bpsToInputValue(150)).toBe("1.5");
     expect(bpsToInputValue(1000)).toBe("10");
     expect(bpsToInputValue(1)).toBe("0.01");
+  });
+
+  describe("editable values in the interface language", () => {
+    it("uses a decimal comma in French and leaves English as stored", () => {
+      expect(toInputDecimal("0.25", "fr")).toBe("0,25");
+      expect(toInputDecimal("5.50", "fr")).toBe("5,50");
+      expect(toInputDecimal("11.20", "fr")).toBe("11,20");
+      expect(toInputDecimal("1.5", "fr")).toBe("1,5");
+      expect(toInputDecimal("1234.56", "fr")).toBe("1234,56"); // never a thousands separator
+      expect(toInputDecimal("40", "fr")).toBe("40");
+      expect(toInputDecimal("", "fr")).toBe("");
+      expect(toInputDecimal("9.99", "en")).toBe("9.99");
+    });
+
+    it("keeps three-decimal values from reading as thousands", () => {
+      expect(toInputDecimal("0.045", "fr")).toBe("0,045");
+      expect(toInputDecimal("1.125", "fr")).toBe("1,1250");
+      expect(toInputDecimal("12.500", "fr")).toBe("12,5000");
+    });
+
+    it("reads back as the same stored value", () => {
+      const amounts: [number, string][] = [
+        [25, "EUR"], [550, "EUR"], [999, "EUR"], [1120, "EUR"], [123456, "EUR"], [100000, "EUR"], [1999, "JPY"], [12500, "KWD"], [1125, "BHD"], [1234567, "KWD"],
+      ];
+      for (const [minor, currency] of amounts) {
+        for (const locale of ["en", "fr"] as const) {
+          expect(parseUserAmount(toInputDecimal(minorToInputValue(minor, currency), locale), currency)).toEqual({ ok: true, value: minor });
+        }
+      }
+      for (const e4 of [450, 2500, 11250, 112000, 99990, 12345678, 10000]) {
+        for (const locale of ["en", "fr"] as const) {
+          expect(parseUserUnitCost(toInputDecimal(e4ToInputValue(e4), locale))).toEqual({ ok: true, value: e4 });
+        }
+      }
+      for (const bps of [1, 25, 150, 290, 1000, 10_000]) {
+        expect(parseUserPercentToBps(toInputDecimal(bpsToInputValue(bps), "fr"))).toEqual({ ok: true, value: bps });
+      }
+    });
   });
 });

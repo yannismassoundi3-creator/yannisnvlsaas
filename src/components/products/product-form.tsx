@@ -10,6 +10,7 @@ import { describedBy, Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toaster";
 import { currencySymbol } from "@/lib/finance/currency";
+import { toInputDecimal } from "@/lib/finance/input";
 import { e4ToInputValue, minorToInputValue } from "@/lib/finance/money";
 import { createProduct, updateProduct } from "@/lib/products/actions";
 import { useLocale } from "@/i18n/client";
@@ -28,12 +29,13 @@ type FormProps = {
 
 export function ProductForm({ currency, initial, productId, onDone, submitLabel, disabled = false }: FormProps) {
   const id = useId();
-  const t = productsMessages[useLocale()];
+  const locale = useLocale();
+  const t = productsMessages[locale];
   const [values, setValues] = useState<Values>({
     name: initial?.name ?? "",
     sku: initial?.sku ?? "",
-    unitCost: initial?.unitCostE4 != null ? e4ToInputValue(initial.unitCostE4) : "",
-    price: initial?.priceMinor != null ? minorToInputValue(initial.priceMinor, currency) : "",
+    unitCost: initial?.unitCostE4 != null ? toInputDecimal(e4ToInputValue(initial.unitCostE4), locale) : "",
+    price: initial?.priceMinor != null ? toInputDecimal(minorToInputValue(initial.priceMinor, currency), locale) : "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);

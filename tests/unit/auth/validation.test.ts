@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import { onboardingMessages } from "@/i18n/messages/auth-onboarding";
 import { authErrorMessage, isPasswordValid, passwordChecks } from "@/lib/auth/validation";
 import { displayStore, type Store } from "@/lib/auth/workspace";
-import { currencyLabel, timezoneLabel } from "@/lib/locale-lists";
-import { platformName, PLATFORMS } from "@/lib/onboarding/constants";
+import { currencyLabel, timezoneLabel, timezoneOptions, utcOffsetLabel } from "@/lib/locale-lists";
+import { platformName, PLATFORMS, pricesIncludeTaxFor, TAX_CHOICES } from "@/lib/onboarding/constants";
 
 describe("passwordChecks", () => {
   it("keeps the English rules by default", () => {
@@ -41,6 +41,13 @@ describe("authErrorMessage", () => {
 });
 
 describe("onboarding option labels", () => {
+  it("offers a no-VAT answer that stores prices as collected (flag off, like tax added on top)", () => {
+    expect(TAX_CHOICES).toEqual(["yes", "no", "none"]);
+    expect(pricesIncludeTaxFor("yes")).toBe(true);
+    expect(pricesIncludeTaxFor("no")).toBe(false);
+    expect(pricesIncludeTaxFor("none")).toBe(false);
+  });
+
   it("translates only the non-brand platform name", () => {
     expect(platformName("shopify", "fr")).toBe("Shopify");
     expect(platformName("other")).toBe("Other or custom");
@@ -75,11 +82,30 @@ describe("onboarding option labels", () => {
     expect(currencyLabel("EUR", "fr")).toBe("EUR — euro");
   });
 
-  it("keeps the time zone identifier and adds its localized name", () => {
-    expect(timezoneLabel("America/New_York")).toBe("America/New York (Eastern Time)");
-    expect(timezoneLabel("America/New_York", "fr")).toMatch(/^America\/New York \(heure de l.Est/);
+  it("labels time zones with the identifier and UTC offset only", () => {
+    const winter = new Date("2026-01-15T12:00:00Z");
+    const summer = new Date("2026-07-15T12:00:00Z");
+    expect(timezoneLabel("America/New_York", { at: winter })).toBe("America/New York (UTC−05:00)");
+    expect(timezoneLabel("Europe/Paris", { at: summer })).toBe("Europe/Paris (UTC+02:00)");
+    expect(timezoneLabel("Asia/Kolkata", { at: summer })).toBe("Asia/Kolkata (UTC+05:30)");
+    expect(timezoneLabel("Africa/Abidjan", { at: summer })).toBe("Africa/Abidjan (UTC)");
     expect(timezoneLabel("UTC")).toBe("UTC");
-    expect(timezoneLabel("Not/AZone", "fr")).toBe("Not/AZone");
+    expect(timezoneLabel("Europe/Paris", { offset: false })).toBe("Europe/Paris");
+    expect(timezoneLabel("Not/AZone")).toBe("Not/AZone");
+  });
+
+  it("never uses localized zone names, which differ between ICU versions", () => {
+    // Node and browsers named this zone "Scoresbysund" or "Ittoqqortoormiit", breaking hydration.
+    expect(timezoneLabel("America/Scoresbysund", { at: new Date("2026-01-15T12:00:00Z") })).toMatch(/^America\/Scoresbysund \(UTC−0[12]:00\)$/);
+    expect(utcOffsetLabel("Not/AZone")).toBeNull();
+  });
+
+  it("lists time zones with UTC first, then alphabetically", () => {
+    const list = timezoneOptions(["Europe/Paris"]);
+    expect(list[0]).toBe("UTC");
+    expect(list).toContain("Europe/Paris");
+    expect(new Set(list).size).toBe(list.length);
+    expect(list.slice(1)).toEqual([...list.slice(1)].sort((a, b) => a.localeCompare(b, "en")));
   });
 });
 

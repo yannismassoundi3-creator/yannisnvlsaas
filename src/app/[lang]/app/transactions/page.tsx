@@ -65,7 +65,14 @@ async function Transactions({ searchParams }: { searchParams: PageProps<"/[lang]
         <>
           <DateRangePicker pathname="/app/transactions" preserve={{ tab }} range={period.range} preset={period.preset} today={period.today} historyStart={period.historyStart} />
           {tab === "orders" ? (
-            <AddOrderDialog currency={store.currency} defaultDate={period.today} pricesIncludeTax={store.prices_include_tax} products={await listProductOptions(store)} disabled={!canWrite} />
+            <AddOrderDialog
+              currency={store.currency}
+              defaultDate={period.today}
+              pricesIncludeTax={store.prices_include_tax}
+              products={await listProductOptions(store)}
+              disabled={!canWrite}
+              defaultOpen={first(sp.new) === "1"}
+            />
           ) : tab === "refunds" ? (
             <AddRefundDialog currency={store.currency} defaultDate={period.today} disabled={!canWrite} />
           ) : (

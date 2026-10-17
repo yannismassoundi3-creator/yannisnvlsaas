@@ -9,7 +9,7 @@ import { Input, NativeSelect } from "@/components/ui/input";
 import { TermTip } from "@/components/ui/overlay";
 import { calculateProfitability, validateCalculatorInput, type Adjustment, type CalculatorInput } from "@/lib/finance/calculator";
 import { COMMON_CURRENCIES, currencySymbol } from "@/lib/finance/currency";
-import { parseUserAmount, parseUserInteger, parseUserPercentToBps, parseUserUnitCost } from "@/lib/finance/input";
+import { parseUserAmount, parseUserInteger, parseUserPercentToBps, parseUserUnitCost, toInputDecimal } from "@/lib/finance/input";
 import { definitionsFor } from "@/lib/finance/metrics";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/config";
@@ -49,6 +49,14 @@ const EXAMPLE: FormState = {
   advertising: "600",
   other: "50",
 };
+
+/** The example in the interface language's number format ("1,5" in French). */
+function exampleFor(locale: Locale, currency: string): FormState {
+  const decimals = ["sellingPrice", "unitCost", "discount", "refunds", "feePercent", "feeFixed", "shipping", "advertising", "other"] as const;
+  const form: FormState = { ...EXAMPLE, currency };
+  for (const key of decimals) form[key] = toInputDecimal(EXAMPLE[key], locale);
+  return form;
+}
 
 type Errors = Partial<Record<keyof FormState, string>>;
 
@@ -110,7 +118,7 @@ export function ProfitCalculator({ defaultCurrency = "EUR", className }: { defau
   const t = calculatorUi[locale];
   const fmt = useFormat();
   const definitions = definitionsFor(locale);
-  const [form, setForm] = useState<FormState>({ ...EXAMPLE, currency: defaultCurrency });
+  const [form, setForm] = useState<FormState>(() => exampleFor(locale, defaultCurrency));
   const { input, errors } = useMemo(() => parseForm(form, locale), [form, locale]);
   const result = useMemo(() => (input ? calculateProfitability(input, locale) : null), [input, locale]);
   const set = (key: keyof FormState) => (value: string) => setForm((f) => ({ ...f, [key]: value }));
@@ -131,7 +139,7 @@ export function ProfitCalculator({ defaultCurrency = "EUR", className }: { defau
               ))}
             </NativeSelect>
           </Field>
-          <Button type="button" variant="ghost" size="sm" onClick={() => setForm({ ...EXAMPLE, currency: form.currency })}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setForm(exampleFor(locale, form.currency))}>
             <RotateCcw aria-hidden />
             {t.reset}
           </Button>

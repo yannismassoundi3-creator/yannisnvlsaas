@@ -141,6 +141,11 @@ async function Overview({ searchParams }: { searchParams: Promise<SearchParams> 
                   <Button asChild>
                     <Link href={"/app/imports/new?kind=orders" as Route}>{t.importOrders}</Link>
                   </Button>
+                  {ws.entitlements.canWrite ? (
+                    <Button variant="secondary" asChild>
+                      <Link href={"/app/transactions?tab=orders&new=1" as Route}>{t.enterSaleManually}</Link>
+                    </Button>
+                  ) : null}
                   {!store.is_demo ? <SampleStoreButton demoStoreId={demoStore?.id ?? null} /> : null}
                 </>
               }

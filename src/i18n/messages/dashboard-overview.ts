@@ -15,6 +15,7 @@ export const overviewMessages = defineMessages({
     noSalesBody:
       "Start with an order export: the dashboard, product margins and insights are built from it. Want to look around first? The sample store shows every view with fictional data.",
     importOrders: "Import orders",
+    enterSaleManually: "Enter a sale manually",
     deltaContext: (days: number) => `vs previous ${days === 1 ? "day" : `${days} days`}`,
     noOrdersTitle: "No orders in this period",
     showAllOrders: "Show all recorded orders",
@@ -56,6 +57,7 @@ export const overviewMessages = defineMessages({
     noSalesBody:
       "Commencez par un export de commandes : le tableau de bord, les marges par produit et les observations en sont tirés. Envie de faire le tour d'abord ? La boutique exemple présente chaque vue avec des données fictives.",
     importOrders: "Importer des commandes",
+    enterSaleManually: "Saisir une vente à la main",
     deltaContext: (days: number) => `vs ${days === 1 ? "jour précédent" : `${days} jours précédents`}`,
     noOrdersTitle: "Aucune commande sur cette période",
     showAllOrders: "Afficher toutes les commandes enregistrées",
