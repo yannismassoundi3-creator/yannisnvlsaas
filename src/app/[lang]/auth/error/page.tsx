@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t.metaTitle, robots: { index: false } };
 }
 
-const REASONS = ["expired", "invalid", "missing"] as const;
+const REASONS = ["expired", "invalid", "missing", "confirmed"] as const;
 
 async function Message({ searchParams, locale }: { searchParams: Promise<{ reason?: string }>; locale: Locale }) {
   const { reason } = await searchParams;

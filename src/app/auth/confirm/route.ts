@@ -35,7 +35,10 @@ export async function GET(request: NextRequest) {
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) redirect(next as Route);
-    redirect("/auth/error?reason=invalid");
+    // Supabase only redirects here with a code after verifying the email link. The
+    // exchange fails when the link is opened in another browser (no PKCE verifier
+    // cookie): a sign-up is then confirmed, and the user only needs to sign in.
+    redirect(`/auth/error?reason=${next === "/onboarding" ? "confirmed" : "invalid"}`);
   }
 
   redirect("/auth/error?reason=missing");
