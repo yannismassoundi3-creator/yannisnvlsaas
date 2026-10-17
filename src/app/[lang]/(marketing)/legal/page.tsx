@@ -32,10 +32,13 @@ export default async function LegalNoticePage() {
                 <th>{t.address}</th>
                 <td>{c.address ?? missing}</td>
               </tr>
-              <tr>
-                <th>{t.registration}</th>
-                <td>{c.registration ?? missing}</td>
-              </tr>
+              {/* Shown only once there is one: an individual founder awaiting a SIRET has no registration yet. */}
+              {c.registration ? (
+                <tr>
+                  <th>{t.registration}</th>
+                  <td>{c.registration}</td>
+                </tr>
+              ) : null}
               <tr>
                 <th>{t.contact}</th>
                 <td>{site.supportEmail ? <a href={`mailto:${site.supportEmail}`}>{site.supportEmail}</a> : missing}</td>

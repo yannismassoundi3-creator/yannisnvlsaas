@@ -125,6 +125,17 @@ describe("orders", () => {
     expect(r.data!.order).toMatchObject({ taxes_minor: 2000, converted_from_tax_inclusive: true });
   });
 
+  it("stores amounts as collected when no tax is charged, whatever the tax setting", () => {
+    // Sellers who charge no VAT ("I don't charge VAT" at onboarding): net equals the price collected.
+    const order = rows([{ order_number: "A-3", ordered_at: "2026-03-02", line_name: "Vase", quantity: "2", unit_price: "12.50", shipping_charged: "4.90" }]);
+    const [included] = normalizeRows("orders", order, opts({ pricesIncludeTax: true }), ctx);
+    const [excluded] = normalizeRows("orders", order, opts({ pricesIncludeTax: false }), ctx);
+    expect(excluded.data!.line).toMatchObject({ gross_minor: 2500, discount_minor: 0 });
+    expect(excluded.data!.order).toMatchObject({ shipping_charged_minor: 490, taxes_minor: 0 });
+    expect(included.data!.line).toEqual(excluded.data!.line);
+    expect({ ...(included.data!.order as Record<string, unknown>), converted_from_tax_inclusive: false }).toEqual(excluded.data!.order);
+  });
+
   it("removes tax from refunds that include it when prices do not", () => {
     const [r] = normalizeRows(
       "orders",

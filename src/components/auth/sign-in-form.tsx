@@ -45,6 +45,11 @@ export function SignInForm() {
     setCode("");
   }
 
+  /** Removes a validation message shown on submit once the field it was about is valid. */
+  function clearIfFixed(message: string, valid: boolean) {
+    if (valid) setError((current) => (current === message ? null : current));
+  }
+
   function signedIn() {
     router.replace(next as Route);
     router.refresh();
@@ -115,7 +120,10 @@ export function SignInForm() {
         autoComplete="email"
         inputMode="email"
         value={email}
-        onChange={(e) => setEmail(e.target.value)}
+        onChange={(e) => {
+          setEmail(e.target.value);
+          clearIfFixed(t.invalidEmail, isEmailValid(e.target.value.trim()));
+        }}
         readOnly={mode === "code" && codeSent}
         required
         autoFocus
@@ -148,7 +156,16 @@ export function SignInForm() {
         {emailField}
         {codeSent ? (
           <Field htmlFor="code" label={t.code.label}>
-            <CodeInput id="code" value={code} onValueChange={setCode} required autoFocus />
+            <CodeInput
+              id="code"
+              value={code}
+              onValueChange={(value) => {
+                setCode(value);
+                clearIfFixed(t.code.enterCode, value.length === CODE_LENGTH);
+              }}
+              required
+              autoFocus
+            />
           </Field>
         ) : null}
         <Button type="submit" className="w-full" size="lg" loading={pending}>
@@ -186,7 +203,16 @@ export function SignInForm() {
           </Link>
         }
       >
-        <PasswordInput id="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <PasswordInput
+          id="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            clearIfFixed(t.signIn.enterPassword, e.target.value !== "");
+          }}
+          required
+        />
       </Field>
       <Button type="submit" className="w-full" size="lg" loading={pending}>
         {t.signIn.submit}

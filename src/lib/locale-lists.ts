@@ -15,7 +15,8 @@ export function otherCurrencies(): string[] {
 export function timezoneOptions(extra: string[] = []): string[] {
   const intl = Intl as IntlWithValues;
   const list = intl.supportedValuesOf ? intl.supportedValuesOf("timeZone") : ["Europe/Paris", "Europe/London", "America/New_York"];
-  return [...new Set(["UTC", ...extra.filter(Boolean), ...list])].sort((a, b) => (a === "UTC" ? -1 : b === "UTC" ? 1 : a.localeCompare(b)));
+  // A fixed collation, so the order does not depend on the runtime's default language.
+  return [...new Set(["UTC", ...extra.filter(Boolean), ...list])].sort((a, b) => (a === "UTC" ? -1 : b === "UTC" ? 1 : a.localeCompare(b, "en")));
 }
 
 /** Currency picker label in the interface language: "EUR — Euro" / "USD — dollar des États-Unis". */
@@ -23,29 +24,42 @@ export function currencyLabel(code: string, locale: Locale = "en"): string {
   return `${code} — ${currencyName(code, INTL_LOCALE[locale])}`;
 }
 
-const zoneNameCache = new Map<string, string | null>();
+const offsetFormatters = new Map<string, Intl.DateTimeFormat | null>();
 
-/** Generic name of a time zone in a language ("Central European Time", "heure d’Europe centrale"), or null. */
-function zoneName(tz: string, locale: Locale): string | null {
-  const key = `${locale}:${tz}`;
-  if (!zoneNameCache.has(key)) {
-    let name: string | null = null;
+/** UTC offset of a time zone at an instant: "UTC+02:00", "UTC−03:30", or "UTC" for zero. Null for an unknown zone. */
+export function utcOffsetLabel(tz: string, at: Date = new Date()): string | null {
+  if (!offsetFormatters.has(tz)) {
+    let formatter: Intl.DateTimeFormat | null = null;
     try {
-      const parts = new Intl.DateTimeFormat(INTL_LOCALE[locale], { timeZone: tz, timeZoneName: "longGeneric" }).formatToParts(new Date(0));
-      name = parts.find((p) => p.type === "timeZoneName")?.value ?? null;
+      // "en-US" with "longOffset" always yields "GMT", "GMT+02:00" or "GMT-03:30", whatever the interface language.
+      formatter = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "longOffset" });
     } catch {
-      name = null;
+      formatter = null;
     }
-    // Offsets ("GMT+03:00") and raw identifiers add nothing to the identifier itself.
-    if (name && (/^(GMT|UTC)([+\-−]|$)/.test(name) || name === tz)) name = null;
-    zoneNameCache.set(key, name);
+    offsetFormatters.set(tz, formatter);
   }
-  return zoneNameCache.get(key) ?? null;
+  const formatter = offsetFormatters.get(tz);
+  const raw = formatter?.formatToParts(at).find((p) => p.type === "timeZoneName")?.value;
+  const match = raw?.match(/^GMT(?:([+-])(\d{2}):(\d{2}))?$/);
+  if (!match) return null;
+  const [, sign, hours, minutes] = match;
+  return sign ? `UTC${sign === "-" ? "−" : "+"}${hours}:${minutes}` : "UTC";
 }
 
-/** Time zone picker label: the IANA identifier followed by its name in the interface language. */
-export function timezoneLabel(tz: string, locale: Locale = "en"): string {
+/**
+ * Time zone picker label: the IANA identifier and its current UTC offset,
+ * "Europe/Paris (UTC+02:00)", or the identifier alone with `offset: false`.
+ *
+ * Localised zone names ("heure : Scoresbysund") are deliberately not used:
+ * they come from the runtime's ICU data, whose wording differs between Node
+ * and browsers ("Ittoqqortoormiit"), so server and browser renders disagreed.
+ * The offset depends on the runtime's time zone rules and the current date,
+ * so pages that server-render the picker show it once hydrated (see
+ * StoreSettingsForm).
+ */
+export function timezoneLabel(tz: string, options: { offset?: boolean; at?: Date } = {}): string {
   const id = tz.replaceAll("_", " ");
-  const name = zoneName(tz, locale);
-  return name ? `${id} (${name})` : id;
+  if (options.offset === false) return id;
+  const offset = utcOffsetLabel(tz, options.at);
+  return offset && offset !== id ? `${id} (${offset})` : id;
 }

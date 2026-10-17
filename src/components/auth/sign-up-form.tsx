@@ -29,6 +29,10 @@ export function SignUpForm() {
   const [errors, setErrors] = useState<{ email?: string; password?: string; terms?: string; form?: string }>({});
   const [pending, setPending] = useState(false);
   const checks = passwordChecks(password, locale);
+  // Errors appear on submit; once a flagged field holds a valid value, its error goes away.
+  const clearIf = (key: "email" | "password" | "terms", valid: boolean) => {
+    if (valid) setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
+  };
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -71,7 +75,10 @@ export function SignUpForm() {
           autoComplete="email"
           inputMode="email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            clearIf("email", isEmailValid(e.target.value.trim()));
+          }}
           aria-invalid={errors.email ? true : undefined}
           aria-describedby={errors.email ? "email-error" : undefined}
           required
@@ -82,7 +89,10 @@ export function SignUpForm() {
           id="password"
           autoComplete="new-password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            clearIf("password", isPasswordValid(e.target.value));
+          }}
           aria-invalid={errors.password ? true : undefined}
           aria-describedby="password-rules"
           required
@@ -99,7 +109,16 @@ export function SignUpForm() {
       </ul>
       <div className="space-y-1.5">
         <div className="flex items-start gap-2.5">
-          <Checkbox id="terms" checked={accepted} onCheckedChange={(v) => setAccepted(v === true)} className="mt-0.5" aria-describedby={errors.terms ? "terms-error" : undefined} />
+          <Checkbox
+            id="terms"
+            checked={accepted}
+            onCheckedChange={(v) => {
+              setAccepted(v === true);
+              clearIf("terms", v === true);
+            }}
+            className="mt-0.5"
+            aria-describedby={errors.terms ? "terms-error" : undefined}
+          />
           <Label htmlFor="terms" className="font-normal text-ink-2">
             {t.acceptPrefix}{" "}
             <Link href={localizedPath("/terms", locale)} className="font-medium text-emerald-700 hover:underline" target="_blank">

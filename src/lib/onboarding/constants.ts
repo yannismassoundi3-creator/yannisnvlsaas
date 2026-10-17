@@ -21,3 +21,26 @@ const PLATFORM_NAMES_FR: Record<PlatformId, string> = { ...PLATFORM_NAMES, other
 export function platformName(platform: PlatformId, locale: Locale = "en"): string {
   return (locale === "fr" ? PLATFORM_NAMES_FR : PLATFORM_NAMES)[platform];
 }
+
+/**
+ * Answers to the onboarding question "Do your selling prices include VAT?":
+ * - "yes": prices include VAT, which is removed using each order's tax amount;
+ * - "no": tax is added on top at checkout;
+ * - "none": no VAT is charged at all (private sellers, VAT-exempt
+ *   micro-businesses such as French "franchise en base de TVA").
+ */
+export const TAX_CHOICES = ["yes", "no", "none"] as const;
+export type TaxChoice = (typeof TAX_CHOICES)[number];
+
+/**
+ * The store's prices_include_tax flag for an answer. "none" leaves it off like
+ * "no": amounts are stored as entered, so without tax the net is exactly the
+ * price collected (as it would also be with the flag on, since a zero tax
+ * removes nothing). Off is the label that fits these sellers (amounts
+ * "excluding tax", as on an invoice marked "TVA non applicable"), spares them
+ * the warning about a missing Taxes column on every import, and keeps any tax
+ * a marketplace adds on top out of their sales instead of deducting it.
+ */
+export function pricesIncludeTaxFor(choice: TaxChoice): boolean {
+  return choice === "yes";
+}

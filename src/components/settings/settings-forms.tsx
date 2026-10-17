@@ -2,7 +2,7 @@
 
 import { Download, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useId, useMemo, useState, useTransition } from "react";
+import { useId, useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/controls";
 import { ConfirmDialog, Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
@@ -14,13 +14,24 @@ import { LOCALE_NAMES, LOCALES, type Locale } from "@/i18n/config";
 import { useLocale } from "@/i18n/client";
 import { settingsForms } from "@/i18n/messages/account-settings";
 import { COMMON_CURRENCIES, currencySymbol } from "@/lib/finance/currency";
-import { bpsToInputValue } from "@/lib/finance/input";
+import { bpsToInputValue, toInputDecimal } from "@/lib/finance/input";
 import { minorToInputValue } from "@/lib/finance/money";
 import { currencyLabel, otherCurrencies, timezoneLabel, timezoneOptions } from "@/lib/locale-lists";
 import { platformName, PLATFORMS, type PlatformId } from "@/lib/onboarding/constants";
 import { changeEmail, changePassword, createStore, deleteAccount, deleteStore, updateLanguage, updateProfile, updateStoreSettings } from "@/lib/settings/actions";
 
 type Errors = Record<string, string>;
+
+const noSubscription = () => () => {};
+
+/** False during the server render and hydration, true afterwards (and on client-side navigations). */
+function useHydrated() {
+  return useSyncExternalStore(
+    noSubscription,
+    () => true,
+    () => false,
+  );
+}
 
 function useResult() {
   const t = settingsForms[useLocale()];
@@ -166,13 +177,19 @@ export function StoreSettingsForm({ store, disabled }: { store: StoreValues; dis
     name: store.name,
     timezone: store.timezone,
     pricesIncludeTax: store.pricesIncludeTax,
-    feePercent: store.feeRuleBps === null ? "" : bpsToInputValue(store.feeRuleBps),
-    feeFixed: store.feeRuleFixedMinor === null ? "" : minorToInputValue(store.feeRuleFixedMinor, store.currency),
-    defaultShipping: store.defaultShippingCostMinor === null ? "" : minorToInputValue(store.defaultShippingCostMinor, store.currency),
+    feePercent: store.feeRuleBps === null ? "" : toInputDecimal(bpsToInputValue(store.feeRuleBps), locale),
+    feeFixed: store.feeRuleFixedMinor === null ? "" : toInputDecimal(minorToInputValue(store.feeRuleFixedMinor, store.currency), locale),
+    defaultShipping: store.defaultShippingCostMinor === null ? "" : toInputDecimal(minorToInputValue(store.defaultShippingCostMinor, store.currency), locale),
   });
   const result = useResult();
   const [pending, startTransition] = useTransition();
-  const timezones = useMemo(() => timezoneOptions([store.timezone]), [store.timezone]);
+  // The zone list and UTC offsets come from the runtime's time zone data, which can differ between the
+  // server and the browser: the server render (and hydration) lists only the saved zone, without its offset.
+  const hydrated = useHydrated();
+  const timezones = useMemo(
+    () => (hydrated ? timezoneOptions([store.timezone]).map((tz) => ({ value: tz, label: timezoneLabel(tz) })) : [{ value: store.timezone, label: timezoneLabel(store.timezone, { offset: false }) }]),
+    [hydrated, store.timezone],
+  );
   const symbol = currencySymbol(store.currency);
 
   return (
@@ -195,8 +212,8 @@ export function StoreSettingsForm({ store, disabled }: { store: StoreValues; dis
         <Field htmlFor={`${id}-tz`} label={t.timezone} hint={t.timezoneHint} error={result.errors.timezone}>
           <NativeSelect id={`${id}-tz`} value={v.timezone} onChange={(e) => setV({ ...v, timezone: e.target.value })} disabled={disabled}>
             {timezones.map((tz) => (
-              <option key={tz} value={tz}>
-                {timezoneLabel(tz, locale)}
+              <option key={tz.value} value={tz.value}>
+                {tz.label}
               </option>
             ))}
           </NativeSelect>
@@ -303,7 +320,7 @@ export function AddStoreDialog({ disabled, reason }: { disabled: boolean; reason
             <NativeSelect id={`${id}-tz`} value={v.timezone} onChange={(e) => setV({ ...v, timezone: e.target.value })}>
               {timezones.map((tz) => (
                 <option key={tz} value={tz}>
-                  {timezoneLabel(tz, locale)}
+                  {timezoneLabel(tz)}
                 </option>
               ))}
             </NativeSelect>

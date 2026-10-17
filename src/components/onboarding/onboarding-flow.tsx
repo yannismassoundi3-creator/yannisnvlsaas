@@ -13,7 +13,7 @@ import { onboardingMessages } from "@/i18n/messages/auth-onboarding";
 import { COMMON_CURRENCIES } from "@/lib/finance/currency";
 import { currencyLabel, otherCurrencies, timezoneLabel, timezoneOptions } from "@/lib/locale-lists";
 import { completeOnboarding, createDemoStore, createWorkspace } from "@/lib/onboarding/actions";
-import { platformName, PLATFORMS, type PlatformId } from "@/lib/onboarding/constants";
+import { platformName, PLATFORMS, type PlatformId, type TaxChoice } from "@/lib/onboarding/constants";
 import { cn } from "@/lib/utils";
 
 type Props = { initialStep: 0 | 2; defaultName: string | null };
@@ -35,13 +35,19 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
     platform: "shopify" as PlatformId,
     currency: "EUR",
     timezone: browserTz,
-    pricesIncludeTax: "" as "" | "yes" | "no",
+    pricesIncludeTax: "" as "" | TaxChoice,
   });
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((f) => ({ ...f, [key]: value }));
   const moreCurrencies = useMemo(() => otherCurrencies().map((c) => ({ value: c, label: currencyLabel(c, locale) })), [locale]);
   const commonCurrencies = useMemo(() => COMMON_CURRENCIES.map((c) => ({ value: c, label: currencyLabel(c, locale) })), [locale]);
   // Always offer UTC and the browser's own zone, which may be missing from the canonical list.
-  const timezones = useMemo(() => timezoneOptions([browserTz]).map((tz) => ({ value: tz, label: timezoneLabel(tz, locale) })), [browserTz, locale]);
+  const timezones = useMemo(() => timezoneOptions([browserTz]).map((tz) => ({ value: tz, label: timezoneLabel(tz) })), [browserTz]);
+  const taxOptions: { value: TaxChoice; title: string; text: string; className?: string }[] = [
+    { value: "yes", title: t.reporting.taxYes, text: t.reporting.taxYesText },
+    { value: "no", title: t.reporting.taxNo, text: t.reporting.taxNoText },
+    // Private sellers and VAT-exempt micro-businesses: full width, under the two usual cases.
+    { value: "none", title: t.reporting.taxNone, text: t.reporting.taxNoneText, className: "sm:col-span-2" },
+  ];
 
   function next() {
     setError(null);
@@ -58,7 +64,7 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
     setError(null);
     if (!form.pricesIncludeTax) return setFieldErrors({ pricesIncludeTax: t.validation.pricesIncludeTax });
     startTransition(async () => {
-      const result = await createWorkspace({ ...form, pricesIncludeTax: form.pricesIncludeTax as "yes" | "no" }).catch(() => null);
+      const result = await createWorkspace({ ...form, pricesIncludeTax: form.pricesIncludeTax as TaxChoice }).catch(() => null);
       if (!result) return failed();
       if (!result.ok) {
         setError(result.message);
@@ -84,7 +90,7 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
 
   return (
     <div className="grid gap-8 md:grid-cols-[220px_1fr]">
-      <ol className="flex gap-2 overflow-x-auto md:flex-col md:gap-0" aria-label={t.progress}>
+      <ol className="flex gap-2 overflow-x-auto md:flex-col md:gap-0 md:overflow-visible" aria-label={t.progress}>
         {STEPS.map((label, i) => {
           const state = i < step ? "done" : i === step ? "current" : "todo";
           return (
@@ -100,9 +106,10 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
               >
                 {state === "done" ? <Check className="size-3.5" aria-hidden /> : i + 1}
               </span>
-              <span className={cn("text-sm whitespace-nowrap", state === "current" ? "font-medium text-ink" : "text-ink-3")}>
+              {/* One line in the horizontal (mobile) stepper; in the narrow side column the label wraps and "Optional" goes below it. */}
+              <span className={cn("text-sm whitespace-nowrap md:whitespace-normal", state === "current" ? "font-medium text-ink" : "text-ink-3")}>
                 {label}
-                {i >= 2 ? <span className="ml-1.5 text-xs text-ink-3">{t.optional}</span> : null}
+                {i >= 2 ? <span className="ml-1.5 text-xs font-normal text-ink-3 md:ml-0 md:block">{t.optional}</span> : null}
               </span>
             </li>
           );
@@ -176,15 +183,13 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
                 <legend className="text-sm font-medium text-ink">{t.reporting.taxQuestion}</legend>
                 <p className="mt-0.5 text-xs text-ink-3">{t.reporting.taxHelp}</p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  {[
-                    { value: "yes", title: t.reporting.taxYes, text: t.reporting.taxYesText },
-                    { value: "no", title: t.reporting.taxNo, text: t.reporting.taxNoText },
-                  ].map((o) => (
+                  {taxOptions.map((o) => (
                     <label
                       key={o.value}
                       className={cn(
                         "flex cursor-pointer gap-3 rounded-md border p-3.5 transition-colors",
                         form.pricesIncludeTax === o.value ? "border-navy-800 bg-navy-50 ring-1 ring-navy-800" : "border-line-strong hover:bg-hover",
+                        o.className,
                       )}
                     >
                       <input
@@ -192,7 +197,7 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
                         name="pricesIncludeTax"
                         value={o.value}
                         checked={form.pricesIncludeTax === o.value}
-                        onChange={() => set("pricesIncludeTax", o.value as "yes" | "no")}
+                        onChange={() => set("pricesIncludeTax", o.value)}
                         className="mt-1 accent-navy-800"
                       />
                       <span>

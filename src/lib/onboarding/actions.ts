@@ -17,7 +17,7 @@ import { currencyDigits, isValidCurrency } from "@/lib/finance/currency";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { PLATFORMS } from "./constants";
+import { PLATFORMS, pricesIncludeTaxFor, TAX_CHOICES } from "./constants";
 
 export type ActionResult = { ok: true } | { ok: false; message: string; fieldErrors?: Record<string, string> };
 
@@ -30,7 +30,7 @@ function workspaceSchema(v: Messages["validation"]) {
     platform: z.enum(PLATFORMS, { message: v.platform }),
     currency: z.string().refine(isValidCurrency, v.currency),
     timezone: z.string().refine(isValidTimezone, v.timezone),
-    pricesIncludeTax: z.enum(["yes", "no"], { message: v.pricesIncludeTax }),
+    pricesIncludeTax: z.enum(TAX_CHOICES, { message: v.pricesIncludeTax }),
   });
 }
 
@@ -59,7 +59,7 @@ export async function createWorkspace(input: WorkspaceInput): Promise<ActionResu
     p_currency: v.currency,
     p_minor_digits: currencyDigits(v.currency),
     p_timezone: v.timezone,
-    p_prices_include_tax: v.pricesIncludeTax === "yes",
+    p_prices_include_tax: pricesIncludeTaxFor(v.pricesIncludeTax),
   });
 
   if (error) {
