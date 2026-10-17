@@ -33,6 +33,8 @@
                     </td>
                   </tr>
                 </table>
+                <p style="margin:24px 0 6px 0;font-size:14px;line-height:22px;color:#454C5C;">{{ if eq (printf "%v" .Data.locale) "fr" }}Ou saisissez ce code sur la page Narixia :{{ else }}Or enter this code on the Narixia page:{{ end }}</p>
+                <p style="margin:0;font-size:28px;line-height:36px;font-weight:600;letter-spacing:0.2em;color:#172033;font-family:'SFMono-Regular',Menlo,Consolas,monospace;">{{ .Token }}</p>
                 <p style="margin:24px 0 0 0;font-size:13px;line-height:20px;color:#5A6070;">{{ if eq (printf "%v" .Data.locale) "fr" }}Si vous n’avez pas créé de compte Narixia, vous pouvez ignorer cet e-mail.{{ else }}If you did not create a Narixia account, you can safely ignore this email.{{ end }}</p>
               </td>
             </tr>

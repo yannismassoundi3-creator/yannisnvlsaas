@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="{{ if eq (printf "%v" .Data.locale) "fr" }}fr{{ else }}en{{ end }}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ if eq (printf "%v" .Data.locale) "fr" }}Votre code de connexion Narixia{{ else }}Your Narixia sign-in code{{ end }}</title>
+  </head>
+  <body style="margin:0;padding:0;background:#F8F7F4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#172033;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F8F7F4;padding:40px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#FFFFFF;border:1px solid #E4E1DA;border-radius:12px;">
+            <tr>
+              <td style="padding:32px 32px 8px 32px;">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="width:28px;height:28px;background:#172033;border-radius:7px;text-align:center;vertical-align:middle;">
+                      <span style="display:inline-block;width:12px;height:2px;background:#5FD3B0;transform:rotate(-40deg);"></span>
+                    </td>
+                    <td style="padding-left:10px;font-size:16px;font-weight:600;letter-spacing:-0.01em;color:#172033;">Narixia</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px 32px 32px;">
+                <h1 style="margin:0 0 12px 0;font-size:20px;line-height:28px;font-weight:600;color:#172033;">{{ if eq (printf "%v" .Data.locale) "fr" }}Votre code de connexion{{ else }}Your sign-in code{{ end }}</h1>
+                <p style="margin:0 0 20px 0;font-size:15px;line-height:24px;color:#454C5C;">{{ if eq (printf "%v" .Data.locale) "fr" }}Saisissez ce code sur la page de connexion Narixia pour accéder à votre compte.{{ else }}Enter this code on the Narixia sign-in page to access your account.{{ end }}</p>
+                <p style="margin:0 0 20px 0;padding:14px 18px;background:#F2F0EB;border-radius:8px;font-size:30px;line-height:38px;font-weight:600;letter-spacing:0.25em;color:#172033;font-family:'SFMono-Regular',Menlo,Consolas,monospace;text-align:center;">{{ .Token }}</p>
+                <p style="margin:0;font-size:13px;line-height:20px;color:#5A6070;">{{ if eq (printf "%v" .Data.locale) "fr" }}Ce code ne fonctionne qu’une fois. Ne le communiquez à personne : Narixia ne vous le demandera jamais. Si vous n’avez pas demandé à vous connecter, ignorez cet e-mail ; votre compte reste protégé.{{ else }}This code works once. Do not share it with anyone: Narixia will never ask you for it. If you did not try to sign in, ignore this email; your account stays protected.{{ end }}</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

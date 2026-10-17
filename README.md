@@ -28,7 +28,7 @@ missing data are always labelled, and contribution margin is never presented as 
   data-quality notes; CSV exports of products and campaigns, protected against formula injection.
 - **Profitability calculator** with an exact break-even price, in the app and as a public tool.
 - **Sample store** with clearly labelled demo data, separate from real stores.
-- **Accounts:** email and password with verification and password reset, four-step onboarding, organisations with
+- **Accounts:** email and password or a 6-digit code sent by email, verification by link or code, password reset, four-step onboarding, organisations with
   roles, several stores (Pro), full data export and account deletion.
 - **Billing:** 14-day trial without a card, Pro plan via Stripe Checkout and the customer portal, verified and
   idempotent webhooks, grace period on failed payments, entitlements enforced by the database.

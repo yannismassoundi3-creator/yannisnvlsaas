@@ -15,6 +15,7 @@ import { authFormMessages } from "@/i18n/messages/auth-forms";
 import { authErrorMessage, isEmailValid, isPasswordValid, passwordChecks } from "@/lib/auth/validation";
 import { getBrowserClient } from "@/lib/supabase/browser";
 import { cn } from "@/lib/utils";
+import { CODE_LENGTH, CodeInput, codeErrorMessage } from "./email-code";
 
 export function ForgotPasswordForm() {
   const locale = useLocale();
@@ -131,10 +132,30 @@ export function ResendConfirmation() {
   const params = useSearchParams();
   const locale = useLocale();
   const t = authFormMessages[locale].resend;
+  const c = authFormMessages[locale].confirmCode;
+  const router = useRouter();
   const email = params.get("email") ?? "";
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [codeError, setCodeError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
   if (!email) return null;
+
+  async function confirmWithCode(event: FormEvent) {
+    event.preventDefault();
+    setCodeError(null);
+    if (code.length !== CODE_LENGTH) return setCodeError(authFormMessages[locale].code.enterCode);
+    setVerifying(true);
+    const { error } = await getBrowserClient().auth.verifyOtp({ email, token: code, type: "email" });
+    if (error) {
+      setVerifying(false);
+      setCodeError(codeErrorMessage(error, locale));
+      return;
+    }
+    router.replace("/onboarding");
+    router.refresh();
+  }
 
   async function resend() {
     setState("sending");
@@ -155,6 +176,15 @@ export function ResendConfirmation() {
         {t.sentTo} <strong className="font-medium text-ink">{email}</strong>
         {t.sentToSuffix}
       </p>
+      <form onSubmit={confirmWithCode} noValidate className="space-y-3 rounded-md border border-line bg-sunken/60 p-4">
+        <p className="text-sm text-ink-2">{c.prompt}</p>
+        <Field htmlFor="confirm-code" label={c.label} error={codeError}>
+          <CodeInput id="confirm-code" value={code} onValueChange={setCode} aria-invalid={codeError ? true : undefined} aria-describedby={codeError ? "confirm-code-error" : undefined} />
+        </Field>
+        <Button type="submit" className="w-full" loading={verifying}>
+          {c.submit}
+        </Button>
+      </form>
       {state === "sent" ? <Alert tone="positive">{t.sent}</Alert> : null}
       {state === "error" && message ? <Alert tone="negative">{message}</Alert> : null}
       <Button variant="secondary" onClick={resend} loading={state === "sending"} disabled={state === "sent"}>

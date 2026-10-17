@@ -14,21 +14,43 @@ import { authFormMessages } from "@/i18n/messages/auth-forms";
 import { safeNextPath } from "@/lib/auth/redirect";
 import { authErrorMessage, isEmailValid } from "@/lib/auth/validation";
 import { getBrowserClient } from "@/lib/supabase/browser";
+import { CODE_LENGTH, CodeInput, codeErrorMessage } from "./email-code";
 
+type Mode = "password" | "code";
+
+/** Sign-in with email and password, or with a 6-digit code sent by email. */
 export function SignInForm() {
   const router = useRouter();
   const params = useSearchParams();
   const locale = useLocale();
   const t = authFormMessages[locale];
   const next = safeNextPath(params.get("next"));
+  const [mode, setMode] = useState<Mode>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [unconfirmed, setUnconfirmed] = useState(false);
   const [resent, setResent] = useState(false);
   const [pending, setPending] = useState(false);
 
-  async function onSubmit(event: FormEvent) {
+  function switchMode(to: Mode) {
+    setMode(to);
+    setError(null);
+    setNotice(null);
+    setUnconfirmed(false);
+    setCodeSent(false);
+    setCode("");
+  }
+
+  function signedIn() {
+    router.replace(next as Route);
+    router.refresh();
+  }
+
+  async function onPasswordSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
     setUnconfirmed(false);
@@ -42,8 +64,37 @@ export function SignInForm() {
       setError(authErrorMessage(signInError, locale));
       return;
     }
-    router.replace(next as Route);
-    router.refresh();
+    signedIn();
+  }
+
+  async function sendCode(isResend = false) {
+    setError(null);
+    setNotice(null);
+    if (!isEmailValid(email.trim())) return setError(t.invalidEmail);
+    setPending(true);
+    // Only existing accounts get a code: new accounts go through sign-up and its terms.
+    const { error: otpError } = await getBrowserClient().auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: false } });
+    setPending(false);
+    // Unknown addresses are answered like known ones, so the form does not reveal who has an account.
+    if (otpError && otpError.code !== "otp_disabled" && otpError.code !== "user_not_found") return setError(authErrorMessage(otpError, locale));
+    setCodeSent(true);
+    setCode("");
+    setNotice(isResend ? t.code.resent : t.code.sentTo(email.trim()));
+  }
+
+  async function onCodeSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (!codeSent) return sendCode();
+    setError(null);
+    if (code.length !== CODE_LENGTH) return setError(t.code.enterCode);
+    setPending(true);
+    const { error: verifyError } = await getBrowserClient().auth.verifyOtp({ email: email.trim(), token: code, type: "email" });
+    if (verifyError) {
+      setPending(false);
+      setError(codeErrorMessage(verifyError, locale));
+      return;
+    }
+    signedIn();
   }
 
   async function resendConfirmation() {
@@ -56,8 +107,24 @@ export function SignInForm() {
     else setResent(true);
   }
 
-  return (
-    <form onSubmit={onSubmit} noValidate className="space-y-4">
+  const emailField = (
+    <Field htmlFor="email" label={t.email}>
+      <Input
+        id="email"
+        type="email"
+        autoComplete="email"
+        inputMode="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        readOnly={mode === "code" && codeSent}
+        required
+        autoFocus
+      />
+    </Field>
+  );
+
+  const alerts = (
+    <>
       {error ? (
         <Alert tone="negative">
           {error}
@@ -69,18 +136,47 @@ export function SignInForm() {
         </Alert>
       ) : null}
       {resent ? <Alert tone="positive">{t.signIn.resent}</Alert> : null}
-      <Field htmlFor="email" label={t.email}>
-        <Input
-          id="email"
-          type="email"
-          autoComplete="email"
-          inputMode="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          autoFocus
-        />
-      </Field>
+      {notice ? <Alert tone="positive">{notice}</Alert> : null}
+    </>
+  );
+
+  if (mode === "code") {
+    return (
+      <form onSubmit={onCodeSubmit} noValidate className="space-y-4">
+        {alerts}
+        {!codeSent ? <p className="text-sm text-ink-2">{t.code.intro}</p> : null}
+        {emailField}
+        {codeSent ? (
+          <Field htmlFor="code" label={t.code.label}>
+            <CodeInput id="code" value={code} onValueChange={setCode} required autoFocus />
+          </Field>
+        ) : null}
+        <Button type="submit" className="w-full" size="lg" loading={pending}>
+          {codeSent ? t.code.submit : t.code.send}
+        </Button>
+        <div className="flex flex-col items-center gap-2 text-sm">
+          {codeSent ? (
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+              <button type="button" onClick={() => sendCode(true)} disabled={pending} className="font-medium text-emerald-700 hover:underline">
+                {t.code.resend}
+              </button>
+              <button type="button" onClick={() => switchMode("code")} className="font-medium text-emerald-700 hover:underline">
+                {t.code.changeEmail}
+              </button>
+            </div>
+          ) : null}
+          <button type="button" onClick={() => switchMode("password")} className="font-medium text-ink-2 hover:text-ink hover:underline">
+            {t.code.usePassword}
+          </button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <form onSubmit={onPasswordSubmit} noValidate className="space-y-4">
+      {alerts}
+      {emailField}
       <Field
         htmlFor="password"
         label={t.password}
@@ -95,6 +191,11 @@ export function SignInForm() {
       <Button type="submit" className="w-full" size="lg" loading={pending}>
         {t.signIn.submit}
       </Button>
+      <p className="text-center text-sm">
+        <button type="button" onClick={() => switchMode("code")} className="font-medium text-emerald-700 hover:underline">
+          {t.code.useCode}
+        </button>
+      </p>
     </form>
   );
 }

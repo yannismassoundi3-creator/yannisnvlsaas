@@ -35,7 +35,7 @@ présentée comme un bénéfice net.
   de formules.
 - **Calculateur de rentabilité** avec un prix exact au seuil de rentabilité, dans l'application et en outil public.
 - **Boutique d'exemple** avec des données de démonstration clairement signalées, séparée des vraies boutiques.
-- **Comptes :** e-mail et mot de passe avec vérification et réinitialisation du mot de passe, prise en main en quatre
+- **Comptes :** e-mail et mot de passe ou code à 6 chiffres reçu par e-mail, vérification par lien ou par code, réinitialisation du mot de passe, prise en main en quatre
   étapes, organisations avec rôles, plusieurs boutiques (Pro), export complet des données et suppression du compte.
 - **Facturation :** essai gratuit de 14 jours sans carte, offre Pro via Stripe Checkout et le portail client, webhooks
   vérifiés et idempotents, période de grâce en cas d'échec de paiement, droits d'accès appliqués par la base de

@@ -18,11 +18,26 @@ async function confirmationLink(email: string): Promise<string> {
   throw new Error(`No confirmation email for ${email}`);
 }
 
+/** Reads the 6-digit code from the newest email to `email` whose subject contains `subject`. */
+export async function emailCode(email: string, subject: string): Promise<string> {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const list = (await (await fetch(`${MAILPIT}/api/v1/messages`)).json()) as { messages?: { ID: string; Subject: string; To?: { Address: string }[] }[] };
+    const message = list.messages?.find((m) => m.Subject.includes(subject) && m.To?.some((t) => t.Address === email));
+    if (message) {
+      const full = (await (await fetch(`${MAILPIT}/api/v1/message/${message.ID}`)).json()) as { HTML: string };
+      const match = full.HTML.match(/>(\d{6})</);
+      if (match) return match[1];
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`No "${subject}" code for ${email}`);
+}
+
 export const uniqueEmail = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.test`;
 
 /** Signs up, confirms the email and lands on onboarding. */
 export async function signUp(page: Page, email: string, password = "margins2026ok") {
-  await page.goto("/sign-up");
+  await page.goto("/sign-up", { waitUntil: "networkidle" });
   await page.getByLabel("Your name").fill("E2E Founder");
   await page.getByLabel("Work email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);

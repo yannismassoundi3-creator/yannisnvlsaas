@@ -13,7 +13,7 @@ export const authPageMessages = defineMessages({
     checkEmail: {
       metaTitle: "Confirm your email",
       title: "Confirm your email address",
-      description: "Open the link in the email we just sent to activate your account and start your trial. You can open it on any device.",
+      description: "Open the link in the email we just sent, or enter the code it contains, to activate your account and start your trial. The link works on any device.",
       noEmail: "No email after a few minutes? Check your spam folder, or make sure the address is correct.",
     },
     forgotPassword: {
@@ -63,7 +63,7 @@ export const authPageMessages = defineMessages({
       metaTitle: "Confirmez votre e-mail",
       title: "Confirmez votre adresse e-mail",
       description:
-        "Ouvrez le lien de l'e-mail que nous venons de vous envoyer pour activer votre compte et démarrer votre essai gratuit. Vous pouvez l'ouvrir sur n'importe quel appareil.",
+        "Ouvrez le lien de l'e-mail que nous venons de vous envoyer, ou saisissez le code qu'il contient, pour activer votre compte et démarrer votre essai gratuit. Le lien fonctionne sur n'importe quel appareil.",
       noEmail: "Toujours pas d'e-mail après quelques minutes ? Vérifiez vos courriers indésirables ou assurez-vous que l'adresse est correcte.",
     },
     forgotPassword: {
