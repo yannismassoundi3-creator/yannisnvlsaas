@@ -17,6 +17,9 @@ export const shellLayout = defineMessages({
       calculator: "Calculator",
       settings: "Settings",
       billing: "Billing",
+      home: "Home",
+      items: "My items",
+      salesCosts: "Sales & costs",
     },
     mobile: {
       open: "Open navigation",
@@ -52,6 +55,9 @@ export const shellLayout = defineMessages({
       calculator: "Calculateur",
       settings: "Paramètres",
       billing: "Facturation",
+      home: "Accueil",
+      items: "Mes articles",
+      salesCosts: "Ventes et coûts",
     },
     mobile: {
       open: "Ouvrir la navigation",

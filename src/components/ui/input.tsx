@@ -14,11 +14,14 @@ type InputProps = ComponentProps<"input"> & {
   leading?: ReactNode;
   /** Content rendered inside the field on the right, e.g. a unit. */
   trailing?: ReactNode;
-  inputSize?: "sm" | "md";
+  /** "lg": large touch-friendly field (48 px, 18 px text, no zoom on iOS) for quick-entry dialogs. */
+  inputSize?: "sm" | "md" | "lg";
 };
 
+const INPUT_SIZES = { sm: "h-8 text-sm", md: "h-9 text-base", lg: "h-12 text-lg" } as const;
+
 export function Input({ className, leading, trailing, inputSize = "md", ...props }: InputProps) {
-  const sizing = inputSize === "sm" ? "h-8 text-sm" : "h-9 text-base";
+  const sizing = INPUT_SIZES[inputSize];
   if (!leading && !trailing) {
     return <input className={cn(inputBase, sizing, "px-3", className)} {...props} />;
   }
@@ -42,7 +45,7 @@ export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
   return <textarea className={cn(inputBase, "min-h-24 px-3 py-2 text-base", className)} {...props} />;
 }
 
-type NativeSelectProps = ComponentProps<"select"> & { inputSize?: "sm" | "md" };
+type NativeSelectProps = ComponentProps<"select"> & { inputSize?: "sm" | "md" | "lg" };
 
 /**
  * Styled native select. Preferred for forms: it works without JavaScript,
@@ -54,7 +57,7 @@ export function NativeSelect({ className, children, inputSize = "md", ...props }
       <select
         className={cn(
           inputBase,
-          inputSize === "sm" ? "h-8 text-sm" : "h-9 text-base",
+          INPUT_SIZES[inputSize],
           "appearance-none pr-9 pl-3",
         )}
         {...props}

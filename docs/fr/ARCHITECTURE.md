@@ -111,6 +111,17 @@ billing_events (Stripe event log, service role only)       private.rate_limits
 - Les **droits d'accès** sont calculés, jamais stockés : la vue `organization_entitlements` déduit le niveau d'accès
   des dates d'essai et du dernier abonnement.
 
+- **Mode revendeur.** `stores.business_model` vaut `ecommerce` (import des commandes, des coûts et des publicités) ou
+  `reseller` (personnes qui revendent des articles un par un sur Vinted, Leboncoin, eBay ou Vestiaire Collective). Les
+  données des revendeurs réutilisent les mêmes tables : tous les rapports, exports et politiques s'appliquent sans
+  changement. Un article est une ligne `products` (prix d'achat dans `unit_cost_e4`, `acquired_on` facultatif), une
+  vente est une ligne `orders` avec une seule ligne `order_items` (quantité 1, instantané du coût, numéro généré
+  `V-AAAAMMJJ-XXXXXX`) et `orders.sales_channel` indique où elle a eu lieu. Un article qui a une ligne de commande est
+  vendu ; sinon il est en stock. Les écritures passent par `src/lib/reseller/actions.ts` et le chemin commun
+  `writeOrder` (`src/lib/transactions/write.ts`, aussi utilisé par les commandes manuelles) ; les lectures par
+  `src/lib/data/reseller.ts` et les fonctions SQL `reseller_items`, `reseller_stock_summary` et
+  `report_channel_breakdown`. L'accueil, la navigation et l'onboarding s'adaptent au mode.
+
 Les types TypeScript générés pour le schéma se trouvent dans `src/lib/supabase/database.types.ts`
 (`npm run db:types`).
 

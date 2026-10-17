@@ -10,6 +10,7 @@ import { onboardingMessages } from "@/i18n/messages/auth-onboarding";
 import { getLocale } from "@/i18n/server";
 import { signOut } from "@/lib/auth/actions";
 import { getWorkspace } from "@/lib/auth/workspace";
+import { isReseller } from "@/lib/onboarding/constants";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = onboardingMessages[await getLocale()].page;
@@ -18,7 +19,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 async function Flow() {
   const ws = await getWorkspace();
-  return <OnboardingFlow initialStep={ws.organization ? 2 : 0} defaultName={ws.user.fullName} />;
+  const store = ws.stores.find((st) => !st.is_demo) ?? null;
+  return <OnboardingFlow initialStep={ws.organization ? 2 : 0} defaultName={ws.user.fullName} initialBusinessModel={isReseller(store) ? "reseller" : "ecommerce"} />;
 }
 
 export default async function OnboardingPage() {

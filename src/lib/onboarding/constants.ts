@@ -65,3 +65,38 @@ export type TaxChoice = (typeof TAX_CHOICES)[number];
 export function pricesIncludeTaxFor(choice: TaxChoice): boolean {
   return choice === "yes";
 }
+
+/** Resale marketplaces: choosing one in onboarding suggests the reseller mode. */
+export const RESALE_PLATFORMS = ["vinted", "leboncoin", "ebay", "vestiaire_collective"] as const satisfies readonly PlatformId[];
+
+export function isResalePlatform(platform: string): boolean {
+  return (RESALE_PLATFORMS as readonly string[]).includes(platform);
+}
+
+/**
+ * How the store sells, stored in stores.business_model:
+ * - "ecommerce": an online shop that imports orders, costs and ad spend;
+ * - "reseller": someone who resells items one by one (Vinted, Leboncoin…)
+ *   and records each purchase and sale by hand in a few seconds.
+ */
+export const BUSINESS_MODELS = ["ecommerce", "reseller"] as const;
+export type BusinessModel = (typeof BUSINESS_MODELS)[number];
+
+export function isReseller(store: { business_model: string } | null | undefined): boolean {
+  return store?.business_model === "reseller";
+}
+
+/** The mode suggested for a platform picked in onboarding. */
+export function suggestedBusinessModel(platform: string): BusinessModel {
+  return isResalePlatform(platform) ? "reseller" : "ecommerce";
+}
+
+/**
+ * Selling platforms offered when recording a sale (orders.sales_channel):
+ * every platform, resale marketplaces first.
+ */
+export const SALES_CHANNELS: readonly PlatformId[] = [...RESALE_PLATFORMS, ...PLATFORMS.filter((p) => !isResalePlatform(p))];
+
+export function isPlatformId(value: unknown): value is PlatformId {
+  return typeof value === "string" && (PLATFORMS as readonly string[]).includes(value);
+}

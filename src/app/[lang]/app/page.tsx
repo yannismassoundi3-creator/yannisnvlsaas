@@ -12,6 +12,7 @@ import { InsightList } from "@/components/dashboard/insight-list";
 import { KpiGrid, KpiTile } from "@/components/dashboard/kpi-tile";
 import { ProductMarginBars } from "@/components/dashboard/product-margin-bars";
 import { ProfitBreakdown } from "@/components/dashboard/profit-breakdown";
+import { ResellerHome } from "@/components/reseller/reseller-home";
 import { SetupChecklist } from "@/components/dashboard/setup-checklist";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -24,6 +25,7 @@ import { rangeQuery } from "@/lib/analytics/range";
 import { requireStore, type ReadyWorkspace, type Store } from "@/lib/auth/workspace";
 import { getOverviewData, getStoreDataStatus, reportPeriod, ReportsPausedError, type ReportPeriod } from "@/lib/data/reports";
 import { buildAdvertisingKpis, buildPrimaryKpis, buildSecondaryKpis } from "@/lib/finance/kpis";
+import { isReseller } from "@/lib/onboarding/constants";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
@@ -97,6 +99,13 @@ async function Overview({ searchParams }: { searchParams: Promise<SearchParams> 
   const t = overviewMessages[locale];
   const store = ws.activeStore;
   const period = reportPeriod(store, ws.entitlements, params);
+
+  if (isReseller(store)) {
+    const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+    const initial = first(params.add) === "1" ? "add" : first(params.sell) === "1" ? "sell" : null;
+    return <ResellerHome ws={ws} period={period} initial={initial} locale={locale} f={f} />;
+  }
+
   const header = <Header store={store} period={period} />;
 
   if (!ws.entitlements.canViewAnalytics) {

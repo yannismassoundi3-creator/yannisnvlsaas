@@ -17,7 +17,7 @@ import { currencyDigits, isValidCurrency } from "@/lib/finance/currency";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { PLATFORMS, pricesIncludeTaxFor, TAX_CHOICES } from "./constants";
+import { BUSINESS_MODELS, PLATFORMS, pricesIncludeTaxFor, suggestedBusinessModel, TAX_CHOICES } from "./constants";
 
 export type ActionResult = { ok: true } | { ok: false; message: string; fieldErrors?: Record<string, string> };
 
@@ -31,6 +31,8 @@ function workspaceSchema(v: Messages["validation"]) {
     currency: z.string().refine(isValidCurrency, v.currency),
     timezone: z.string().refine(isValidTimezone, v.timezone),
     pricesIncludeTax: z.enum(TAX_CHOICES, { message: v.pricesIncludeTax }),
+    /** Defaults to the mode suggested by the platform (resale marketplaces: reseller). */
+    businessModel: z.enum(BUSINESS_MODELS).optional(),
   });
 }
 
@@ -60,6 +62,7 @@ export async function createWorkspace(input: WorkspaceInput): Promise<ActionResu
     p_minor_digits: currencyDigits(v.currency),
     p_timezone: v.timezone,
     p_prices_include_tax: pricesIncludeTaxFor(v.pricesIncludeTax),
+    p_business_model: v.businessModel ?? suggestedBusinessModel(v.platform),
   });
 
   if (error) {
@@ -130,8 +133,18 @@ export async function createDemoStore(): Promise<ActionResult> {
   return { ok: true };
 }
 
-export async function completeOnboarding(destination: "dashboard" | "import" | "products") {
+const DESTINATIONS = {
+  dashboard: "/app",
+  import: "/app/imports/new",
+  products: "/app/products?new=1",
+  // Reseller mode: the home page opens the matching quick dialog.
+  add_item: "/app?add=1",
+  sell: "/app?sell=1",
+} as const;
+
+export async function completeOnboarding(destination: keyof typeof DESTINATIONS) {
   const ws = await getWorkspace();
+  const target = DESTINATIONS[destination] ?? DESTINATIONS.dashboard;
   if (ws.organization) trackFirst("onboarding_completed", { organizationId: ws.organization.id, userId: ws.user.id }, { destination });
-  redirect((destination === "import" ? "/app/imports/new" : destination === "products" ? "/app/products?new=1" : "/app") as Route);
+  redirect(target as Route);
 }

@@ -23,6 +23,7 @@ Pure logic, no network or database. `npm run test:unit`.
 | Aggregation reference | Demo generator determinism, time-zone date attribution, refunds dated separately, estimates, product allocation, insight rules on the demo store |
 | Date ranges and series | Presets, custom ranges clipped to the plan's history, comparison periods, weekly/monthly buckets and partial buckets, SQL row mapping |
 | Imports | Header recognition (Shopify, Meta, Google Ads), timestamps with offsets, local times across DST, day/month order detection and ambiguity, order grouping, order-discount split, tax-inclusive orders and refunds, whole-order hold-back, cancelled orders, other currencies, conflicting order-level values, Shopify variants, product matching like the database, ad and expense rows |
+| Reseller mode | Sale numbers and item references (format, no ambiguous letters, uniqueness), the 60-day "lingering" rule, mode suggested by the platform, sales channels, default platform, loose name matching, item and sale validation (comma decimals, required fields, future dates, bounds, messages in both languages) |
 | Entitlements | Access levels, trial countdown, grace period, plan limits, history start |
 | Auth redirects | Only same-site relative `next` paths are accepted |
 | Exports | CSV formula-injection neutralisation, BOM and CRLF, decimal cells, file names; PDF report renders (sample-store label included) |
@@ -50,6 +51,7 @@ These run real SQL, RLS policies and functions as the `authenticated`, `anon` an
 | `reporting.test.ts` | SQL totals, daily series, product and campaign breakdowns equal the TypeScript reference on a generated dataset, including allocation ties; another organisation's store returns nothing; reports pause after expiry while data stays exportable; invalid ranges rejected |
 | `imports.test.ts` | Staging, finalize and duplicate rules for each kind (skip and update strategies), whole-order hold-back, batched commit, undo restoring replaced records, "only the latest import can be undone", access control |
 | `billing.test.ts` | Pro only from a verified checkout event; grace period start and expiry; recovery after a retried payment; stale events ignored; cancellation; unknown organisations ignored; billing periods from subscription items; webhook signature verification (unsigned and wrongly signed requests rejected) and idempotent replays, using Stripe's own test signature helper |
+| `reseller.test.ts` | Onboarding with the reseller mode (zero fee and shipping rules) and the old seven-argument call; mode, sales channel and purchase date constraints; unique sale numbers; a quick sale feeds the daily totals, the product report, the per-platform breakdown and the items list; refunds per platform; undoing a sale returns the item to stock; other tenants and anonymous callers see nothing; expired accounts cannot switch the mode |
 | `stores.test.ts` | Store limit per plan enforced by the database; the sample store does not count |
 
 The billing tests stub only the call that re-reads a subscription from Stripe; signatures are produced and verified
@@ -65,6 +67,10 @@ Supabase stack (sign-up confirmation emails are read from its Mailpit inbox at `
 - **Merchant journey** (serial): sign up and confirm by email → onboarding → sample store → switch to the real store
   → import a Shopify CSV with one invalid row, review the error, confirm → overview figures and missing-cost notice →
   add a cost inline → undo the import → save cost rules → download the full data export → delete the account.
+- **Reseller mode** (in French): sign up → onboarding with Vinted, which selects the reseller mode → add two items in a
+  row → record a sale with « Vendu ! » and a comma price (18,50) → the home page shows the sale, what is left and one
+  item in stock → My items shows it sold; axe checks on the home page and both dialogs, and no horizontal overflow at
+  a 390 px phone width.
 - **Accessibility:** axe-core (WCAG 2.0/2.1/2.2 A and AA rules) runs on the public pages, the dashboard and the
   import review and must report no violations.
 

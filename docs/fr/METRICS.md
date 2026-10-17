@@ -118,6 +118,28 @@ Sur la page Products (Produits) et dans les rapports par produit :
 - La marge sur coûts variables d'un produit est affichée sous la forme « — » dès qu'une de ses lignes vendues n'a pas
   de coût.
 
+## Mode revendeur
+
+Les boutiques en mode revendeur suivent les mêmes règles ; seuls leurs écrans les présentent autrement.
+
+- **« Ce qui vous reste »** est la marge sur coûts variables de la période (le même chiffre et la même définition que
+  partout ailleurs, jamais présenté comme un bénéfice net). **Ventes** correspond au chiffre d'affaires net ;
+  **articles vendus** au nombre d'unités vendues.
+- **Frais.** Les boutiques en mode revendeur démarrent avec une règle de frais nulle et un coût d'expédition par défaut
+  nul, car Vinted et Leboncoin facturent l'acheteur. Des frais ou un coût d'envoi saisis sur une vente sont enregistrés
+  sur cette commande ; laissés vides, la règle de la boutique s'applique et la valeur est signalée comme estimation
+  (zéro sauf si le vendeur modifie la règle).
+- **Le stock** est l'ensemble des articles sans ligne de commande. L'« argent immobilisé » est la somme de leurs prix
+  d'achat ; les articles sans prix d'achat sont comptés à part, jamais considérés comme gratuits. Les « articles qui
+  traînent » sont en stock depuis plus de 60 jours, à compter de la date d'achat, à défaut de la date d'ajout.
+- **Par article** (Mes articles), la marge d'une vente n'est affichée que si la commande ne compte qu'une ligne :
+  prix de vente + port facturé − remboursements − prix d'achat − coût d'envoi − frais, avec les mêmes règles
+  (enregistré ou estimé) que les rapports. Elle vaut « — » si le prix d'achat est inconnu.
+- **Par plateforme**, ventes et marges sont additionnées à partir des mêmes valeurs par commande que les totaux
+  quotidiens ; les remboursements comptent à leur propre date, sous la plateforme de leur commande. Les dépenses
+  variables et la publicité restent au niveau de la boutique : elles sont déduites du total « Ce qui vous reste » mais
+  jamais réparties entre plateformes ou articles.
+
 ## Prix toutes taxes comprises
 
 Les boutiques dont les prix incluent la TVA (`prices_include_tax`) stockent chaque montant hors taxe. Pour chaque

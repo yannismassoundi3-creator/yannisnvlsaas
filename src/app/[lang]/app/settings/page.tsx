@@ -2,6 +2,7 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { SampleStoreButton } from "@/components/app/sample-store-button";
+import { BusinessModelForm } from "@/components/reseller/business-model-form";
 import { AddStoreDialog, DataControls, DeleteStoreButton, ProfileForms, StoreSettingsForm } from "@/components/settings/settings-forms";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -9,10 +10,11 @@ import { Alert, Skeleton } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
 import { INTL_LOCALE } from "@/i18n/config";
 import { settingsPage } from "@/i18n/messages/account-settings";
+import { resellerMessages } from "@/i18n/messages/reseller";
 import { getLocale } from "@/i18n/server";
 import { requireWorkspace } from "@/lib/auth/workspace";
 import { currencyName } from "@/lib/finance/currency";
-import { platformName, type PlatformId } from "@/lib/onboarding/constants";
+import { isReseller, platformName, type PlatformId } from "@/lib/onboarding/constants";
 import { cn } from "@/lib/utils";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -95,6 +97,15 @@ async function Settings({ searchParams }: { searchParams: PageProps<"/[lang]/app
           ) : (
             <Alert tone="info">{t.noStore}</Alert>
           )
+        ) : null}
+
+        {section === "store" && store && !store.is_demo && ws.role !== "member" ? (
+          <Card>
+            <CardHeader title={resellerMessages[locale].settings.title} description={resellerMessages[locale].settings.description} />
+            <CardBody>
+              <BusinessModelForm key={store.business_model} current={isReseller(store) ? "reseller" : "ecommerce"} disabled={!canWrite} />
+            </CardBody>
+          </Card>
         ) : null}
 
         {section === "stores" ? (

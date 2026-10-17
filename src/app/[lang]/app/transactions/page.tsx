@@ -19,10 +19,12 @@ import { reportPeriod, type ReportPeriod } from "@/lib/data/reports";
 import { listExpenses, listOrders, listProductOptions, listRefunds } from "@/lib/data/transactions";
 import { addDays } from "@/lib/dates";
 import { expenseCategoryLabel, expenseKindLabel } from "@/lib/domain/types";
+import { isReseller } from "@/lib/onboarding/constants";
 import { cn } from "@/lib/utils";
 import type { Format } from "@/i18n/format";
 import { catalogCommon } from "@/i18n/messages/catalog-common";
 import { transactionsMessages } from "@/i18n/messages/catalog-transactions";
+import { shellLayout } from "@/i18n/messages/shell-layout";
 import { getFormat, getLocale } from "@/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -59,7 +61,7 @@ async function Transactions({ searchParams }: { searchParams: PageProps<"/[lang]
   const header = (
     <PageHeader
       eyebrow={store.name}
-      title={t.title}
+      title={isReseller(store) ? shellLayout[locale].nav.salesCosts : t.title}
       description={t.description(f.range(period.range))}
       actions={
         <>

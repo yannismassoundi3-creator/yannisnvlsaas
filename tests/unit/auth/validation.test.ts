@@ -77,6 +77,12 @@ describe("onboarding option labels", () => {
     expect([...list.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort()).toEqual([...PLATFORMS].sort());
   });
 
+  it("accepts exactly the same platforms as sales channels of reseller sales", () => {
+    const sql = readFileSync(path.join(process.cwd(), "supabase", "migrations", "20261017110000_reseller_mode.sql"), "utf8");
+    const list = /check \(sales_channel is null or sales_channel in \(([^)]*)\)/.exec(sql)![1];
+    expect([...list.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort()).toEqual([...PLATFORMS].sort());
+  });
+
   it("names currencies in the interface language", () => {
     expect(currencyLabel("EUR")).toBe("EUR — Euro");
     expect(currencyLabel("EUR", "fr")).toBe("EUR — euro");

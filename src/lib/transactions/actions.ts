@@ -11,6 +11,7 @@ import { removeIncludedTax } from "@/lib/finance/tax";
 import { normalizeText } from "@/lib/imports/normalize";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
+import { writeOrder } from "@/lib/transactions/write";
 import { catalogCommon } from "@/i18n/messages/catalog-common";
 import { transactionsMessages } from "@/i18n/messages/catalog-transactions";
 import { getRequestLocale } from "@/i18n/request";
@@ -265,57 +266,22 @@ export async function createManualOrder(input: z.input<typeof orderInput>): Prom
     shipping = converted.order.shippingCharged;
   }
 
-  const { data: order, error } = await supabase
-    .from("orders")
-    .insert({
-      organization_id: ws.organization.id,
-      store_id: store.id,
-      external_id: orderNumber,
-      ordered_at: zonedTimeToUtc(v.date, `${time}:00`, store.timezone),
-      shipping_charged_minor: shipping,
-      taxes_minor: tax,
-      shipping_cost_minor: shippingCost.ok ? shippingCost.value : null,
-      transaction_fees_minor: fees.ok ? fees.value : null,
-      converted_from_tax_inclusive: store.prices_include_tax,
-      source: "manual",
-    })
-    .select("id")
-    .single();
-  if (error || !order) {
-    return error?.code === "23505"
-      ? { ok: false, message: c.checkFields, fieldErrors: { orderNumber: t.duplicateOrder } }
-      : { ok: false, message: t.orderSaveFailed };
-  }
-
-  // Lines without a chosen product are matched by SKU or name, creating the product if needed.
-  for (const l of lines) {
-    if (l.productId) continue;
-    const key = (l.sku ? l.sku : `name:${l.name}`).toLowerCase();
-    const { data: existing } = await supabase.from("products").select("id").eq("store_id", store.id).eq("match_key", key).maybeSingle();
-    if (existing) l.productId = existing.id;
-    else {
-      const { data: created } = await supabase.from("products").insert({ organization_id: ws.organization.id, store_id: store.id, name: l.name, sku: l.sku, source: "manual" }).select("id").single();
-      l.productId = created?.id ?? null;
-    }
-  }
-  const { error: linesError } = await supabase.from("order_items").insert(
-    lines.map((l, i) => ({
-      organization_id: ws.organization.id,
-      order_id: order.id,
-      position: i,
-      product_id: l.productId,
-      name: l.name,
-      sku: l.sku,
-      quantity: l.quantity,
-      gross_minor: lineAmounts[i].gross,
-      discount_minor: lineAmounts[i].discount,
-      unit_cost_e4: l.unitCostE4,
-    })),
-  );
-  if (linesError) {
-    await supabase.from("orders").delete().eq("id", order.id);
-    return { ok: false, message: t.linesSaveFailed };
+  const written = await writeOrder(supabase, {
+    organizationId: ws.organization.id,
+    storeId: store.id,
+    externalId: orderNumber,
+    orderedAt: zonedTimeToUtc(v.date, `${time}:00`, store.timezone),
+    shippingCharged: shipping,
+    taxes: tax,
+    shippingCost: shippingCost.ok ? shippingCost.value : null,
+    fees: fees.ok ? fees.value : null,
+    convertedFromTaxInclusive: store.prices_include_tax,
+    lines: lines.map((l, i) => ({ ...l, gross: lineAmounts[i].gross, discount: lineAmounts[i].discount })),
+  });
+  if (!written.ok) {
+    if (written.reason === "duplicate") return { ok: false, message: c.checkFields, fieldErrors: { orderNumber: t.duplicateOrder } };
+    return { ok: false, message: written.reason === "lines" ? t.linesSaveFailed : t.orderSaveFailed };
   }
   refresh();
-  return { ok: true, orderId: order.id };
+  return { ok: true, orderId: written.orderId };
 }

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 import { AccessBanner } from "@/components/app/access-banner";
 import { MobileNav } from "@/components/app/mobile-nav";
 import { SidebarNav } from "@/components/app/sidebar-nav";
@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/feedback";
 import { shellLayout } from "@/i18n/messages/shell-layout";
 import { getLocale } from "@/i18n/server";
 import { requireWorkspace } from "@/lib/auth/workspace";
+import { isReseller } from "@/lib/onboarding/constants";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = shellLayout[await getLocale()];
@@ -40,6 +41,25 @@ async function Banner() {
   return <AccessBanner ws={ws} />;
 }
 
+/** Navigation for the active store: reseller stores get their own sections. */
+async function Navigation() {
+  const ws = await requireWorkspace();
+  return <SidebarNav mode={isReseller(ws.activeStore) ? "reseller" : "ecommerce"} />;
+}
+
+async function MobileNavigation({ storeSwitcher, userMenu }: { storeSwitcher: ReactNode; userMenu: ReactNode }) {
+  const ws = await requireWorkspace();
+  return <MobileNav storeSwitcher={storeSwitcher} userMenu={userMenu} mode={isReseller(ws.activeStore) ? "reseller" : "ecommerce"} />;
+}
+
+const navFallback = (
+  <div className="flex flex-1 flex-col gap-1.5" aria-hidden>
+    {Array.from({ length: 7 }, (_, i) => (
+      <Skeleton key={i} className="h-8 w-full rounded-md" />
+    ))}
+  </div>
+);
+
 const switcherFallback = <Skeleton className="h-[46px] w-full rounded-md" />;
 const accountFallback = <Skeleton className="h-11 w-full rounded-md" />;
 
@@ -57,7 +77,9 @@ export default async function AppLayout({ children }: LayoutProps<"/[lang]/app">
         <Suspense fallback={switcherFallback}>
           <Switcher />
         </Suspense>
-        <SidebarNav />
+        <Suspense fallback={navFallback}>
+          <Navigation />
+        </Suspense>
         <div className="border-t border-line pt-3">
           <Suspense fallback={accountFallback}>
             <Account />
@@ -65,18 +87,35 @@ export default async function AppLayout({ children }: LayoutProps<"/[lang]/app">
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <MobileNav
-          storeSwitcher={
-            <Suspense fallback={switcherFallback}>
-              <Switcher />
-            </Suspense>
+        <Suspense
+          fallback={
+            <MobileNav
+              storeSwitcher={
+                <Suspense fallback={switcherFallback}>
+                  <Switcher />
+                </Suspense>
+              }
+              userMenu={
+                <Suspense fallback={accountFallback}>
+                  <Account />
+                </Suspense>
+              }
+            />
           }
-          userMenu={
-            <Suspense fallback={accountFallback}>
-              <Account />
-            </Suspense>
-          }
-        />
+        >
+          <MobileNavigation
+            storeSwitcher={
+              <Suspense fallback={switcherFallback}>
+                <Switcher />
+              </Suspense>
+            }
+            userMenu={
+              <Suspense fallback={accountFallback}>
+                <Account />
+              </Suspense>
+            }
+          />
+        </Suspense>
         <Suspense fallback={null}>
           <Banner />
         </Suspense>

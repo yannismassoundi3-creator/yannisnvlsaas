@@ -6,7 +6,9 @@ import { Suspense } from "react";
 import { useLocale } from "@/i18n/client";
 import { shellLayout } from "@/i18n/messages/shell-layout";
 import { cn } from "@/lib/utils";
-import { isActive, PRIMARY_NAV, SECONDARY_NAV, type NavItem } from "./nav-items";
+import { isActive, primaryNav, SECONDARY_NAV, type NavItem } from "./nav-items";
+
+type Mode = "ecommerce" | "reseller";
 
 function NavLink({ item, label, pathname, onNavigate }: { item: NavItem; label: string; pathname: string | null; onNavigate?: () => void }) {
   const active = pathname !== null && isActive(pathname, item);
@@ -31,24 +33,24 @@ function NavLink({ item, label, pathname, onNavigate }: { item: NavItem; label: 
  * The current path is request data on dynamic routes, so the active state is
  * resolved inside Suspense; the links themselves render with the static shell.
  */
-export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+export function SidebarNav({ onNavigate, mode = "ecommerce" }: { onNavigate?: () => void; mode?: Mode }) {
   return (
-    <Suspense fallback={<NavList pathname={null} onNavigate={onNavigate} />}>
-      <ActiveNav onNavigate={onNavigate} />
+    <Suspense fallback={<NavList pathname={null} onNavigate={onNavigate} mode={mode} />}>
+      <ActiveNav onNavigate={onNavigate} mode={mode} />
     </Suspense>
   );
 }
 
-function ActiveNav({ onNavigate }: { onNavigate?: () => void }) {
-  return <NavList pathname={usePathname()} onNavigate={onNavigate} />;
+function ActiveNav({ onNavigate, mode }: { onNavigate?: () => void; mode: Mode }) {
+  return <NavList pathname={usePathname()} onNavigate={onNavigate} mode={mode} />;
 }
 
-function NavList({ pathname, onNavigate }: { pathname: string | null; onNavigate?: () => void }) {
+function NavList({ pathname, onNavigate, mode }: { pathname: string | null; onNavigate?: () => void; mode: Mode }) {
   const t = shellLayout[useLocale()].nav;
   return (
     <nav aria-label={t.label} className="flex flex-1 flex-col gap-6">
       <ul className="space-y-0.5">
-        {PRIMARY_NAV.map((item) => (
+        {primaryNav(mode).map((item) => (
           <li key={item.href}>
             <NavLink item={item} label={t[item.key]} pathname={pathname} onNavigate={onNavigate} />
           </li>

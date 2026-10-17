@@ -697,6 +697,7 @@ export type Database = {
           note: string | null;
           ordered_at: string;
           organization_id: string;
+          sales_channel: string | null;
           shipping_charged_minor: number;
           shipping_cost_minor: number | null;
           source: string;
@@ -715,6 +716,7 @@ export type Database = {
           note?: string | null;
           ordered_at: string;
           organization_id: string;
+          sales_channel?: string | null;
           shipping_charged_minor?: number;
           shipping_cost_minor?: number | null;
           source?: string;
@@ -732,6 +734,7 @@ export type Database = {
           note?: string | null;
           ordered_at?: string;
           organization_id?: string;
+          sales_channel?: string | null;
           shipping_charged_minor?: number;
           shipping_cost_minor?: number | null;
           source?: string;
@@ -884,6 +887,7 @@ export type Database = {
       };
       products: {
         Row: {
+          acquired_on: string | null;
           archived_at: string | null;
           created_at: string;
           id: string;
@@ -900,6 +904,7 @@ export type Database = {
         };
         ComputedFields: never;
         Insert: {
+          acquired_on?: string | null;
           archived_at?: string | null;
           created_at?: string;
           id?: string;
@@ -915,6 +920,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          acquired_on?: string | null;
           archived_at?: string | null;
           created_at?: string;
           id?: string;
@@ -1069,6 +1075,7 @@ export type Database = {
       };
       stores: {
         Row: {
+          business_model: string;
           created_at: string;
           currency: string;
           default_shipping_cost_minor: number | null;
@@ -1086,6 +1093,7 @@ export type Database = {
         };
         ComputedFields: never;
         Insert: {
+          business_model?: string;
           created_at?: string;
           currency: string;
           default_shipping_cost_minor?: number | null;
@@ -1102,6 +1110,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          business_model?: string;
           created_at?: string;
           currency?: string;
           default_shipping_cost_minor?: number | null;
@@ -1231,6 +1240,7 @@ export type Database = {
       consume_rate_limit: { Args: { p_key: string; p_limit: number; p_window_seconds: number }; Returns: boolean };
       create_organization_with_store: {
         Args: {
+          p_business_model?: string;
           p_currency: string;
           p_minor_digits: number;
           p_organization_name: string;
@@ -1270,6 +1280,20 @@ export type Database = {
           platform: string;
           product_id: string;
           spend: number;
+        }[];
+      };
+      report_channel_breakdown: {
+        Args: { p_from: string; p_store_id: string; p_to: string };
+        Returns: {
+          cogs: number;
+          lines_without_cost: number;
+          margin: number;
+          net_revenue: number;
+          orders: number;
+          sales_channel: string;
+          shipping_costs: number;
+          transaction_fees: number;
+          units: number;
         }[];
       };
       report_daily_totals: {
@@ -1383,6 +1407,40 @@ export type Database = {
           ad_spend: number;
           refunds: number;
           variable_expenses: number;
+        }[];
+      };
+      reseller_items: {
+        Args: { p_search?: string; p_status?: string; p_store_id: string };
+        Returns: {
+          acquired_on: string;
+          archived: boolean;
+          created_at: string;
+          fees: number;
+          item_cost: number;
+          margin: number;
+          name: string;
+          order_external_id: string;
+          order_id: string;
+          ordered_at: string;
+          product_id: string;
+          refunds: number;
+          sale_price: number;
+          sales_channel: string;
+          shipping_charged: number;
+          shipping_cost: number;
+          sold_on: string;
+          status: string;
+          stocked_on: string;
+          unit_cost_e4: number;
+        }[];
+      };
+      reseller_stock_summary: {
+        Args: { p_stale_before: string; p_store_id: string };
+        Returns: {
+          cost_minor: number;
+          items: number;
+          items_without_cost: number;
+          stale_items: number;
         }[];
       };
     };

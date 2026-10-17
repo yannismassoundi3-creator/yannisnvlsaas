@@ -11,7 +11,7 @@ import { shellLayout } from "@/i18n/messages/shell-layout";
 import { SidebarNav } from "./sidebar-nav";
 
 /** Top bar and slide-in navigation for small screens. */
-export function MobileNav({ storeSwitcher, userMenu }: { storeSwitcher: ReactNode; userMenu: ReactNode }) {
+export function MobileNav({ storeSwitcher, userMenu, mode = "ecommerce" }: { storeSwitcher: ReactNode; userMenu: ReactNode; mode?: "ecommerce" | "reseller" }) {
   const [open, setOpen] = useState(false);
   const t = shellLayout[useLocale()];
   return (
@@ -39,7 +39,7 @@ export function MobileNav({ storeSwitcher, userMenu }: { storeSwitcher: ReactNod
               </DialogPrimitive.Close>
             </div>
             <div onClick={() => undefined}>{storeSwitcher}</div>
-            <SidebarNav onNavigate={() => setOpen(false)} />
+            <SidebarNav onNavigate={() => setOpen(false)} mode={mode} />
             <div className="border-t border-line pt-3">{userMenu}</div>
           </DialogPrimitive.Content>
         </DialogPrimitive.Portal>

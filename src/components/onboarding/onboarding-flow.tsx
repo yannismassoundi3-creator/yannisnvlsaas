@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Check, FileSpreadsheet, LayoutDashboard, PencilLine, Sparkles } from "lucide-react";
+import { ArrowRight, Check, FileSpreadsheet, House, LayoutDashboard, PackagePlus, PencilLine, Shirt, Sparkles, Store, Tag } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { Alert } from "@/components/ui/feedback";
@@ -10,19 +10,20 @@ import { Input, NativeSelect } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/i18n/client";
 import { onboardingMessages } from "@/i18n/messages/auth-onboarding";
+import { resellerMessages } from "@/i18n/messages/reseller";
 import { COMMON_CURRENCIES } from "@/lib/finance/currency";
 import { currencyLabel, otherCurrencies, timezoneLabel, timezoneOptions } from "@/lib/locale-lists";
 import { completeOnboarding, createDemoStore, createWorkspace } from "@/lib/onboarding/actions";
-import { platformName, PLATFORMS, type PlatformId, type TaxChoice } from "@/lib/onboarding/constants";
+import { platformName, PLATFORMS, suggestedBusinessModel, type BusinessModel, type PlatformId, type TaxChoice } from "@/lib/onboarding/constants";
 import { cn } from "@/lib/utils";
 
-type Props = { initialStep: 0 | 2; defaultName: string | null };
+type Props = { initialStep: 0 | 2; defaultName: string | null; initialBusinessModel?: BusinessModel };
 
-export function OnboardingFlow({ initialStep, defaultName }: Props) {
+export function OnboardingFlow({ initialStep, defaultName, initialBusinessModel = "ecommerce" }: Props) {
   const router = useRouter();
   const locale = useLocale();
   const t = onboardingMessages[locale];
-  const STEPS = t.steps;
+  const r = resellerMessages[locale];
   const [step, setStep] = useState<number>(initialStep);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -36,8 +37,17 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
     currency: "EUR",
     timezone: browserTz,
     pricesIncludeTax: "" as "" | TaxChoice,
+    businessModel: initialBusinessModel,
   });
+  // Until the person picks a mode, it follows the platform (resale marketplaces: reseller mode).
+  const [modelTouched, setModelTouched] = useState(false);
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((f) => ({ ...f, [key]: value }));
+  const reseller = form.businessModel === "reseller";
+  const STEPS = reseller ? r.onboarding.steps : t.steps;
+  const modeOptions: { value: BusinessModel; title: string; text: string; icon: ReactNode }[] = [
+    { value: "reseller", title: r.modes.resellerTitle, text: r.modes.resellerText, icon: <Shirt /> },
+    { value: "ecommerce", title: r.modes.ecommerceTitle, text: r.modes.ecommerceText, icon: <Store /> },
+  ];
   const moreCurrencies = useMemo(() => otherCurrencies().map((c) => ({ value: c, label: currencyLabel(c, locale) })), [locale]);
   const commonCurrencies = useMemo(() => COMMON_CURRENCIES.map((c) => ({ value: c, label: currencyLabel(c, locale) })), [locale]);
   // Always offer UTC and the browser's own zone, which may be missing from the canonical list.
@@ -54,6 +64,8 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
     if (step === 0) {
       if (!form.storeName.trim()) return setFieldErrors({ storeName: t.validation.storeName });
       setFieldErrors({});
+      // Resellers are usually private sellers who charge no VAT: preselected, and still changeable.
+      if (reseller && !form.pricesIncludeTax) set("pricesIncludeTax", "none");
       setStep(1);
     }
   }
@@ -129,7 +141,14 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
                 <Input id="organizationName" value={form.organizationName} onChange={(e) => set("organizationName", e.target.value)} maxLength={120} />
               </Field>
               <Field htmlFor="platform" label={t.profile.platform}>
-                <NativeSelect id="platform" value={form.platform} onChange={(e) => set("platform", e.target.value as PlatformId)}>
+                <NativeSelect
+                  id="platform"
+                  value={form.platform}
+                  onChange={(e) => {
+                    const platform = e.target.value as PlatformId;
+                    setForm((f) => ({ ...f, platform, businessModel: modelTouched ? f.businessModel : suggestedBusinessModel(platform) }));
+                  }}
+                >
                   {PLATFORMS.map((p) => (
                     <option key={p} value={p}>
                       {platformName(p, locale)}
@@ -137,6 +156,39 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
                   ))}
                 </NativeSelect>
               </Field>
+              <fieldset>
+                <legend className="text-sm font-medium text-ink">{r.modes.question}</legend>
+                <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                  {modeOptions.map((o) => (
+                    <label
+                      key={o.value}
+                      className={cn(
+                        "flex cursor-pointer gap-3 rounded-md border p-3.5 transition-colors",
+                        form.businessModel === o.value ? "border-navy-800 bg-navy-50 ring-1 ring-navy-800" : "border-line-strong hover:bg-hover",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="businessModel"
+                        value={o.value}
+                        checked={form.businessModel === o.value}
+                        onChange={() => {
+                          setModelTouched(true);
+                          set("businessModel", o.value);
+                        }}
+                        className="mt-1 accent-navy-800"
+                      />
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sunken text-ink-2 [&_svg]:size-4" aria-hidden>
+                        {o.icon}
+                      </span>
+                      <span>
+                        <span className="block text-sm font-medium text-ink">{o.title}</span>
+                        <span className="mt-0.5 block text-xs text-ink-3">{o.text}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
             </div>
             <StepActions>
               <Button onClick={next}>
@@ -225,7 +277,22 @@ export function OnboardingFlow({ initialStep, defaultName }: Props) {
           </StepShell>
         ) : null}
 
-        {step === 2 ? (
+        {step === 2 && reseller ? (
+          <StepShell title={r.onboarding.dataTitle} description={r.onboarding.dataDescription}>
+            <div className="grid gap-3">
+              <ChoiceCard icon={<PackagePlus />} title={r.onboarding.addTitle} text={r.onboarding.addText} onClick={() => startTransition(() => completeOnboarding("add_item"))} disabled={pending} />
+              <ChoiceCard icon={<Tag />} title={r.onboarding.sellTitle} text={r.onboarding.sellText} onClick={() => startTransition(() => completeOnboarding("sell"))} disabled={pending} />
+            </div>
+            <StepActions>
+              <Button variant="ghost" onClick={() => startTransition(() => completeOnboarding("dashboard"))} disabled={pending}>
+                <House aria-hidden />
+                {r.onboarding.home}
+              </Button>
+            </StepActions>
+          </StepShell>
+        ) : null}
+
+        {step === 2 && !reseller ? (
           <StepShell title={t.data.title} description={t.data.description}>
             <div className="grid gap-3">
               <ChoiceCard

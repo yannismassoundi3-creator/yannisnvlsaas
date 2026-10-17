@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Alert, Skeleton } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
 import { rangeQuery } from "@/lib/analytics/range";
+import { isReseller } from "@/lib/onboarding/constants";
 import { requireStore } from "@/lib/auth/workspace";
 import { getOverviewData, reportPeriod } from "@/lib/data/reports";
 import { reportsPage } from "@/i18n/messages/account-reports";
@@ -39,7 +40,7 @@ async function Reports({ searchParams }: { searchParams: PageProps<"/[lang]/app/
   const q = rangeQuery(period);
   const canDownload = ws.entitlements.limits.exports;
 
-  const reports: ReportDef[] = [
+  const allReports: ReportDef[] = [
     {
       id: "summary",
       title: t.summaryTitle,
@@ -74,6 +75,9 @@ async function Reports({ searchParams }: { searchParams: PageProps<"/[lang]/app/
       downloads: [{ label: "CSV", href: `/api/reports/daily?format=csv&${q}`, format: "CSV" }],
     },
   ];
+
+  // Reseller stores have no advertising: its report is not offered.
+  const reports = isReseller(store) ? allReports.filter((r) => r.id !== "advertising") : allReports;
 
   const header = (
     <PageHeader

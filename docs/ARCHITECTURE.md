@@ -104,6 +104,16 @@ billing_events (Stripe event log, service role only)       private.rate_limits
 - **Entitlements** are computed, never stored: the `organization_entitlements` view derives the access level from
   the trial dates and the latest subscription.
 
+- **Reseller mode.** `stores.business_model` is `ecommerce` (imports orders, costs and ads) or `reseller` (people
+  who resell items one by one on Vinted, Leboncoin, eBay or Vestiaire Collective). Reseller data reuses the same
+  tables, so every report, export and policy applies unchanged: an item is a `products` row (purchase price in
+  `unit_cost_e4`, optional `acquired_on`), a sale is an `orders` row with one `order_items` line (quantity 1, cost
+  snapshot, generated number `V-YYYYMMDD-XXXXXX`) and `orders.sales_channel` records where it sold. An item with an
+  order line is sold; without one it is in stock. Writes go through `src/lib/reseller/actions.ts` and the shared
+  `writeOrder` path (`src/lib/transactions/write.ts`, also used by manual orders); reads through
+  `src/lib/data/reseller.ts` and the SQL functions `reseller_items`, `reseller_stock_summary` and
+  `report_channel_breakdown`. The home page, navigation and onboarding adapt to the mode.
+
 Generated TypeScript types for the schema live in `src/lib/supabase/database.types.ts` (`npm run db:types`).
 
 ## Where the rules live
