@@ -9,6 +9,9 @@ export const shellUi = defineMessages({
     whatIs: (term: string) => `What is ${term}?`,
     notifications: "Notifications",
     closeToast: "Close toast",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
+    capsLock: "Caps Lock is on.",
   },
   fr: {
     close: "Fermer",
@@ -17,5 +20,8 @@ export const shellUi = defineMessages({
     whatIs: (term: string) => `Qu'est-ce que « ${term} » ?`,
     notifications: "Notifications",
     closeToast: "Fermer la notification",
+    showPassword: "Afficher le mot de passe",
+    hidePassword: "Masquer le mot de passe",
+    capsLock: "La touche Verr. Maj est activée.",
   },
 });

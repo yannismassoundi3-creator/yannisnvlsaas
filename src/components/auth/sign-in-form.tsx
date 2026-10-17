@@ -8,6 +8,7 @@ import { Alert } from "@/components/ui/feedback";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useLocale } from "@/i18n/client";
 import { authFormMessages } from "@/i18n/messages/auth-forms";
 import { safeNextPath } from "@/lib/auth/redirect";
@@ -89,7 +90,7 @@ export function SignInForm() {
           </Link>
         }
       >
-        <Input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <PasswordInput id="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
       </Field>
       <Button type="submit" className="w-full" size="lg" loading={pending}>
         {t.signIn.submit}

@@ -8,6 +8,7 @@ import { Alert } from "@/components/ui/feedback";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { toast } from "@/components/ui/toaster";
 import { useLocale } from "@/i18n/client";
 import { authFormMessages } from "@/i18n/messages/auth-forms";
@@ -106,7 +107,7 @@ export function ResetPasswordForm() {
     <form onSubmit={onSubmit} noValidate className="space-y-4">
       {error ? <Alert tone="negative">{error}</Alert> : null}
       <Field htmlFor="password" label={t.newPassword}>
-        <Input id="password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} aria-describedby="password-rules" required autoFocus />
+        <PasswordInput id="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} aria-describedby="password-rules" required autoFocus />
       </Field>
       <ul id="password-rules" className="-mt-1 space-y-1 text-xs">
         {checks.map((c) => (
@@ -117,7 +118,7 @@ export function ResetPasswordForm() {
         ))}
       </ul>
       <Field htmlFor="confirm" label={t.confirmPassword}>
-        <Input id="confirm" type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+        <PasswordInput id="confirm" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
       </Field>
       <Button type="submit" className="w-full" size="lg" loading={pending}>
         {t.submit}

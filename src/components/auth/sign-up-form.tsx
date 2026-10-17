@@ -9,6 +9,7 @@ import { Alert } from "@/components/ui/feedback";
 import { Button } from "@/components/ui/button";
 import { Field, Label } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { localizedPath } from "@/i18n/config";
 import { useLocale } from "@/i18n/client";
 import { authFormMessages } from "@/i18n/messages/auth-forms";
@@ -77,9 +78,8 @@ export function SignUpForm() {
         />
       </Field>
       <Field htmlFor="password" label={authFormMessages[locale].password} error={errors.password}>
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}

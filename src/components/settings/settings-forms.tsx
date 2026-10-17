@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/controls";
 import { ConfirmDialog, Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { describedBy, Field } from "@/components/ui/field";
 import { Input, NativeSelect } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { toast } from "@/components/ui/toaster";
 import { LOCALE_NAMES, LOCALES, type Locale } from "@/i18n/config";
 import { useLocale } from "@/i18n/client";
@@ -143,7 +144,7 @@ export function ProfileForms({ fullName, email }: { fullName: string | null; ema
         }}
       >
         <Field htmlFor={`${id}-password`} label={t.newPassword} hint={t.passwordHint} error={passwordResult.errors.password}>
-          <Input id={`${id}-password`} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" aria-describedby={describedBy(`${id}-password`, { hint: true, error: passwordResult.errors.password })} />
+          <PasswordInput id={`${id}-password`} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" aria-describedby={describedBy(`${id}-password`, { hint: true, error: passwordResult.errors.password })} />
         </Field>
         <Message text={passwordResult.message} />
         <Button type="submit" variant="secondary" loading={pending && which === "password"} disabled={!password}>
