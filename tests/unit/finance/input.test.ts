@@ -41,7 +41,19 @@ describe("form input parsing", () => {
     expect(parseUserInteger("0", { min: 1 }).ok).toBe(false);
   });
 
-  it("formats basis points for editing", () => {
+  it("returns validation messages in French when asked", () => {
+    expect(parseUserAmount("", "EUR", { locale: "fr" })).toEqual({ ok: false, message: "Saisissez une valeur." });
+    expect(parseUserAmount("-3", "EUR", { locale: "fr" })).toEqual({ ok: false, message: "Saisissez zéro ou une valeur positive." });
+    expect(parseUserUnitCost("abc", { locale: "fr" })).toEqual({ ok: false, message: "Saisissez un nombre, par exemple 12,50." });
+    expect(parseUserPercentToBps("101", { locale: "fr" })).toEqual({ ok: false, message: "Saisissez un pourcentage entre 0 et 100." });
+    expect(parseUserInteger("1.5", { locale: "fr" })).toEqual({ ok: false, message: "Saisissez un nombre entier." });
+    expect(parseUserInteger("0", { min: 1, locale: "fr" })).toEqual({ ok: false, message: "Saisissez 1 ou plus." });
+    expect(parseUserInteger("2000000", { max: 1_000_000, locale: "fr" })).toEqual({ ok: false, message: `Saisissez ${(1_000_000).toLocaleString("fr-FR")} ou moins.` });
+    expect(parseUserInteger("2000000", { max: 1_000_000 })).toEqual({ ok: false, message: "Enter 1,000,000 or less." });
+    expect(parseUserUnitCost("abc")).toEqual({ ok: false, message: "Enter a number, for example 12.50." });
+  });
+
+    it("formats basis points for editing", () => {
     expect(bpsToInputValue(290)).toBe("2.9");
     expect(bpsToInputValue(150)).toBe("1.5");
     expect(bpsToInputValue(1000)).toBe("10");

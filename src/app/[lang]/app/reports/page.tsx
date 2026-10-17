@@ -93,7 +93,7 @@ async function Reports({ searchParams }: { searchParams: PageProps<"/[lang]/app/
     );
   }
 
-  const data = await getOverviewData(store, period.range, period.comparison);
+  const data = await getOverviewData(store, period.range, period.comparison, locale);
 
   return (
     <div className="space-y-6">
@@ -154,7 +154,7 @@ async function Reports({ searchParams }: { searchParams: PageProps<"/[lang]/app/
         <h2 id="preview-heading" className="text-lg font-semibold tracking-tight text-ink">
           {t.preview}
         </h2>
-        <ProfitBreakdown metrics={data.metrics} currency={store.currency} title={f.range(period.range)} />
+        <ProfitBreakdown metrics={data.metrics} currency={store.currency} title={f.range(period.range)} locale={locale} />
       </section>
     </div>
   );

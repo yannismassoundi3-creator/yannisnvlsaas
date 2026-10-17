@@ -5,9 +5,8 @@ import { createFormat } from "@/i18n/format";
 import { reportFiles } from "@/i18n/messages/account-reports";
 import type { ReadyWorkspace, Store } from "@/lib/auth/workspace";
 import { type CsvCell } from "@/lib/csv";
-import { fetchDailyTotals, fetchProductBreakdown, getOverviewData, type OverviewData, type ReportPeriod } from "@/lib/data/reports";
+import { fetchDailyTotals, getOverviewData, type ReportPeriod } from "@/lib/data/reports";
 import { moneyCell, rateCell } from "@/lib/exports";
-import { buildInsights, type Insight, type InsightInput } from "@/lib/finance/insights";
 import { createClient } from "@/lib/supabase/server";
 import type { PdfReportInput, ReportKind } from "./pdf";
 
@@ -15,7 +14,7 @@ export const REPORT_KINDS: ReportKind[] = ["summary", "products", "advertising"]
 
 /** Everything a PDF report needs, from the same data functions as the screens. */
 export async function buildPdfInput(ws: ReadyWorkspace, store: Store, period: ReportPeriod, kind: ReportKind, locale: Locale = "en"): Promise<PdfReportInput> {
-  const data = await getOverviewData(store, period.range, period.comparison);
+  const data = await getOverviewData(store, period.range, period.comparison, locale);
   const f = createFormat(locale);
   const notes = dataNotices(data.metrics, store, locale).map((n) => `${n.title}. ${n.body}`);
   if (data.unallocated.adSpend > 0) {
@@ -35,36 +34,17 @@ export async function buildPdfInput(ws: ReadyWorkspace, store: Store, period: Re
     previous: data.previous,
     products: data.products,
     campaigns: data.campaigns,
-    insights: locale === "en" ? data.insights : await localizedInsights(store, period, data, locale),
+    insights: data.insights,
     notes,
     unallocatedAdSpend: data.unallocated.adSpend,
   };
-}
-
-/**
- * getOverviewData builds its insights in English (it is cached per store and
- * period, without a language). For another language, rebuild them with the
- * same inputs and the report's locale.
- */
-async function localizedInsights(store: Store, period: ReportPeriod, data: OverviewData, locale: Locale): Promise<Insight[]> {
-  const previousProducts = period.comparison ? await fetchProductBreakdown(await createClient(), store.id, period.comparison) : null;
-  const input: InsightInput = {
-    currency: store.currency,
-    current: data.metrics,
-    previous: data.previous,
-    products: { current: data.products, previous: previousProducts?.rows ?? [] },
-    campaigns: data.campaigns,
-    feeRule: { basisPoints: store.fee_rule_bps, fixedMinor: store.fee_rule_fixed_minor },
-    locale,
-  };
-  return buildInsights(input);
 }
 
 /** Key figures and the profit breakdown, current vs previous period, as CSV rows. */
 export async function summaryCsvRows(store: Store, period: ReportPeriod, locale: Locale = "en"): Promise<{ header: string[]; rows: CsvCell[][] }> {
   const t = reportFiles[locale];
   const L = t.summary;
-  const data = await getOverviewData(store, period.range, period.comparison);
+  const data = await getOverviewData(store, period.range, period.comparison, locale);
   const m = data.metrics;
   const p = data.previous;
   const c = store.currency;

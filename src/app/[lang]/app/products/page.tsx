@@ -313,7 +313,7 @@ async function Products({ searchParams }: { searchParams: PageProps<"/[lang]/app
 
 function ProductsSkeleton({ label }: { label: string }) {
   return (
-    <div className="space-y-5" aria-busy="true" aria-label={label}>
+    <div className="space-y-5" role="status" aria-busy="true" aria-label={label}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
           <Skeleton className="h-4 w-28" />

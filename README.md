@@ -33,6 +33,7 @@ missing data are always labelled, and contribution margin is never presented as 
 - **Billing:** 14-day trial without a card, Pro plan via Stripe Checkout and the customer portal, verified and
   idempotent webhooks, grace period on failed payments, entitlements enforced by the database.
 - **Marketing site** with pricing, FAQ, glossary of financial terms, legal pages, sitemap and social images.
+- **English and French:** public pages in both languages (English at the root, French under `/fr`, chosen from the browser language); the app, emails, PDF reports and CSV exports follow the language picked in Settings or the language switch. Numbers and dates are formatted for the language. Translations are typed modules in `src/i18n/messages/`.
 
 ## Stack
 

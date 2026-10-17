@@ -42,6 +42,7 @@ présentée comme un bénéfice net.
   données.
 - **Site marketing** avec tarifs, FAQ, glossaire des termes financiers, pages légales, sitemap et images pour les
   réseaux sociaux.
+- **Anglais et français :** pages publiques dans les deux langues (anglais à la racine, français sous `/fr`, choisi selon la langue du navigateur) ; l'application, les e-mails, les rapports PDF et les exports CSV suivent la langue choisie dans les paramètres ou via le sélecteur de langue. Les nombres et les dates sont formatés selon la langue. Les traductions sont des modules typés dans `src/i18n/messages/`.
 
 ## Stack technique
 

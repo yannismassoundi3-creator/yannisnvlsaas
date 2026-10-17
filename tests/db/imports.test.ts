@@ -115,6 +115,8 @@ describe("orders import", () => {
   it("re-importing the same file adds nothing (safe re-import)", async () => {
     const again = await stage({ kind: "orders", rows: ORDERS });
     expect(await finalize(again)).toMatchObject({ valid: 0, duplicate: 3 });
+    const warnings = await adminQuery("select warnings from public.import_rows where import_job_id = $1 and row_number = 2", [again]);
+    expect(warnings.rows[0].warnings.at(-1)).toEqual({ field: "order_number", message: "This order already exists and will be skipped." });
     await commitAll(again);
     expect(await job(again)).toMatchObject({ status: "committed", inserted_count: 0, skipped_count: 3 });
     const count = await adminQuery("select count(*)::int as n from public.orders where store_id = $1", [org.storeId]);
@@ -122,6 +124,28 @@ describe("orders import", () => {
     // The skipped re-import is now the latest import, so the first cannot be undone before it.
     await expect(rollback(first)).rejects.toThrow(/more recent imports/);
     await rollback(again);
+  });
+
+  it("writes duplicate messages in the language stored on the job", async () => {
+    const fr = await stage({ kind: "orders", rows: ORDERS, options: { locale: "fr" } });
+    expect(await finalize(fr)).toMatchObject({ valid: 0, duplicate: 3 });
+    const rows = await adminQuery("select warnings from public.import_rows where import_job_id = $1 order by row_number", [fr]);
+    expect(rows.rows.map((r) => r.warnings.at(-1))).toEqual(Array(3).fill({ field: "order_number", message: "Cette commande existe déjà et sera ignorée." }));
+    await commitAll(fr);
+    await rollback(fr);
+
+    const products = await stage({
+      kind: "products",
+      rows: [
+        { name: "Bol", sku: "BOL-1", unit_cost: "2" },
+        { name: "Bol bis", sku: "bol-1", unit_cost: "3" },
+      ],
+      options: { locale: "fr" },
+    });
+    expect(await finalize(products)).toMatchObject({ valid: 1, duplicate: 1 });
+    const dup = await adminQuery("select errors from public.import_rows where import_job_id = $1 and row_number = 3", [products]);
+    expect(dup.rows[0].errors).toEqual([{ field: "sku", message: "Même produit qu'à la ligne 2. Seule la première ligne est importée." }]);
+    await adminQuery("delete from public.import_jobs where id = $1", [products]);
   });
 
   it("replaces existing orders on request and undo restores them exactly", async () => {

@@ -306,7 +306,7 @@ async function Overview({ searchParams }: { searchParams: Promise<SearchParams> 
 
 function OverviewSkeleton({ locale }: { locale: Locale }) {
   return (
-    <div className="space-y-6" aria-busy="true" aria-label={overviewMessages[locale].loading}>
+    <div className="space-y-6" role="status" aria-busy="true" aria-label={overviewMessages[locale].loading}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
           <Skeleton className="h-4 w-28" />

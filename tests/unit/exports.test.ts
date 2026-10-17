@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { exportsMessages } from "@/i18n/messages/catalog-exports";
 import { escapeCsvCell, fileSlug, toCsv } from "@/lib/csv";
 import { deriveMetrics, EMPTY_TOTALS } from "@/lib/finance/metrics";
 import { renderPdfReport } from "@/lib/reports/pdf";
@@ -24,6 +25,21 @@ describe("CSV export safety", () => {
   it("writes a BOM and CRLF line ends", () => {
     expect(toCsv(["a", "b"], [[1, "x"]])).toBe("﻿a,b\r\n1,x\r\n");
     expect(fileSlug("Atelier Camille / Été 2026")).toBe("atelier-camille-ete-2026");
+  });
+});
+
+describe("CSV export headers", () => {
+  it("keeps the English headers and has a French header for every column", () => {
+    expect(exportsMessages.en.productColumns[0]).toBe("Product");
+    expect(exportsMessages.en.productColumns.at(-1)).toBe("Contribution margin %");
+    expect(exportsMessages.en.campaignColumns.at(-1)).toBe("Below break-even ROAS");
+    expect(exportsMessages.fr.productColumns).toHaveLength(exportsMessages.en.productColumns.length);
+    expect(exportsMessages.fr.campaignColumns).toHaveLength(exportsMessages.en.campaignColumns.length);
+    expect(exportsMessages.fr.productColumns).toContain("Marge sur coûts variables");
+    expect(toCsv(exportsMessages.fr.campaignColumns.slice(0, 2), [[exportsMessages.fr.storeWide, exportsMessages.fr.yes]])).toBe(
+      "\uFEFFCampagne,Plateforme\r\nPlusieurs produits / toute la boutique,oui\r\n",
+    );
+    expect(escapeCsvCell(exportsMessages.en.yes)).toBe(escapeCsvCell(true));
   });
 });
 
