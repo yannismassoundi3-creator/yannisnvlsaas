@@ -16,6 +16,12 @@ Chaque champ, sa description et les noms d'en-têtes reconnus automatiquement so
 `src/lib/imports/schema.ts`. La correspondance des en-têtes ignore la casse, les accents, la ponctuation et le texte
 entre parenthèses (« Amount spent (EUR) » correspond à « amount spent »), et inclut les en-têtes français courants.
 
+Les modèles suivent la langue de l'interface. Les modèles français utilisent des en-têtes français (tous reconnus
+automatiquement), des dates jour/mois/année, la virgule décimale et le point-virgule comme séparateur : Excel en
+français les ouvre donc en colonnes. Les modèles anglais utilisent la virgule et le point décimal. Tous sont en UTF-8
+avec BOM et fins de ligne CRLF, et le type de dépense est lu dans les deux langues (« fixed »/« variable »,
+« fixe »/« variable »).
+
 ## Le pipeline
 
 | # | Étape | Où | Ce qui se passe |

@@ -21,6 +21,27 @@ describe("demo generator", () => {
     expect(generateDemoDataset({ endDate: END, seed: 1 })).not.toEqual(ds);
   });
 
+  it("writes names in French without changing SKUs or a single figure", () => {
+    const fr = generateDemoDataset({ endDate: END, locale: "fr" });
+    expect(generateDemoDataset({ endDate: END, locale: "fr" })).toEqual(fr);
+    const figures = (d: Dataset) => JSON.parse(JSON.stringify(d, (key, value) => (key === "name" || key === "description" ? undefined : value)));
+    expect(figures(fr)).toEqual(figures(ds));
+    expect(fr.products.map((p) => p.sku)).toEqual(ds.products.map((p) => p.sku));
+
+    const bySku = (d: Dataset, sku: string) => d.products.find((p) => p.sku === sku)?.name;
+    expect(bySku(ds, "BEAN-MER-CHR")).toBe("Merino beanie");
+    expect(bySku(fr, "BEAN-MER-CHR")).toBe("Bonnet en mérinos");
+    expect(bySku(fr, "TOTE-LIN-NAT")).toBe("Tote bag en lin");
+    expect(bySku(fr, "NAPK-LIN-4PK")).toBe("Serviettes en lin (lot de 4)");
+    expect(fr.campaigns.map((c) => c.name)).toEqual(expect.arrayContaining(["Prospection – audiences larges", "Shopping – tous les produits", "Recherche – marque"]));
+    expect(ds.campaigns.map((c) => c.name)).toContain("Prospecting – broad audiences");
+
+    // Order lines carry the same (translated) name as their product.
+    const names = new Map(fr.products.map((p) => [p.id, p.name]));
+    expect(fr.orders.flatMap((o) => o.lines).every((l) => l.name === names.get(l.productId!))).toBe(true);
+    expect(fr.expenses.map((e) => e.description)).toContain("Logiciel de comptabilité");
+  });
+
   it("produces a plausible store", () => {
     const m = deriveMetrics(computeTotals(ds, last30));
     expect(m.orders).toBeGreaterThan(300);

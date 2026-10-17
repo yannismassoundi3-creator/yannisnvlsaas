@@ -3,6 +3,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { cache } from "react";
+import { LOCALES, type Locale } from "@/i18n/config";
+import { onboardingMessages } from "@/i18n/messages/auth-onboarding";
+import { getRequestLocale } from "@/i18n/request";
 import { resolveEntitlements, type Entitlements } from "@/lib/billing/entitlements";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -34,6 +37,18 @@ export type ReadyWorkspace = Workspace & {
 };
 
 export const ACTIVE_STORE_COOKIE = "nx_store";
+
+/** Default names the sample store is created with, in every language (and earlier wordings). */
+const SAMPLE_STORE_NAMES = new Set<string>(["Sample store", "Boutique exemple", ...LOCALES.map((l) => onboardingMessages[l].actions.sampleStoreName)]);
+
+/**
+ * The sample store's name is stored in the language it was created in. While
+ * it keeps its default name, it is shown in the current interface language.
+ */
+export function displayStore(store: Store, locale: Locale): Store {
+  if (!store.is_demo || !SAMPLE_STORE_NAMES.has(store.name)) return store;
+  return { ...store, name: onboardingMessages[locale].actions.sampleStoreName };
+}
 
 /** Verified identity of the caller (JWT signature and expiry checked), or null. */
 export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
@@ -78,13 +93,14 @@ export const getWorkspace = cache(async (): Promise<Workspace> => {
     };
   }
 
-  const [{ data: stores }, { data: entitlementRow }, cookieStore] = await Promise.all([
+  const [{ data: stores }, { data: entitlementRow }, cookieStore, locale] = await Promise.all([
     supabase.from("stores").select("*").eq("organization_id", organization.id).order("created_at", { ascending: true }),
     supabase.from("organization_entitlements").select("*").eq("organization_id", organization.id).maybeSingle(),
     cookies(),
+    getRequestLocale(),
   ]);
 
-  const list = stores ?? [];
+  const list = (stores ?? []).map((s) => displayStore(s, locale));
   const preferred = cookieStore.get(ACTIVE_STORE_COOKIE)?.value;
   const activeStore = list.find((s) => s.id === preferred) ?? list.find((s) => !s.is_demo) ?? list[0] ?? null;
 

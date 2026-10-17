@@ -13,14 +13,15 @@ const DEMO_TIMEZONE = "Europe/Paris";
 /**
  * Demo figures for the public website, computed from the fictional sample
  * store. Cached for a day so the marketing pages stay static and fast. The
- * locale only changes the wording of the insights (it is part of the cache key).
+ * locale only changes the wording of the insights and the product and campaign
+ * names (it is part of the cache key); the figures are the same in every language.
  */
 export async function getMarketingDemo(locale: Locale = "en") {
   "use cache";
   cacheLife("days");
 
   const end = addDays(todayIn(DEMO_TIMEZONE), -1);
-  const ds = generateDemoDataset({ endDate: end, timezone: DEMO_TIMEZONE });
+  const ds = generateDemoDataset({ endDate: end, timezone: DEMO_TIMEZONE, locale });
   const range = { from: addDays(end, -29), to: end };
   const prev = previousPeriod(range);
 

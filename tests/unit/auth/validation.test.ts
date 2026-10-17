@@ -1,7 +1,11 @@
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { onboardingMessages } from "@/i18n/messages/auth-onboarding";
 import { authErrorMessage, isPasswordValid, passwordChecks } from "@/lib/auth/validation";
+import { displayStore, type Store } from "@/lib/auth/workspace";
 import { currencyLabel, timezoneLabel } from "@/lib/locale-lists";
-import { platformName } from "@/lib/onboarding/constants";
+import { platformName, PLATFORMS } from "@/lib/onboarding/constants";
 
 describe("passwordChecks", () => {
   it("keeps the English rules by default", () => {
@@ -43,6 +47,29 @@ describe("onboarding option labels", () => {
     expect(platformName("other", "fr")).toBe("Autre ou sur mesure");
   });
 
+  it("offers the resale marketplaces, under their brand names in both languages", () => {
+    expect(PLATFORMS).toEqual(expect.arrayContaining(["vinted", "leboncoin", "ebay", "vestiaire_collective"]));
+    expect(PLATFORMS.at(-1)).toBe("other");
+    for (const locale of ["en", "fr"] as const) {
+      expect(platformName("vinted", locale)).toBe("Vinted");
+      expect(platformName("leboncoin", locale)).toBe("Leboncoin");
+      expect(platformName("ebay", locale)).toBe("eBay");
+      expect(platformName("vestiaire_collective", locale)).toBe("Vestiaire Collective");
+    }
+  });
+
+  it("lists exactly the platforms the database accepts", () => {
+    const dir = path.join(process.cwd(), "supabase", "migrations");
+    const latest = readdirSync(dir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort()
+      .map((f) => readFileSync(path.join(dir, f), "utf8"))
+      .filter((sql) => /stores_platform_check|platform text not null default 'other'/.test(sql))
+      .at(-1)!;
+    const list = /check \(platform in \(([^)]*)\)/.exec(latest.slice(latest.search(/stores_platform_check|platform text not null default 'other'/)))![1];
+    expect([...list.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort()).toEqual([...PLATFORMS].sort());
+  });
+
   it("names currencies in the interface language", () => {
     expect(currencyLabel("EUR")).toBe("EUR — Euro");
     expect(currencyLabel("EUR", "fr")).toBe("EUR — euro");
@@ -53,5 +80,22 @@ describe("onboarding option labels", () => {
     expect(timezoneLabel("America/New_York", "fr")).toMatch(/^America\/New York \(heure de l.Est/);
     expect(timezoneLabel("UTC")).toBe("UTC");
     expect(timezoneLabel("Not/AZone", "fr")).toBe("Not/AZone");
+  });
+});
+
+describe("sample store name", () => {
+  const store = (name: string, isDemo: boolean) => ({ id: "s1", name, is_demo: isDemo }) as Store;
+
+  it("shows the default sample-store name in the interface language", () => {
+    const { en, fr } = { en: onboardingMessages.en.actions.sampleStoreName, fr: onboardingMessages.fr.actions.sampleStoreName };
+    expect(displayStore(store("Sample store", true), "fr").name).toBe(fr);
+    expect(displayStore(store("Boutique exemple", true), "en").name).toBe(en);
+    expect(displayStore(store(fr, true), "fr").name).toBe(fr);
+    expect(displayStore(store(en, true), "fr").name).toBe(fr);
+  });
+
+  it("leaves real stores and renamed sample stores alone", () => {
+    expect(displayStore(store("Sample store", false), "fr").name).toBe("Sample store");
+    expect(displayStore(store("Ma boutique test", true), "en").name).toBe("Ma boutique test");
   });
 });
