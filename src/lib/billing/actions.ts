@@ -20,18 +20,29 @@ const STRIPE_LOCALE: Record<Locale, "en" | "fr"> = { en: "en", fr: "fr" };
 /** Stripe only accepts a trial end at least 48 hours ahead. */
 const MIN_TRIAL_END_MS = 2 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000;
 
+/** The stored Stripe customer, or null when there is none or it was deleted in the Stripe dashboard. */
+async function storedCustomer(organizationId: string): Promise<{ id: string | null; deleted: string | null }> {
+  const { data } = await createAdminClient().from("billing_customers").select("stripe_customer_id").eq("organization_id", organizationId).maybeSingle();
+  if (!data) return { id: null, deleted: null };
+  const customer = await getStripe().customers.retrieve(data.stripe_customer_id);
+  return customer.deleted ? { id: null, deleted: data.stripe_customer_id } : { id: customer.id, deleted: null };
+}
+
 async function ensureCustomer(organizationId: string, organizationName: string, email: string | null): Promise<string> {
   const admin = createAdminClient();
-  const { data } = await admin.from("billing_customers").select("stripe_customer_id").eq("organization_id", organizationId).maybeSingle();
-  if (data) return data.stripe_customer_id;
+  const stored = await storedCustomer(organizationId);
+  if (stored.id) return stored.id;
   const customer = await getStripe().customers.create(
     { name: organizationName, email: email ?? undefined, metadata: { organization_id: organizationId } },
-    { idempotencyKey: `customer-${organizationId}` },
+    // A replacement for a deleted customer needs its own key, or Stripe replays the deleted one.
+    { idempotencyKey: stored.deleted ? `customer-${organizationId}-after-${stored.deleted}` : `customer-${organizationId}` },
   );
-  const { error } = await admin.from("billing_customers").upsert({ organization_id: organizationId, stripe_customer_id: customer.id }, { onConflict: "organization_id", ignoreDuplicates: true });
+  const { error } = stored.deleted
+    ? await admin.from("billing_customers").update({ stripe_customer_id: customer.id }).eq("organization_id", organizationId).eq("stripe_customer_id", stored.deleted)
+    : await admin.from("billing_customers").upsert({ organization_id: organizationId, stripe_customer_id: customer.id }, { onConflict: "organization_id", ignoreDuplicates: true });
   if (error) throw new Error("Could not store the billing customer");
-  const { data: stored } = await admin.from("billing_customers").select("stripe_customer_id").eq("organization_id", organizationId).single();
-  return stored?.stripe_customer_id ?? customer.id;
+  const { data: saved } = await admin.from("billing_customers").select("stripe_customer_id").eq("organization_id", organizationId).single();
+  return saved?.stripe_customer_id ?? customer.id;
 }
 
 /**
@@ -95,12 +106,12 @@ export async function openBillingPortal(): Promise<Failure> {
   if (!isStripeConfigured()) return { ok: false, message: t.notConfigured };
   if (!(await consumeRateLimit(`portal:${ws.user.id}`, 20, 3600))) return { ok: false, message: t.tooMany };
 
-  const { data } = await createAdminClient().from("billing_customers").select("stripe_customer_id").eq("organization_id", ws.organization.id).maybeSingle();
-  if (!data) return { ok: false, message: t.noCustomer };
   let url: string;
   try {
+    const customer = await storedCustomer(ws.organization.id);
+    if (!customer.id) return { ok: false, message: t.noCustomer };
     const session = await getStripe().billingPortal.sessions.create({
-      customer: data.stripe_customer_id,
+      customer: customer.id,
       return_url: `${publicEnv.siteUrl}/app/billing`,
       locale: STRIPE_LOCALE[locale],
     });
