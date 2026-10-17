@@ -1,14 +1,17 @@
 /**
  * "Nice" axis scales: round steps of 1, 2, 2.5 or 5 × 10^n so tick labels read
  * as €0, €500, €1K, €1.5K rather than arbitrary values. Always includes zero.
+ * Chart values are integers (minor currency units or counts), so steps are
+ * whole numbers: a fractional tick would be a fraction of a cent.
  */
 export function niceScale(min: number, max: number, maxTicks = 5): { domain: [number, number]; ticks: number[] } {
   let lo = Math.min(0, min);
   let hi = Math.max(0, max);
-  if (lo === hi) hi = lo + 1;
+  // Nothing to scale (e.g. a product without sales in the period): a single zero line.
+  if (lo === hi) return { domain: [lo, lo + 1], ticks: [lo] };
 
   const rawStep = (hi - lo) / Math.max(1, maxTicks - 1);
-  const step = niceStep(rawStep);
+  const step = Math.max(1, niceStep(rawStep));
   lo = Math.floor(lo / step) * step;
   hi = Math.ceil(hi / step) * step;
 
