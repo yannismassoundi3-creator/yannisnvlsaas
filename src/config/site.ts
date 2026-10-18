@@ -22,7 +22,7 @@ export const site = {
     country: process.env.NEXT_PUBLIC_COMPANY_COUNTRY || null,
   },
   /** Date shown on the legal pages. Update whenever the documents change. */
-  legalLastUpdated: "2026-10-17",
+  legalLastUpdated: "2026-10-18",
   /**
    * Service providers that process personal data on Narixia's behalf. Keep this
    * list accurate for your deployment: it is published in the privacy policy.
@@ -37,6 +37,16 @@ export const site = {
       name: process.env.NEXT_PUBLIC_INBOUND_EMAIL_PROVIDER || "Postmark",
       purpose: "Receiving the sale emails you forward to us",
       location: process.env.NEXT_PUBLIC_INBOUND_EMAIL_REGION || "United States",
+    },
+    // Listed always, not only when ANTHROPIC_API_KEY is set: the privacy policy is a
+    // prerendered page, so a condition on a server secret could silently drop it from
+    // the published list while the feature is on. Photos reach Anthropic only when a
+    // seller presses the button, which the purpose states.
+    {
+      id: "ai",
+      name: "Anthropic (Claude)",
+      purpose: "Writing listings from your photos (only if you use this feature)",
+      location: "United States",
     },
   ],
 } as const;
@@ -68,6 +78,10 @@ const PROCESSORS_FR: Record<ProcessorId, { purpose: string; location: string }> 
   inbound: {
     purpose: "Réception des e-mails de vente que vous nous transférez",
     location: process.env.NEXT_PUBLIC_INBOUND_EMAIL_REGION || "États-Unis",
+  },
+  ai: {
+    purpose: "Génération d'annonces à partir de vos photos (si vous utilisez la fonction)",
+    location: "États-Unis",
   },
 };
 

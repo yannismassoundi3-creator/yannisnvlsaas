@@ -13,10 +13,15 @@ import { currencySymbol } from "@/lib/finance/currency";
 import { toInputDecimal } from "@/lib/finance/input";
 import { e4ToInputValue } from "@/lib/finance/money";
 import { platformName, SALES_CHANNELS, type PlatformId } from "@/lib/onboarding/constants";
-import { addItem, sellItem, updateItem } from "@/lib/reseller/actions";
+import { listingMessages } from "@/i18n/messages/listing";
+import { thumbnail } from "@/lib/photos/browser";
+import { addItem, attachItemPhoto, sellItem, updateItem } from "@/lib/reseller/actions";
 import { MAX_ITEM_QUANTITY, nameTokens } from "@/lib/reseller/logic";
 import { unitCostFromInput, type PriceMode } from "@/lib/reseller/schema";
 import { cn } from "@/lib/utils";
+import { ItemPhotos, usePhotoPicker } from "./item-photos";
+import { ItemThumb } from "./item-thumb";
+import { ListingAssistant } from "./listing-assistant";
 
 /**
  * Quick dialogs of the reseller mode: "Add an item" and "Sold!". Built for a
@@ -27,7 +32,16 @@ import { cn } from "@/lib/utils";
  * open them (e.g. the "Sold" button of an item that lingers in stock).
  */
 
-export type StockOption = { id: string; name: string; unitCostE4: number | null; stockedOn: string; /** Pieces left. */ remaining: number };
+export type StockOption = {
+  id: string;
+  name: string;
+  unitCostE4: number | null;
+  stockedOn: string;
+  /** Pieces left. */
+  remaining: number;
+  /** Short-lived signed URL of the item's thumbnail, if it has one. */
+  photoUrl?: string | null;
+};
 
 /** Values that prefill the sale form, e.g. from a forwarded sale email. */
 export type SalePrefill = { price?: string; channel?: PlatformId; title?: string | null; productId?: string | null; inboundEmailId?: string };
@@ -322,6 +336,21 @@ function AddItemContent({ currency, today, onDone }: { currency: string; today: 
   const [, startTransition] = useTransition();
   const another = useRef(false);
   const nameRef = useRef<HTMLInputElement>(null);
+  const photos = usePhotoPicker();
+  // A new key resets the AI listing for the next item.
+  const [assistantKey, setAssistantKey] = useState(0);
+
+  /** Stores the thumbnail of the first enhanced photo; the item itself is already saved. */
+  const saveThumbnail = async (productId: string) => {
+    const enhanced = photos.firstEnhanced();
+    if (!enhanced) return;
+    const blob = await thumbnail(enhanced).catch(() => null);
+    const form = new FormData();
+    if (blob) form.append("photo", blob, "thumbnail.jpg");
+    const saved = blob ? await attachItemPhoto(productId, form).catch(() => null) : null;
+    // "unavailable": the photos migration is not in the database yet; the item is fine without a thumbnail.
+    if (!saved || (!saved.ok && saved.code !== "unavailable")) toast.warning(listingMessages[locale].photos.thumbnailFailed);
+  };
 
   return (
     <DialogContent
@@ -343,6 +372,7 @@ function AddItemContent({ currency, today, onDone }: { currency: string; today: 
           setSaving(true);
           startTransition(async () => {
             const r = await addItem(values).catch(() => null);
+            if (r?.ok) await saveThumbnail(r.productId);
             setSaving(false);
             if (!r) return setFormError(resellerMessages[locale].actions.itemSaveFailed);
             if (!r.ok) {
@@ -357,12 +387,24 @@ function AddItemContent({ currency, today, onDone }: { currency: string; today: 
             if (keepGoing) {
               // Same purchase date for a batch; the next name gets the focus.
               setValues({ ...blank, acquiredOn: values.acquiredOn });
+              photos.reset();
+              setAssistantKey((k) => k + 1);
               nameRef.current?.focus();
             } else onDone();
           });
         }}
       >
         <ItemFormFields id={id} values={values} setValues={setValues} errors={errors} currency={currency} today={today} nameRef={nameRef} />
+        <ItemPhotos picker={photos} />
+        <ListingAssistant
+          key={assistantKey}
+          photoCount={photos.readyCount}
+          photosBusy={photos.busy}
+          aiImages={photos.aiImages}
+          name={values.name}
+          price={values.purchasePrice}
+          onUseTitle={(title) => setValues((v) => ({ ...v, name: title }))}
+        />
         <FormError message={formError} />
         <div className="flex flex-col gap-2 pt-1 sm:flex-row-reverse">
           <Button type="submit" size="lg" loading={saving} className="w-full sm:w-auto">
@@ -586,7 +628,8 @@ function SellContent({
         {/* Which item */}
         {mode === "chosen" && chosen ? (
           <div className="flex items-center justify-between gap-3 rounded-md border border-line bg-sunken/60 px-3.5 py-3">
-            <div className="min-w-0">
+            <ItemThumb url={chosen.photoUrl} size="sm" />
+            <div className="min-w-0 flex-1">
               <p className="text-xs font-medium text-ink-3">{t.chosen}</p>
               <p className="truncate text-md font-semibold text-ink">{chosen.name}</p>
               <p className="text-xs text-ink-3 tabular">
@@ -698,11 +741,14 @@ function SellContent({
                     onClick={() => choose(item)}
                     className="flex min-h-12 w-full items-center justify-between gap-3 px-3.5 py-2 text-left hover:bg-hover focus-visible:bg-hover"
                   >
-                    <span className="min-w-0">
+                    <span className="flex min-w-0 items-center gap-3">
+                      <ItemThumb url={item.photoUrl} size="sm" />
+                      <span className="min-w-0">
                       <span className="block truncate text-md text-ink">{item.name}</span>
                       <span className="block text-xs text-ink-3">
                         {item.remaining > 1 ? `${t.inStock(item.remaining)} · ` : null}
                         {t.boughtOn(f.date(item.stockedOn))}
+                      </span>
                       </span>
                     </span>
                     <span className="shrink-0 text-sm text-ink-2 tabular">{costLabel(item.unitCostE4)}</span>

@@ -66,6 +66,12 @@ export const marketingLegal = defineMessages({
             "Only if you forward them: sender, subject and date, the detected platform, amount and item name, and an excerpt of at most 2,000 characters from which email addresses and phone numbers are removed",
           why: "To prepare the sales you confirm (contract)",
         },
+        {
+          category: "Item photos (optional)",
+          examples:
+            "Enhanced on your device. Narixia stores one small thumbnail per item. Only if you ask for a listing written with AI, the photos are sent to Anthropic (Claude) for that analysis and are not kept by Narixia",
+          why: "To show your items and write listings you ask for (contract)",
+        },
         { category: "Support messages", examples: "Messages and feedback you send us", why: "To answer you (contract or legitimate interest)" },
       ],
       csvTitle: "CSV files",
@@ -222,6 +228,12 @@ export const marketingLegal = defineMessages({
           examples:
             "Seulement si vous les transférez : expéditeur, objet et date, plateforme, montant et nom d'article détectés, et un extrait de 2 000 caractères au plus dont les adresses e-mail et numéros de téléphone sont retirés",
           why: "Préparer les ventes que vous validez (contrat)",
+        },
+        {
+          category: "Photos d'articles (facultatif)",
+          examples:
+            "Améliorées sur votre appareil. Narixia conserve une petite miniature par article. Seulement si vous demandez une annonce rédigée par l'IA, les photos sont envoyées à Anthropic (Claude) pour cette analyse et ne sont pas conservées par Narixia",
+          why: "Afficher vos articles et rédiger les annonces que vous demandez (contrat)",
         },
         {
           category: "Messages d'assistance",

@@ -19,6 +19,13 @@ subsistent. Il ne s'agit pas d'une certification : aucun audit externe ni test d
   - `inbound_emails` (e-mails de vente transférés) peut être lue par les membres et modifiée uniquement sur `status`
     et `order_id` (valider ou ignorer) ; seul le rôle de service y insère des lignes, après vérification des
     identifiants du webhook entrant, et personne ne les supprime via l'API ;
+  - `ai_usage` (annonces rédigées par l'IA, par organisation et par mois) peut être lue par les membres ; personne
+    n'y écrit via l'API : seules `reserve_listing_analysis` (membres ayant le droit d'écrire) et
+    `release_listing_analysis` (rôle de service) la modifient ;
+  - les miniatures d'articles sont dans le bucket Storage privé `item-photos`, sous `<organization_id>/<product_id>/…` :
+    les politiques de `storage.objects` permettent aux membres de lire et supprimer les fichiers de leur organisation,
+    et d'en envoyer seulement avec un essai ou un abonnement actif, dans un article existant de leur organisation ;
+    `products.photo_path` doit pointer dans ce même dossier ;
   - des clés étrangères composites maintiennent les lignes enfants dans l'organisation de leur parent, et des
     déclencheurs les maintiennent dans la même boutique (une ligne de commande ne peut pas pointer vers le produit
     d'un autre client (locataire) ou d'une autre boutique).
@@ -35,8 +42,8 @@ subsistent. Il ne s'agit pas d'une certification : aucun audit externe ni test d
   de rapport (`private.assert_report_request`).
 - **Clé privilégiée.** `SUPABASE_SECRET_KEY` contourne la RLS. Elle n'est utilisée que dans des modules serveur
   marqués `import "server-only"`, pour : les webhooks Stripe vérifiés, le webhook d'e-mails entrants authentifié, la suppression de compte et de boutique, les
-  événements d'audit et d'analyse, les limites de requêtes, la création de la boutique d'exemple et la lecture de
-  l'identifiant client Stripe. Chaque appelant autorise d'abord l'utilisateur.
+  événements d'audit et d'analyse, les limites de requêtes, le remboursement d'une analyse IA échouée, la suppression des
+  photos d'articles d'un compte, la création de la boutique d'exemple et la lecture de l'identifiant client Stripe. Chaque appelant autorise d'abord l'utilisateur.
 
 Vérifié par `tests/db/tenancy.test.ts` (les lectures, écritures et appels de fonctions entre clients sont refusés pour
 chaque table, les comptes expirés ne peuvent pas écrire), `tests/db/integrity.test.ts` (les références entre clients
@@ -94,6 +101,7 @@ utilisateur :
 | E-mails de vente entrants | 120 / heure par boutique |
 | Validation ou rejet des e-mails entrants | 300 / heure |
 | Changement de l'adresse de réception | 10 / heure |
+| Annonces rédigées par l'IA | 10 / 10 minutes par utilisateur, et 50 / mois par organisation (`LISTING_AI_MONTHLY_LIMIT`) |
 
 Les fenêtres expirées sont purgées chaque jour par `/api/cron/maintenance`.
 
@@ -160,7 +168,10 @@ organisation ; personne ne peut les modifier via l'API. Les événements Stripe 
   d'analyse ou publicitaire, donc aucun bandeau de consentement n'est requis à leur égard au titre des règles
   ePrivacy ; ajoutez-en un avant d'introduire tout traceur non essentiel.
 - **Les sous-traitants** sont listés dans la politique de confidentialité à partir de `src/config/site.ts` (Supabase,
-  Stripe, hébergeur, prestataire d'e-mails du compte et prestataire d'e-mails entrants).
+  Stripe, hébergeur, prestataire d'e-mails du compte, prestataire d'e-mails entrants et Anthropic). Anthropic est
+  listé même tant que `ANTHROPIC_API_KEY` n'est pas défini, avec la finalité « si vous utilisez la fonction » : la
+  politique de confidentialité est une page pré-rendue, donc une liste dépendant d'un secret serveur pourrait omettre
+  sans bruit un sous-traitant réellement utilisé, alors que le lister à l'avance ne fait qu'informer davantage.
 
 ### Ventes reçues par e-mail
 
@@ -187,6 +198,34 @@ aspiré (scraping) et aucun compte de plateforme n'est consulté.
 - **Sous-traitant.** Postmark (nom et région configurables : `NEXT_PUBLIC_INBOUND_EMAIL_PROVIDER`,
   `NEXT_PUBLIC_INBOUND_EMAIL_REGION`) reçoit les e-mails, aux États-Unis par défaut.
 
+### Photos d'articles et annonces rédigées par l'IA
+
+- **Sur l'appareil.** Les photos sont prises ou choisies dans le navigateur, décodées et améliorées avec Canvas 2D
+  (`src/lib/photos`) : niveaux, exposition, balance des blancs « monde gris » bornée, léger contraste et netteté,
+  cadrage carré ou d'origine, JPEG de 1 600 px. Seuls la lumière, les couleurs et le cadrage changent ; rien n'est
+  effacé ni retouché, et l'interface le dit. Télécharger ou partager une photo ne la fait pas quitter l'appareil
+  (le partage Web la confie au téléphone).
+- **Ce qui est conservé.** Une miniature carrée JPEG de 480 px par article (environ 30 à 60 Ko, limite du bucket
+  300 Ko, JPEG ou WebP reconnu à ses octets), envoyée par une server action avec la session de l'utilisateur, donc
+  soumise aux politiques de Storage. Les pages l'affichent par des URL signées valables 15 minutes. Supprimer un
+  article supprime son fichier, supprimer une boutique ceux de ses articles, supprimer le compte tout le dossier de
+  l'organisation (rôle de service). L'export des données liste chaque miniature avec son chemin et un lien de
+  téléchargement valable une heure.
+- **Envoyé à Anthropic seulement sur demande.** Rien n'est envoyé tant que `ANTHROPIC_API_KEY` n'est pas défini et que
+  le vendeur n'appuie pas sur « Créer l'annonce avec l'IA » ; le bouton indique que les photos partent chez Claude
+  (Anthropic). Le navigateur envoie au plus 3 copies de 1 024 px (JPEG 0,8). La route (`/api/listing`) vérifie la
+  session et le droit d'écrire, limite le corps à 5 Mo et chaque image à 1,5 Mo décodée, n'accepte que JPEG, PNG ou
+  WebP reconnus à leurs octets magiques, limite le débit par utilisateur, puis réserve une analyse de façon atomique
+  dans la base avant d'appeler Claude, et la rend si l'appel échoue (refus, réponse tronquée ou illisible, erreur de
+  l'API, annulation). Ni les photos ni le texte généré ne sont conservés ou journalisés par Narixia ; les journaux ne
+  contiennent que des nombres, l'usage de jetons, la raison d'arrêt et le modèle.
+- **Résultat honnête.** Le prompt demande uniquement ce qui est visible, les attributs incertains signalés, aucune
+  marque, taille ou matière inventée, les défauts visibles mentionnés. La réponse est un JSON structuré validé par
+  zod ; le prix est présenté comme « Estimation de l'IA, sans données de marché — à vérifier », et rien n'est
+  enregistré tant que le vendeur n'enregistre pas l'article.
+- **Mode test.** `LISTING_AI_FAKE=1` renvoie une annonce préparée marquée « données de test » et est ignoré quand
+  `NODE_ENV=production` ; les tests n'appellent jamais la vraie API.
+
 Ces fonctionnalités préparent la conformité au RGPD ; elles ne rendent pas à elles seules le service conforme. Voir les
 points juridiques dans [LAUNCH.md](LAUNCH.md).
 
@@ -210,7 +249,13 @@ uniquement par le linter sur les propres fichiers du dépôt ; le seul correctif
 - Aucune durée de conservation n'est encore appliquée à `audit_events`, `product_events` et `billing_events` ;
   définissez-en une et ajoutez-la à la tâche de maintenance.
 - Pas d'analyse antimalware automatisée des fichiers importés (les fichiers sont analysés comme du texte dans le
-  navigateur et ne sont jamais stockés).
+  navigateur et ne sont jamais stockés ; les miniatures sont ré-encodées par le navigateur et vérifiées par leurs
+  octets magiques et leur taille, pas analysées).
+- Les photos envoyées pour une annonce IA sont traitées par Anthropic aux États-Unis selon ses conditions d'API (pas
+  d'entraînement sur les données de l'API par défaut) ; Narixia ne maîtrise pas leur conservation chez lui.
+- Un membre peut consommer le quota IA mensuel de son organisation en appelant directement la fonction de réservation
+  (elle ne fait que compter ; aucune analyse n'a lieu sans le serveur). Le quota est un plafond de coût, pas une
+  frontière de sécurité.
 - Pas de test d'intrusion externe.
 - Les e-mails transférés passent par le prestataire d'e-mails entrants (Postmark, aux États-Unis par défaut) avant
   d'arriver chez Narixia ; les vendeurs les transfèrent par choix et la politique de confidentialité mentionne ce

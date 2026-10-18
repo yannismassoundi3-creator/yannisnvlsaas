@@ -17,6 +17,7 @@ import { currencyDigits, isValidCurrency } from "@/lib/finance/currency";
 import { parseUserAmount, parseUserPercentToBps } from "@/lib/finance/input";
 import { normalizeText } from "@/lib/imports/normalize";
 import { PLATFORMS } from "@/lib/onboarding/constants";
+import { organizationPhotoPaths, removePhotoPaths, storePhotoPaths } from "@/lib/photos/storage";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -199,8 +200,11 @@ export async function deleteStore(storeId: string, confirmName: string): Promise
   }
   if (!(await consumeRateLimit(`store-delete:${ws.user.id}`, 10, 3600))) return { ok: false, message: t.tooMany };
   const supabase = await createClient();
+  // Item thumbnails are storage files, not rows: collect them before the store and its items go.
+  const photos = await storePhotoPaths(supabase, storeId);
   const { data, error } = await supabase.from("stores").delete().eq("id", storeId).eq("organization_id", ws.organization.id).select("id");
   if (error || !data?.length) return { ok: false, message: t.deleteStoreFailed };
+  if (photos.length) await removePhotoPaths(supabase, photos);
   const jar = await cookies();
   if (jar.get(ACTIVE_STORE_COOKIE)?.value === storeId) jar.delete(ACTIVE_STORE_COOKIE);
   audit("store.deleted", { organizationId: ws.organization.id, actorId: ws.user.id }, { type: "store", id: storeId }, { demo: store.is_demo });
@@ -243,6 +247,8 @@ export async function deleteAccount(input: { confirm: string }): Promise<Result>
     }
     const { error } = await admin.from("organizations").delete().eq("id", ws.organization.id);
     if (error) return { ok: false, message: t.dataDeleteFailed };
+    // Item thumbnails (storage files) of the whole organisation, including unsaved ones.
+    await removePhotoPaths(admin, await organizationPhotoPaths(admin, ws.organization.id));
   }
 
   const { error: userError } = await admin.auth.admin.deleteUser(ws.user.id);

@@ -53,6 +53,7 @@ These run real SQL, RLS policies and functions as the `authenticated`, `anon` an
 | `imports.test.ts` | Staging, finalize and duplicate rules for each kind (skip and update strategies), whole-order hold-back, batched commit, undo restoring replaced records, "only the latest import can be undone", access control |
 | `billing.test.ts` | Pro only from a verified checkout event; grace period start and expiry; recovery after a retried payment; stale events ignored; cancellation; unknown organisations ignored; billing periods from subscription items; webhook signature verification (unsigned and wrongly signed requests rejected) and idempotent replays, using Stripe's own test signature helper |
 | `reseller.test.ts` | Onboarding with the reseller mode (zero fee and shipping rules) and the old seven-argument call; mode, sales channel and purchase date constraints; unique sale numbers; a quick sale feeds the daily totals, the product report, the per-platform breakdown and the items list; refunds per platform; undoing a sale returns the item to stock; other tenants and anonymous callers see nothing; expired accounts cannot switch the mode |
+| `photos-ai.test.ts` | `products.photo_path` stays in the item's own folder; the `item-photos` bucket is private (300 KB, JPEG/WebP); members read, upload and delete only in their organisation's folder, uploads need an existing item and an active trial; RLS on `ai_usage` (members read, nobody writes); `reserve_listing_analysis` counts down and stops at the cap, refuses non-members and expired organisations, and 24 concurrent calls never exceed a cap of 5; only the service role refunds, never below zero |
 | `inbound.test.ts` | Inbound tokens (random, readable by members, never writable directly, rotated by owners only); the webhook route handler (503 until configured, basic auth required, unknown tokens answered like accepted ones, parsed pending rows, idempotent message ids, token in the recipient address, malformed and oversized payloads, Gmail confirmations); RLS on `inbound_emails` (members read and confirm or dismiss only, no inserts or deletes, same-store orders, read-only after expiry); 30/90-day retention |
  Store limit per plan enforced by the database; the sample store does not count |
 
@@ -75,6 +76,12 @@ Supabase stack (sign-up confirmation emails are read from its Mailpit inbox at `
   a 390 px phone width. Then sales received by email (when `INBOUND_*` is set in `.env.local`): a synthetic
   Postmark payload posted to the local webhook (wrong password refused) appears on the home page and in the inbox
   with a Gmail confirmation code; « Valider » opens the prefilled sale dialog and records the sale.
+- **Item photos and AI listings** (in French, 390 px): a generated photo is enhanced on the device (square framing,
+  before/after, download link); with the AI off the button says « Bientôt disponible »; with `LISTING_AI_FAKE=1` (set by
+  `playwright.config.ts`, a canned listing marked as test data, Anthropic is never called) the result card shows the
+  remaining quota, the price warning, copy to the clipboard and « Utiliser ce titre »; saving stores one thumbnail,
+  shown in « Mes articles » and the sale picker, and deleting the item deletes the file; axe checks on the dialog.
+  An undecodable file (HEIC-like) shows a clear message.
 - **Accessibility:** axe-core (WCAG 2.0/2.1/2.2 A and AA rules) runs on the public pages, the dashboard and the
   import review and must report no violations.
 

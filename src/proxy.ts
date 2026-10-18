@@ -71,5 +71,6 @@ export const config = {
     "/api/reports/:path*",
     "/api/account/:path*",
     "/api/imports/:path*",
+    "/api/listing",
   ],
 };

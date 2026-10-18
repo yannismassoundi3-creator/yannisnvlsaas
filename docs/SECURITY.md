@@ -19,6 +19,11 @@ It is not a certification: no external audit or penetration test has been perfor
   - `inbound_emails` (forwarded sale emails) can be read by members and updated only in `status` and `order_id`
     (confirm or dismiss); only the service role inserts them, after the inbound webhook has verified its
     credentials, and nobody deletes them through the API;
+  - `ai_usage` (AI listings per organisation and month) can be read by members; nobody writes it through the API:
+    only `reserve_listing_analysis` (members with write access) and `release_listing_analysis` (service role) change it;
+  - item thumbnails live in the private Storage bucket `item-photos` under `<organization_id>/<product_id>/…`: policies
+    on `storage.objects` let members read and delete their organisation's files, and upload only with a live trial or
+    subscription, into an existing item of their organisation; `products.photo_path` must point into that same folder;
   - composite foreign keys keep child rows in their parent's organisation, and triggers keep them in the same
     store (an order line cannot point to another tenant's or another store's product).
 - **SQL functions** used by the app (`report_*`, `import_*`) are `SECURITY INVOKER`, so RLS applies inside them.
@@ -32,7 +37,8 @@ It is not a certification: no external audit or penetration test has been perfor
   exports and reports in their routes, analytics access in the report functions (`private.assert_report_request`).
 - **Privileged key.** `SUPABASE_SECRET_KEY` bypasses RLS. It is used only in server modules marked
   `import "server-only"`, for: verified Stripe webhooks, the authenticated inbound email webhook, account and store deletion, audit and analytics events,
-  rate limits, creating the sample store, and reading the Stripe customer id. Each caller authorises the user first.
+  rate limits, refunding a failed AI analysis, deleting an account's item photos, creating the sample store, and
+  reading the Stripe customer id. Each caller authorises the user first.
 
 Verified by `tests/db/tenancy.test.ts` (cross-tenant reads, writes and function calls are refused for every table,
 expired accounts cannot write), `tests/db/integrity.test.ts` (cross-tenant references are rejected) and
@@ -82,6 +88,7 @@ Database-backed fixed windows (`public.consume_rate_limit`, `private.rate_limits
 | Inbound sale emails | 120 / hour per store |
 | Confirming or dismissing inbound emails | 300 / hour |
 | Changing the inbound address | 10 / hour |
+| Listings written with AI | 10 / 10 minutes per user, and 50 / month per organisation (`LISTING_AI_MONTHLY_LIMIT`) |
 
 Expired windows are pruned daily by `/api/cron/maintenance`.
 
@@ -140,7 +147,10 @@ Stripe events are kept in `billing_events`.
   cookies, so no consent banner is required for them under the ePrivacy rules; add one before introducing any
   non-essential tracker.
 - **Processors** are listed in the privacy policy from `src/config/site.ts` (Supabase, Stripe, hosting provider,
-  the auth email provider and the inbound email provider).
+  the auth email provider, the inbound email provider and Anthropic). Anthropic is listed even while
+  `ANTHROPIC_API_KEY` is not set, with the purpose "only if you use this feature": the privacy policy is a
+  prerendered page, so a list that depended on a server secret could silently omit a processor that is in use,
+  whereas listing it early only over-informs.
 
 ### Sales received by email
 
@@ -163,6 +173,30 @@ Postmark posts each message to `/api/inbound/email`. Nothing is scraped and no p
 - **Processor.** Postmark (configurable name and region: `NEXT_PUBLIC_INBOUND_EMAIL_PROVIDER`,
   `NEXT_PUBLIC_INBOUND_EMAIL_REGION`) receives the emails, in the United States by default.
 
+### Item photos and listings written with AI
+
+- **On the device.** Photos are picked or taken in the browser, decoded and enhanced with Canvas 2D
+  (`src/lib/photos`): levels, exposure, a clamped gray-world white balance, slight contrast and sharpening, square or
+  original framing, 1,600 px JPEG. Only light, colour and framing change; nothing is removed or retouched, and the
+  interface says so. Downloading or sharing a photo never leaves the device (Web Share hands it to the phone).
+- **Stored.** One 480 px square JPEG thumbnail per item (about 30-60 KB, bucket limit 300 KB, JPEG or WebP sniffed
+  from the bytes), uploaded by a server action with the user's session so the storage policies apply. Pages show it
+  through signed URLs valid 15 minutes. Deleting an item deletes its file, deleting a store deletes its items' files,
+  deleting the account deletes the organisation's whole folder (service role). The data export lists each thumbnail
+  with its path and a download link valid one hour.
+- **Sent to Anthropic only on request.** Nothing is sent unless `ANTHROPIC_API_KEY` is set and the seller presses
+  « Créer l'annonce avec l'IA »; the button says that the photos go to Claude (Anthropic). The browser sends at most 3
+  copies at 1,024 px (JPEG 0.8). The route (`/api/listing`) checks the session and write access, limits the body to
+  5 MB and each image to 1.5 MB decoded, accepts only JPEG/PNG/WebP recognised from their magic bytes, rate-limits per
+  user, then reserves one analysis atomically in the database before calling Claude, and gives it back if the call
+  fails (refusal, truncated or unreadable answer, API error, cancellation). Neither the photos nor the generated text
+  are stored or logged by Narixia; logs contain counts, token usage, stop reasons and the model only.
+- **Honest output.** The prompt asks for what is visible only, uncertain attributes marked, no invented brand, size or
+  material, visible defects mentioned. The answer is structured JSON validated with zod; the price is labelled
+  « Estimation de l'IA, sans données de marché — à vérifier », and nothing is saved unless the seller saves the item.
+- **Test mode.** `LISTING_AI_FAKE=1` returns a canned listing marked "test data" and is ignored when
+  `NODE_ENV=production`; tests never call the real API.
+
 These features prepare for GDPR compliance; they do not make the service compliant by themselves. See the legal
 items in [LAUNCH.md](LAUNCH.md).
 
@@ -182,7 +216,12 @@ so it is accepted until an upstream fix is released.
   user calling the database API directly could read their own older data. Tenancy is not affected.
 - No retention period is applied yet to `audit_events`, `product_events` and `billing_events`; define one and add it
   to the maintenance job.
-- No automated malware scanning of uploads (files are parsed as text in the browser and never stored).
+- No automated malware scanning of uploads (import files are parsed as text in the browser and never stored; item
+  thumbnails are re-encoded by the browser and checked by magic bytes and size, not scanned).
+- Photos sent for an AI listing are processed by Anthropic in the United States under its API terms (no training on
+  API data by default); Narixia does not control their retention there.
+- A member can spend the organisation's monthly AI quota by calling the reservation function directly (it only
+  counts; no analysis runs without the server). The quota is a cost cap, not a security boundary.
 - No external penetration test.
 - Forwarded emails pass through the inbound provider (Postmark, United States by default) before reaching Narixia;
   sellers forward them by choice, and the privacy policy lists the provider. The excerpt filter is heuristic: an

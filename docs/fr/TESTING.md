@@ -55,6 +55,7 @@ Ces tests exécutent du vrai SQL, des politiques RLS et des fonctions avec les r
 | `imports.test.ts` | Règles de mise en attente (staging), de finalisation et de doublons pour chaque type (stratégies d'ignorance et de mise à jour), mise en attente de la commande entière, validation par lots, annulation restaurant les enregistrements remplacés, « seul le dernier import peut être annulé », contrôle d'accès |
 | `billing.test.ts` | Pro uniquement à partir d'un événement de checkout vérifié ; début et fin de la période de grâce ; rétablissement après un paiement réessayé ; événements obsolètes ignorés ; résiliation ; organisations inconnues ignorées ; périodes de facturation issues des éléments d'abonnement ; vérification de la signature du webhook (requêtes non signées ou mal signées rejetées) et rejeux idempotents, à l'aide de l'outil de signature de test fourni par Stripe |
 | `reseller.test.ts` | Onboarding en mode revendeur (règles de frais et d'expédition nulles) et ancien appel à sept arguments ; contraintes sur le mode, la plateforme de vente et la date d'achat ; numéros de vente uniques ; une vente rapide alimente les totaux quotidiens, le rapport produits, la répartition par plateforme et la liste des articles ; remboursements par plateforme ; annuler une vente remet l'article en stock ; les autres clients et les visiteurs anonymes ne voient rien ; un compte expiré ne peut pas changer de mode |
+| `photos-ai.test.ts` | `products.photo_path` reste dans le dossier de son article ; le bucket `item-photos` est privé (300 Ko, JPEG/WebP) ; les membres lisent, envoient et suppriment uniquement dans le dossier de leur organisation, l'envoi exige un article existant et un essai actif ; RLS sur `ai_usage` (les membres lisent, personne n'écrit) ; `reserve_listing_analysis` décompte et s'arrête au plafond, refuse les non-membres et les organisations expirées, et 24 appels simultanés ne dépassent jamais un plafond de 5 ; seul le rôle de service rembourse, jamais en dessous de zéro |
 | `inbound.test.ts` | Jetons d'adresse entrante (aléatoires, lisibles par les membres, jamais modifiables directement, renouvelés par les propriétaires seulement) ; le route handler du webhook (503 tant qu'il n'est pas configuré, authentification basique obligatoire, jetons inconnus traités comme des messages acceptés, lignes en attente analysées, identifiants de message idempotents, jeton dans l'adresse du destinataire, contenus mal formés ou trop volumineux, confirmations Gmail) ; RLS sur `inbound_emails` (les membres lisent, valident ou ignorent seulement, ni insertion ni suppression, commandes de la même boutique, lecture seule après expiration) ; conservation à 30/90 jours |
  Limite de boutiques par offre appliquée par la base de données ; la boutique d'exemple n'est pas comptée |
 
@@ -81,6 +82,13 @@ tests nécessitent la pile Supabase locale (les e-mails de confirmation d'inscri
   (si `INBOUND_*` est défini dans `.env.local`) : un contenu Postmark synthétique envoyé au webhook local (mauvais mot
   de passe refusé) apparaît sur l'accueil et dans la boîte de réception avec un code de confirmation Gmail ;
   « Valider » ouvre la fenêtre de vente préremplie et enregistre la vente.
+- **Photos d'articles et annonces IA** (en français, 390 px) : une photo générée est améliorée sur l'appareil (cadrage
+  carré, avant/après, lien de téléchargement) ; IA désactivée, le bouton affiche « Bientôt disponible » ; avec
+  `LISTING_AI_FAKE=1` (défini par `playwright.config.ts`, annonce préparée marquée « données de test », Anthropic n'est
+  jamais appelé) la carte de résultat montre le quota restant, l'avertissement sur le prix, la copie dans le
+  presse-papiers et « Utiliser ce titre » ; l'enregistrement stocke une miniature, visible dans « Mes articles » et le
+  sélecteur de vente, et supprimer l'article supprime le fichier ; contrôles axe sur la boîte de dialogue. Un fichier
+  illisible (de type HEIC) affiche un message clair.
 - **Accessibilité :** axe-core (règles WCAG 2.0/2.1/2.2 de niveaux A et AA) s'exécute sur les pages publiques, le
   tableau de bord et l'examen de l'import, et ne doit signaler aucune violation.
 

@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV === "development";
 
-/** Origin of the Supabase project, needed by the browser auth client. */
+/** Origin of the Supabase project, needed by the browser auth client and for item thumbnails. */
 function supabaseOrigins(): string[] {
   const raw = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!raw) return [];
@@ -25,7 +25,8 @@ const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' blob: data:",
+  // Item thumbnails are shown through short-lived signed URLs of the Supabase project's Storage.
+  `img-src 'self' blob: data: ${supabaseOrigins()[0] ?? ""}`.trim(),
   "font-src 'self'",
   `connect-src 'self' ${supabaseOrigins().join(" ")}${isDev ? " ws://localhost:* ws://127.0.0.1:*" : ""}`,
   "object-src 'none'",

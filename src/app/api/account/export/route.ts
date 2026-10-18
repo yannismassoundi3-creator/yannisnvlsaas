@@ -3,6 +3,8 @@ import { getRequestLocale } from "@/i18n/request";
 import { audit } from "@/lib/audit";
 import { getWorkspace } from "@/lib/auth/workspace";
 import { fileSlug } from "@/lib/csv";
+import { isMissingObject } from "@/lib/listing/quota";
+import { signPhotoPaths } from "@/lib/photos/storage";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -16,7 +18,8 @@ type TableName = keyof Database["public"]["Tables"];
  * including after a trial or subscription has ended.
  */
 // Paged by primary key so pagination is stable while rows are read.
-const TABLES: { name: TableName; key: string; columns: string; order: string }[] = [
+// optional: added by a later migration; skipped while the database does not have it yet.
+const TABLES: { name: TableName; key: string; columns: string; order: string; optional?: boolean }[] = [
   { name: "stores", key: "stores", columns: "*", order: "id" },
   { name: "products", key: "products", columns: "*", order: "id" },
   { name: "orders", key: "orders", columns: "*", order: "id" },
@@ -34,7 +37,11 @@ const TABLES: { name: TableName; key: string; columns: string; order: string }[]
   },
   { name: "subscriptions", key: "subscriptions", columns: "status, plan, current_period_start, current_period_end, cancel_at_period_end, cancel_at, canceled_at, ended_at, trial_end, created_at", order: "id" },
   { name: "audit_events", key: "audit_trail", columns: "action, target_type, target_id, metadata, created_at", order: "id" },
+  { name: "ai_usage", key: "ai_listing_usage", columns: "period, used, updated_at", order: "period", optional: true },
 ];
+
+/** Signed links to item thumbnails in the export stay valid this long. */
+const PHOTO_LINK_TTL_SECONDS = 3600;
 
 export async function GET() {
   const ws = await getWorkspace().catch(() => null);
@@ -51,28 +58,40 @@ export async function GET() {
       try {
         write("{\n");
         write(`"format": "narixia-export/1",\n"exported_at": ${JSON.stringify(new Date().toISOString())},\n`);
-        write(`"notes": ${JSON.stringify("Amounts are integers in the minor unit of each store's currency (cents for EUR); unit_cost_e4 values are costs × 10,000. All amounts exclude tax.")},\n`);
+        write(`"notes": ${JSON.stringify("Amounts are integers in the minor unit of each store's currency (cents for EUR); unit_cost_e4 values are costs × 10,000. All amounts exclude tax. item_photos lists each item thumbnail with a download link that expires one hour after the export.")},\n`);
         write(`"user": ${JSON.stringify({ id: ws.user.id, email: ws.user.email, full_name: profile?.full_name ?? null, created_at: profile?.created_at ?? null })},\n`);
         write(`"organization": ${JSON.stringify(ws.organization ? { ...ws.organization, role: ws.role } : null)}`);
+        const photos: string[] = [];
         if (ws.organization) {
           for (const table of TABLES) {
-            write(`,\n${JSON.stringify(table.key)}: [`);
             let first = true;
+            let opened = false;
             for (let from = 0; from < 5_000_000; from += 1000) {
               const { data, error } = await supabase
                 .from(table.name)
                 .select(table.columns)
                 .order(table.order, { ascending: true })
                 .range(from, from + 999);
+              if (error && table.optional && from === 0 && isMissingObject(error.code)) break;
               if (error) throw new Error(`${table.name}: ${error.code}`);
-              for (const row of data ?? []) {
+              if (!opened) {
+                write(`,\n${JSON.stringify(table.key)}: [`);
+                opened = true;
+              }
+              for (const row of (data ?? []) as unknown as Record<string, unknown>[]) {
+                if (table.name === "products" && typeof row.photo_path === "string") photos.push(row.photo_path);
                 write(`${first ? "\n" : ",\n"}${JSON.stringify(row)}`);
                 first = false;
               }
               if (!data || data.length < 1000) break;
             }
-            write("\n]");
+            if (opened) write("\n]");
           }
+          // Item thumbnails: their storage path (also in products.photo_path) and a link valid one hour.
+          const links = await signPhotoPaths(supabase, photos, PHOTO_LINK_TTL_SECONDS);
+          write(`,\n"item_photos": [`);
+          photos.forEach((path, i) => write(`${i ? ",\n" : "\n"}${JSON.stringify({ path, download_url: links.get(path) ?? null })}`));
+          write("\n]");
         }
         write("\n}\n");
         controller.close();

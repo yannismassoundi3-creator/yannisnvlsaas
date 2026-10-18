@@ -187,6 +187,43 @@ export type Database = {
           },
         ];
       };
+      ai_usage: {
+        Row: {
+          organization_id: string;
+          period: string;
+          updated_at: string;
+          used: number;
+        };
+        ComputedFields: never;
+        Insert: {
+          organization_id: string;
+          period: string;
+          updated_at?: string;
+          used?: number;
+        };
+        Update: {
+          organization_id?: string;
+          period?: string;
+          updated_at?: string;
+          used?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organization_entitlements";
+            referencedColumns: ["organization_id"];
+          },
+          {
+            foreignKeyName: "ai_usage_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       audit_events: {
         Row: {
           action: string;
@@ -988,6 +1025,7 @@ export type Database = {
           match_key: string | null;
           name: string;
           organization_id: string;
+          photo_path: string | null;
           price_minor: number | null;
           sku: string | null;
           source: string;
@@ -1006,6 +1044,7 @@ export type Database = {
           match_key?: never;
           name: string;
           organization_id: string;
+          photo_path?: string | null;
           price_minor?: number | null;
           sku?: string | null;
           source?: string;
@@ -1023,6 +1062,7 @@ export type Database = {
           match_key?: never;
           name?: string;
           organization_id?: string;
+          photo_path?: string | null;
           price_minor?: number | null;
           sku?: string | null;
           source?: string;
@@ -1360,6 +1400,7 @@ export type Database = {
       prune_inbound_emails: { Args: Record<PropertyKey, never>; Returns: number };
       prune_rate_limits: { Args: Record<PropertyKey, never>; Returns: number };
       regenerate_inbound_token: { Args: { p_store_id: string }; Returns: string };
+      release_listing_analysis: { Args: { p_organization_id: string; p_period: string }; Returns: undefined };
       report_ad_daily: {
         Args: { p_from: string; p_store_id: string; p_to: string };
         Returns: {
@@ -1560,6 +1601,13 @@ export type Database = {
           items: number;
           items_without_cost: number;
           stale_items: number;
+        }[];
+      };
+      reserve_listing_analysis: {
+        Args: { p_limit: number; p_organization_id: string };
+        Returns: {
+          period: string;
+          remaining: number;
         }[];
       };
     };

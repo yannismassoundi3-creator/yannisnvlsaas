@@ -5,6 +5,7 @@ import type { DateRange } from "@/lib/domain/types";
 import { deriveMetrics, type Metrics } from "@/lib/finance/metrics";
 import { defaultSalesChannel, staleBefore } from "@/lib/reseller/logic";
 import type { PlatformId } from "@/lib/onboarding/constants";
+import { photoUrlsFor, storePhotoUrls } from "@/lib/photos/storage";
 import { createClient } from "@/lib/supabase/server";
 import { fetchTotals, ReportsPausedError, ReportUnavailableError } from "./reports";
 
@@ -133,7 +134,16 @@ export async function listItems(
   return { rows: ((data ?? []) as SqlItem[]).map(toItem), total: count ?? 0 };
 }
 
-export type StockOption = { id: string; name: string; unitCostE4: number | null; stockedOn: string; /** Pieces left. */ remaining: number };
+export type StockOption = {
+  id: string;
+  name: string;
+  unitCostE4: number | null;
+  stockedOn: string;
+  /** Pieces left. */
+  remaining: number;
+  /** Short-lived signed URL of the item's thumbnail, if it has one. */
+  photoUrl: string | null;
+};
 
 export type SellContext = {
   /** Items in stock, most recent first (at most 1,000, searched in the browser). */
@@ -141,16 +151,22 @@ export type SellContext = {
   defaultChannel: PlatformId;
 };
 
+/** Thumbnail URLs of the listed items (by product id); empty before the photos migration. */
+export async function itemPhotoUrls(productIds: readonly string[]): Promise<Record<string, string>> {
+  return photoUrlsFor(await createClient(), productIds);
+}
+
 /** What the quick dialogs need: the stock to pick from and the preselected platform. */
 export const getSellContext = cache(async (store: Store): Promise<SellContext> => {
   const supabase = await createClient();
-  const [stock, last] = await Promise.all([
+  const [stock, last, photos] = await Promise.all([
     supabase
       .rpc("reseller_items", { p_store_id: store.id, p_status: "in_stock" })
       .order("created_at", { ascending: false })
       .order("product_id")
       .limit(1000),
     supabase.from("orders").select("sales_channel").eq("store_id", store.id).not("sales_channel", "is", null).order("ordered_at", { ascending: false }).limit(1).maybeSingle(),
+    storePhotoUrls(supabase, store.id),
   ]);
   check(stock.error, "stock options");
   return {
@@ -160,6 +176,7 @@ export const getSellContext = cache(async (store: Store): Promise<SellContext> =
       unitCostE4: nn(r.unit_cost_e4),
       stockedOn: String(r.stocked_on).slice(0, 10),
       remaining: quantities(r).remaining,
+      photoUrl: photos[r.product_id] ?? null,
     })),
     defaultChannel: defaultSalesChannel(last.data?.sales_channel, store.platform),
   };

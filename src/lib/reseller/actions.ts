@@ -1,6 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { catalogCommon } from "@/i18n/messages/catalog-common";
 import { resellerMessages } from "@/i18n/messages/reseller";
@@ -9,6 +10,9 @@ import { audit } from "@/lib/audit";
 import { requireStore } from "@/lib/auth/workspace";
 import { todayIn, zonedTimeToUtc } from "@/lib/dates";
 import { BUSINESS_MODELS } from "@/lib/onboarding/constants";
+import { isMissingObject } from "@/lib/listing/quota";
+import { sniffImage } from "@/lib/listing/schema";
+import { ITEM_PHOTOS_BUCKET, MAX_THUMBNAIL_BYTES, removePhotoPaths } from "@/lib/photos/storage";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { writeOrder } from "@/lib/transactions/write";
@@ -264,6 +268,50 @@ export async function sellItem(input: SaleInput): Promise<Result<{ orderId: stri
     if (written.reason !== "duplicate") break;
   }
   return fail(t.actions.saleSaveFailed);
+}
+
+/**
+ * Stores the thumbnail of an item (a 480 px square JPEG made in the browser
+ * from the first enhanced photo) and replaces the previous one. The file goes
+ * to the private item-photos bucket with the user's session, so the storage
+ * policies apply (members of the organisation, active trial or subscription,
+ * an existing item of the organisation in the path).
+ *
+ * "unavailable" means the photos migration is not in the database yet: the
+ * item stays saved without a thumbnail and the interface says nothing.
+ */
+export async function attachItemPhoto(productId: string, form: FormData): Promise<{ ok: true } | { ok: false; code: "unavailable" | "invalid" | "failed" | "paused" | "rate_limited" }> {
+  const ws = await requireStore();
+  if (!ws.entitlements.canWrite) return { ok: false, code: "paused" };
+  if (!uuid.safeParse(productId).success) return { ok: false, code: "invalid" };
+  const file = form.get("photo");
+  if (!(file instanceof Blob) || file.size === 0 || file.size > MAX_THUMBNAIL_BYTES) return { ok: false, code: "invalid" };
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const type = sniffImage(bytes);
+  if (type !== "image/jpeg" && type !== "image/webp") return { ok: false, code: "invalid" };
+  if (!(await consumeRateLimit(`product-write:${ws.user.id}`, 300, 3600))) return { ok: false, code: "rate_limited" };
+
+  const supabase = await createClient();
+  const { data: item, error: readError } = await supabase.from("products").select("id, photo_path").eq("id", productId).eq("store_id", ws.activeStore.id).maybeSingle();
+  if (readError) return { ok: false, code: isMissingObject(readError.code) ? "unavailable" : "failed" };
+  if (!item) return { ok: false, code: "invalid" };
+
+  const path = `${ws.organization.id}/${productId}/${randomUUID()}.${type === "image/webp" ? "webp" : "jpg"}`;
+  const { error: uploadError } = await supabase.storage.from(ITEM_PHOTOS_BUCKET).upload(path, bytes, { contentType: type, upsert: false, cacheControl: "3600" });
+  if (uploadError) {
+    const status = Number((uploadError as { statusCode?: string | number; status?: number }).statusCode ?? (uploadError as { status?: number }).status ?? 0);
+    console.error("[photos] upload failed", { status });
+    // 404: no bucket yet (migration not applied); 403: storage policies refused (e.g. access ended).
+    return { ok: false, code: status === 404 ? "unavailable" : status === 403 ? "paused" : "failed" };
+  }
+  const { error: updateError } = await supabase.from("products").update({ photo_path: path }).eq("id", productId).eq("store_id", ws.activeStore.id);
+  if (updateError) {
+    await removePhotoPaths(supabase, [path]);
+    return { ok: false, code: isMissingObject(updateError.code) ? "unavailable" : "failed" };
+  }
+  if (item.photo_path && item.photo_path !== path) await removePhotoPaths(supabase, [item.photo_path]);
+  refresh();
+  return { ok: true };
 }
 
 /** Switches how the store sells (owner or admin). Only the home page, menu and defaults change. */

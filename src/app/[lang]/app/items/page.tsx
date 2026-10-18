@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AnalyticsPaused } from "@/components/app/analytics-paused";
 import { StockItemActions, UndoSaleButton } from "@/components/reseller/item-actions";
+import { ItemThumb } from "@/components/reseller/item-thumb";
 import { AddItemButton, QuickActionsProvider, SellButton } from "@/components/reseller/quick-actions";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -18,7 +19,7 @@ import { catalogCommon } from "@/i18n/messages/catalog-common";
 import { resellerMessages } from "@/i18n/messages/reseller";
 import { getFormat, getLocale } from "@/i18n/server";
 import { requireStore, type Store } from "@/lib/auth/workspace";
-import { getSellContext, listItems, type ItemFilter, type ItemRow } from "@/lib/data/reseller";
+import { getSellContext, itemPhotoUrls, listItems, type ItemFilter, type ItemRow } from "@/lib/data/reseller";
 import { ReportsPausedError } from "@/lib/data/reports";
 import { todayIn } from "@/lib/dates";
 import { e4ToMinor } from "@/lib/finance/money";
@@ -78,6 +79,7 @@ async function Items({ searchParams }: { searchParams: PageProps<"/[lang]/app/it
     throw error;
   }
 
+  const photos = await itemPhotoUrls(list.rows.map((r) => r.productId));
   const base = `/app/items?tab=${tab}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
   const pages = Math.ceil(list.total / PAGE_SIZE);
   const c = catalogCommon[locale];
@@ -126,7 +128,7 @@ async function Items({ searchParams }: { searchParams: PageProps<"/[lang]/app/it
           ) : (
             <ul className="divide-y divide-line" aria-label={t.countLabel(list.total)}>
               {list.rows.map((item) => (
-                <ItemLine key={item.productId} item={item} store={store} locale={locale} f={f} today={today} canWrite={canWrite} />
+                <ItemLine key={item.productId} item={item} photoUrl={photos[item.productId] ?? null} store={store} locale={locale} f={f} today={today} canWrite={canWrite} />
               ))}
             </ul>
           )}
@@ -160,7 +162,23 @@ async function Items({ searchParams }: { searchParams: PageProps<"/[lang]/app/it
  * stock", "1 sold · 2 left") and, once sold at least once, their latest sale
  * (its price is the total of that sale, for all its pieces).
  */
-function ItemLine({ item, store, locale, f, today, canWrite }: { item: ItemRow; store: Store; locale: Locale; f: Format; today: string; canWrite: boolean }) {
+function ItemLine({
+  item,
+  photoUrl,
+  store,
+  locale,
+  f,
+  today,
+  canWrite,
+}: {
+  item: ItemRow;
+  photoUrl: string | null;
+  store: Store;
+  locale: Locale;
+  f: Format;
+  today: string;
+  canWrite: boolean;
+}) {
   const t = resellerMessages[locale].items;
   const money = (v: number) => f.money(v, store.currency);
   const cost = item.unitCostE4 === null ? null : e4ToMinor(item.unitCostE4, store.currency);
@@ -178,7 +196,9 @@ function ItemLine({ item, store, locale, f, today, canWrite }: { item: ItemRow; 
   const saleLabel = item.saleQuantity !== null && item.saleQuantity > 1 ? t.salePieces(item.saleQuantity) : several ? t.lastSalePrice : t.salePrice;
   return (
     <li className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <ItemThumb url={photoUrl} />
+        <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-2">
           <span className="text-md font-medium break-words text-ink">{item.name}</span>
           {status}
@@ -193,6 +213,7 @@ function ItemLine({ item, store, locale, f, today, canWrite }: { item: ItemRow; 
               ? t.bought(f.date(item.acquiredOn))
               : t.added(f.date(item.stockedOn))}
         </p>
+        </div>
       </div>
       <dl className="grid grid-cols-3 gap-3 text-sm sm:w-80 sm:shrink-0">
         <div>

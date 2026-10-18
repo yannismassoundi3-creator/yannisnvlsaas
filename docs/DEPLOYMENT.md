@@ -103,6 +103,39 @@ What the endpoint does: constant-time credential check (401 otherwise), 5 MB bod
 `MessageID`, no email content in logs. Excerpts are capped at 2,000 characters and purged by the daily maintenance job
 (see [SECURITY.md](SECURITY.md)).
 
+## 4b. Item photos and listings written with AI (reseller mode)
+
+Photo enhancement (light, colour, framing) runs in the browser and costs nothing. Thumbnails use Supabase Storage
+(free tier: 1 GB; a thumbnail is about 30-60 KB, so roughly 20,000 items per GB). Writing listings with Claude is
+**off** until you set a key: the « Créer l'annonce avec l'IA » button then says « Bientôt disponible » and nothing is
+sent anywhere.
+
+1. Run `supabase/migrations/20261018110000_item_photos_ai.sql` in the Supabase SQL editor (or `npx supabase db push`).
+   It adds `products.photo_path`, the private bucket `item-photos` (300 KB, JPEG/WebP) and its storage policies, the
+   `ai_usage` table and the `reserve_listing_analysis` / `release_listing_analysis` functions. It is idempotent.
+   Until it runs, the app keeps working: no thumbnails are stored or shown and the AI button says « Bientôt
+   disponible ».
+2. Optional, only when demand is proven: set `ANTHROPIC_API_KEY` (Anthropic Console → API keys) in Vercel and
+   redeploy. `LISTING_AI_MODEL` (default `claude-opus-5-5`) and `LISTING_AI_MONTHLY_LIMIT` (default 50 analyses per
+   organisation and calendar month, UTC) are optional. Refunds of failed analyses use `SUPABASE_SECRET_KEY`, which
+   production already needs. Set a monthly spend limit in the Anthropic Console as a second safety net.
+3. Check: add an item with a photo; the thumbnail appears in « Mes articles ». With a key, « Créer l'annonce avec
+   l'IA » shows « 50 analyses restantes ce mois-ci » and a listing after 10-30 seconds.
+
+**Cost per analysis (estimate).** The browser sends up to 3 photos at 1,024 px on the longest side. Claude counts
+about width × height / 750 tokens per image: up to about 1,400 tokens for a square 1,024 × 1,024 photo (about 1,050
+for 4:3). With the instructions and the JSON schema (roughly 1,000 tokens), input is at most about 5,200 tokens:
+$0.021 at $4 per million input tokens (Claude Opus 5.5). Output (the listing plus the model's short reasoning at
+effort "low") is typically 1,000 to 2,500 tokens, $0.02 to $0.05 at $20 per million, capped by `max_tokens` 4,000
+($0.08). So **about $0.03 to $0.07 per analysis, $0.10 at most**. At the default cap of 50 analyses per month, one
+very active customer costs about **$1.50 to $3.50 per month, $5 at most**. Real cost depends on the number and shape
+of the photos and the length of the answer; a request declined by the model and re-run on the fallback model is billed
+even though the seller's analysis is refunded. Check real usage in the Anthropic Console (the app logs token counts
+per analysis under `[listing-ai]`, never the photos or the text).
+
+Possible later improvement: background removal. It is deliberately not included (model licences and the weight of
+in-browser models); a white or neutral background when taking the photo gives most of the benefit.
+
 ## 5. Smoke test after each production deployment
 
 1. `/`, `/pricing`, `/privacy` load; response headers include `content-security-policy` and
@@ -113,7 +146,9 @@ What the endpoint does: constant-time credential check (401 otherwise), 5 MB bod
 5. `curl -H "Authorization: Bearer $CRON_SECRET" https://<your-domain>/api/cron/maintenance` returns `{"ok":true,…}`.
 6. If inbound email is configured: `curl -u narixia:$INBOUND_WEBHOOK_SECRET -H 'content-type: application/json' -d '{}'
    https://<your-domain>/api/inbound/email` returns `{"ok":true}`, and the same request without `-u` returns 401.
-7. Delete the test account from Settings → Data.
+7. Add an item with a photo in a reseller store: the thumbnail appears in « Mes articles » (needs the photos
+   migration).
+8. Delete the test account from Settings → Data.
 
 ## Database migrations
 

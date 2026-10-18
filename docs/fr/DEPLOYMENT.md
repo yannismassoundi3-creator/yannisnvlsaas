@@ -108,6 +108,42 @@ Ce que fait le point de terminaison : vérification des identifiants en temps co
 120 messages par boutique et par heure, idempotence par `MessageID`, aucun contenu d'e-mail dans les journaux. Les
 extraits sont limités à 2 000 caractères et purgés par la maintenance quotidienne (voir [SECURITY.md](SECURITY.md)).
 
+## 4b. Photos d'articles et annonces rédigées par l'IA (mode revendeur)
+
+L'amélioration des photos (lumière, couleurs, cadrage) se fait dans le navigateur et ne coûte rien. Les miniatures
+utilisent Supabase Storage (offre gratuite : 1 Go ; une miniature fait environ 30 à 60 Ko, soit environ 20 000
+articles par Go). La rédaction d'annonces avec Claude est **désactivée** tant qu'aucune clé n'est définie : le bouton
+« Créer l'annonce avec l'IA » affiche alors « Bientôt disponible » et rien n'est envoyé nulle part.
+
+1. Exécutez `supabase/migrations/20261018110000_item_photos_ai.sql` dans l'éditeur SQL de Supabase (ou
+   `npx supabase db push`). Il ajoute `products.photo_path`, le bucket privé `item-photos` (300 Ko, JPEG/WebP) et ses
+   politiques de stockage, la table `ai_usage` et les fonctions `reserve_listing_analysis` /
+   `release_listing_analysis`. Il peut être relancé sans risque. Tant qu'il n'est pas exécuté, l'application continue
+   de fonctionner : aucune miniature n'est enregistrée ni affichée et le bouton IA affiche « Bientôt disponible ».
+2. Facultatif, seulement quand la demande est confirmée : définissez `ANTHROPIC_API_KEY` (Console Anthropic → API keys)
+   dans Vercel et redéployez. `LISTING_AI_MODEL` (par défaut `claude-opus-5-5`) et `LISTING_AI_MONTHLY_LIMIT` (par
+   défaut 50 analyses par organisation et par mois civil, en UTC) sont facultatifs. Le remboursement des analyses
+   échouées utilise `SUPABASE_SECRET_KEY`, déjà nécessaire en production. Fixez aussi une limite de dépense mensuelle
+   dans la Console Anthropic, comme second filet de sécurité.
+3. Vérifiez : ajoutez un article avec une photo ; la miniature apparaît dans « Mes articles ». Avec une clé,
+   « Créer l'annonce avec l'IA » affiche « 50 analyses restantes ce mois-ci » puis une annonce en 10 à 30 secondes.
+
+**Coût par analyse (estimation).** Le navigateur envoie jusqu'à 3 photos de 1 024 px sur le plus grand côté. Claude
+compte environ largeur × hauteur / 750 jetons par image : jusqu'à environ 1 400 jetons pour une photo carrée de
+1 024 × 1 024 (environ 1 050 en 4:3). Avec les instructions et le schéma JSON (environ 1 000 jetons), l'entrée fait
+au plus environ 5 200 jetons : 0,021 $ à 4 $ le million de jetons d'entrée (Claude Opus 5.5). La sortie (l'annonce et
+le court raisonnement du modèle en effort « low ») fait en général 1 000 à 2 500 jetons, soit 0,02 à 0,05 $ à 20 $ le
+million, plafonnée par `max_tokens` 4 000 (0,08 $). Donc **environ 0,03 à 0,07 $ par analyse, 0,10 $ au plus**. Au
+plafond par défaut de 50 analyses par mois, un client très actif coûte environ **1,50 à 3,50 $ par mois, 5 $ au
+plus**. Le coût réel dépend du nombre et du format des photos et de la longueur de la réponse ; une demande refusée par
+le modèle puis relancée sur le modèle de repli est facturée même si l'analyse du vendeur lui est rendue. Suivez l'usage
+réel dans la Console Anthropic (l'application journalise le nombre de jetons de chaque analyse sous `[listing-ai]`,
+jamais les photos ni le texte).
+
+Amélioration possible plus tard : le détourage (suppression du fond). Il n'est volontairement pas inclus (licences des
+modèles et poids des modèles exécutés dans le navigateur) ; un fond blanc ou neutre à la prise de vue apporte
+l'essentiel du bénéfice.
+
 ## 5. Test de fumée après chaque déploiement en production
 
 1. `/`, `/pricing` et `/privacy` se chargent ; les en-têtes de réponse incluent `content-security-policy` et
@@ -120,7 +156,9 @@ extraits sont limités à 2 000 caractères et purgés par la maintenance quotid
 5. `curl -H "Authorization: Bearer $CRON_SECRET" https://<your-domain>/api/cron/maintenance` renvoie `{"ok":true,…}`.
 6. Si les e-mails entrants sont configurés : `curl -u narixia:$INBOUND_WEBHOOK_SECRET -H 'content-type: application/json'
    -d '{}' https://<your-domain>/api/inbound/email` renvoie `{"ok":true}`, et la même requête sans `-u` renvoie 401.
-7. Supprimez le compte de test depuis Settings → Data.
+7. Ajoutez un article avec une photo dans une boutique en mode revendeur : la miniature apparaît dans
+   « Mes articles » (nécessite la migration des photos).
+8. Supprimez le compte de test depuis Settings → Data.
 
 ## Migrations de base de données
 

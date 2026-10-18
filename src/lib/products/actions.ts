@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireStore } from "@/lib/auth/workspace";
 import { parseUserAmount, parseUserUnitCost } from "@/lib/finance/input";
 import { normalizeText } from "@/lib/imports/normalize";
+import { removePhotoPaths } from "@/lib/photos/storage";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import type { Locale } from "@/i18n/config";
@@ -135,8 +136,12 @@ export async function deleteProduct(productId: string): Promise<Result> {
   const supabase = await createClient();
   const { count } = await supabase.from("order_items").select("id", { count: "exact", head: true }).eq("product_id", productId);
   if ((count ?? 0) > 0) return { ok: false, message: t.inOrders };
-  const { data, error } = await supabase.from("products").delete().eq("id", productId).eq("store_id", ws.activeStore.id).select("id");
+  // "*" so the delete also works before the photos migration (no photo_path column yet).
+  const { data, error } = await supabase.from("products").delete().eq("id", productId).eq("store_id", ws.activeStore.id).select("*");
   if (error) return { ok: false, message: t.deleteFailed };
   if (!data?.length) return { ok: false, message: t.notFound };
+  // Its thumbnail goes with it (storage files are not deleted by the database).
+  const photo = "photo_path" in data[0] ? data[0].photo_path : null;
+  if (photo) await removePhotoPaths(supabase, [photo]);
   return { ok: true };
 }

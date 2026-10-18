@@ -24,5 +24,12 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], launchOptions: chromiumPath ? { executablePath: chromiumPath } : {} } }],
   webServer: process.env.E2E_BASE_URL
     ? undefined
-    : { command: "npm run dev", url: "http://localhost:3000/robots.txt", reuseExistingServer: true, timeout: 180_000 },
+    : {
+        command: "npm run dev",
+        url: "http://localhost:3000/robots.txt",
+        reuseExistingServer: true,
+        timeout: 180_000,
+        // Canned AI listings (never in production, never calls Anthropic); see src/lib/listing/config.ts.
+        env: { LISTING_AI_FAKE: "1" },
+      },
 });
