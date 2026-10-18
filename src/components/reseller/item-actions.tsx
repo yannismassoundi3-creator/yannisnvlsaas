@@ -12,12 +12,18 @@ import { deleteProduct } from "@/lib/products/actions";
 import { deleteOrder } from "@/lib/transactions/actions";
 import { EditItemDialog } from "./quick-actions";
 
-/** Edit and delete buttons of an item in stock (existing product flows). */
+/**
+ * Edit and delete buttons of an item (existing product flows). Items with a
+ * sale can be edited (e.g. their quantity, never below the pieces sold) but
+ * not deleted: the sale must be undone first.
+ */
 export function StockItemActions({
   productId,
   name,
   unitCostE4,
   acquiredOn,
+  quantity,
+  soldUnits,
   currency,
   today,
   disabled,
@@ -26,6 +32,8 @@ export function StockItemActions({
   name: string;
   unitCostE4: number | null;
   acquiredOn: string | null;
+  quantity: number;
+  soldUnits: number;
   currency: string;
   today: string;
   disabled: boolean;
@@ -41,7 +49,8 @@ export function StockItemActions({
       <Button variant="ghost" size="icon" aria-label={`${t.edit} : ${name}`} title={t.edit} onClick={() => setEditOpen(true)} disabled={disabled}>
         <Pencil />
       </Button>
-      <EditItemDialog open={editOpen} onOpenChange={setEditOpen} productId={productId} initial={{ name, unitCostE4, acquiredOn }} currency={currency} today={today} />
+      <EditItemDialog open={editOpen} onOpenChange={setEditOpen} productId={productId} initial={{ name, unitCostE4, acquiredOn, quantity, soldUnits }} currency={currency} today={today} />
+      {soldUnits > 0 ? null : (
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
@@ -70,6 +79,7 @@ export function StockItemActions({
           )
         }
       />
+      )}
     </>
   );
 }

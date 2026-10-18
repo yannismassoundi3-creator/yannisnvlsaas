@@ -193,4 +193,109 @@ test.describe.serial("Reseller mode", () => {
     await expect(confirmed).toContainText(/25,00\s€/);
     await expect(confirmed).toContainText(/13,00\s€/);
   });
+
+  test("a reseller records a lot of identical pieces and sells part of it", async ({ page }) => {
+    await signUp(page, uniqueEmail("e2e-reseller-lot"));
+    await page.goto("/onboarding?hl=fr");
+    await page.getByLabel("Nom de la boutique").fill("Mes lots");
+    await page.getByLabel("Où vendez-vous ?").selectOption("vinted");
+    await page.getByRole("button", { name: "Continuer" }).click();
+    await page.getByRole("button", { name: "Créer mon espace de travail" }).click();
+    await page.getByRole("button", { name: /Ajouter un article que j'ai acheté/ }).click();
+    await page.waitForURL(/\/app\?add=1$/);
+
+    // 3 polos bought as a lot for 24,00 €: 8,00 € each, shown before saving.
+    const add = page.getByRole("dialog", { name: "Ajouter un article" });
+    await add.getByLabel("Nom de l'article").fill("Polo Ralph Lauren");
+    await expect(add.getByLabel("Quantité")).toHaveValue("1");
+    await expect(add.getByRole("radio", { name: "Prix du lot" })).toHaveCount(0);
+    await add.getByRole("button", { name: "Un de plus" }).click();
+    await add.getByRole("button", { name: "Un de plus" }).click();
+    await expect(add.getByLabel("Quantité")).toHaveValue("3");
+    await add.getByRole("radio", { name: "Prix du lot" }).check();
+    await add.getByLabel("Prix d'achat du lot").fill("24,00");
+    await expect(add.getByText(/soit 8,00\s€ par article/)).toBeVisible();
+    await expectAccessible(page);
+    await add.getByRole("button", { name: "Ajouter", exact: true }).click();
+    await expect(page.getByText("« Polo Ralph Lauren » ajouté à votre stock (3 pièces)")).toBeVisible();
+    await expect(add).toBeHidden();
+    const stock = page.getByRole("region", { name: "Votre stock" });
+    await expect(stock).toContainText(/3\s*articles en stock/);
+    await expect(stock).toContainText(/24,00\s€/);
+
+    // Sell 2 of them for 30,00 € in total.
+    await page.getByRole("button", { name: "Vendu !", exact: true }).click();
+    const sell = page.getByRole("dialog", { name: "Vendu !" });
+    await sell.getByRole("button", { name: /Polo Ralph Lauren/ }).click();
+    await expect(sell.getByText(/3 disponibles/)).toBeVisible();
+    await expect(sell.getByLabel("Quantité vendue")).toHaveValue("1");
+    await expect(sell.getByLabel("Prix de vente", { exact: true })).toBeVisible();
+    await sell.getByRole("button", { name: "Un de plus" }).click();
+    await expect(sell.getByLabel("Quantité vendue")).toHaveValue("2");
+    const total = sell.getByLabel("Prix de vente total");
+    await total.fill("30");
+    await expect(sell.getByText("Ce que vous recevez pour les 2 articles au total", { exact: false })).toBeVisible();
+    await expectAccessible(page);
+    await total.press("Enter");
+    await expect(page.getByText("Vente enregistrée")).toBeVisible();
+    await expect(sell).toBeHidden();
+
+    // Home: 2 pieces sold, 1 left worth 8,00 €; 30,00 − 2 × 8,00 = 14,00 € kept.
+    await expect(stock).toContainText(/1\s*article en stock/);
+    await expect(stock).toContainText(/8,00\s€/);
+    const figures = page.getByRole("region", { name: "Chiffres clés" });
+    await expect(figures).toContainText(/14,00\s€/);
+    await expect(figures).toContainText(/30,00\s€/);
+
+    // My items: one row with the quantities and the latest sale.
+    await page.goto("/app/items");
+    const row = page.getByRole("main").getByRole("listitem").filter({ hasText: "Polo Ralph Lauren", visible: true });
+    await expect(row).toContainText("2 vendus · 1 restant");
+    await expect(row).toContainText("Prix par article");
+    await expect(row).toContainText(/8,00\s€/);
+    await expect(row).toContainText("Dernière vente (2 articles)");
+    await expect(row).toContainText(/30,00\s€/);
+    await expect(row).toContainText(/14,00\s€/);
+    await expectAccessible(page);
+
+    // The last piece sells alone: no quantity to choose.
+    await row.getByRole("button", { name: "Vendu : Polo Ralph Lauren" }).click();
+    await expect(sell).toBeVisible();
+    await expect(sell.getByLabel("Prix de vente", { exact: true })).toBeVisible();
+    await expect(sell.getByLabel("Quantité vendue")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+
+    // Editing: the quantity cannot go below the 2 pieces sold.
+    await row.getByRole("button", { name: "Modifier : Polo Ralph Lauren" }).click();
+    const edit = page.getByRole("dialog", { name: "Modifier l'article" });
+    await expect(edit.getByLabel("Quantité")).toHaveValue("3");
+    await expect(edit.getByText("2 pièces déjà vendues.")).toBeVisible();
+    await edit.getByRole("button", { name: "Un de moins" }).click();
+    await expect(edit.getByLabel("Quantité")).toHaveValue("2");
+    await expect(edit.getByRole("button", { name: "Un de moins" })).toBeDisabled();
+    await edit.getByRole("button", { name: "Un de plus" }).click();
+    await edit.getByRole("button", { name: "Un de plus" }).click();
+    await edit.getByRole("button", { name: "Enregistrer" }).click();
+    await expect(page.getByText("Article enregistré")).toBeVisible();
+    await expect(row).toContainText("2 vendus · 2 restants");
+
+    // Partly sold items are listed among the sales too.
+    await page.getByRole("link", { name: "Vendus" }).click();
+    await page.waitForURL(/tab=sold/);
+    await expect(page.getByRole("main").getByRole("listitem").filter({ hasText: "Polo Ralph Lauren", visible: true })).toContainText("2 vendus · 2 restants");
+
+    // Phone width: the add dialog with a lot fits.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/app/items");
+    await expectNoHorizontalOverflow(page);
+    await page.getByRole("button", { name: "Ajouter un article" }).click();
+    const addPhone = page.getByRole("dialog", { name: "Ajouter un article" });
+    await addPhone.getByLabel("Quantité").fill("10");
+    await addPhone.getByRole("radio", { name: "Prix du lot" }).check();
+    await addPhone.getByLabel("Prix d'achat du lot").fill("10");
+    await expect(addPhone.getByText(/soit 1,00\s€ par article/)).toBeVisible();
+    await addPhone.getByLabel("Quantité").fill("3");
+    await expect(addPhone.getByText(/soit 3,3333\s€ par article \(arrondi à 4 décimales\)/)).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  });
 });

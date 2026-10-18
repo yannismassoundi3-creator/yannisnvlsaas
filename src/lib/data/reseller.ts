@@ -45,8 +45,13 @@ export type ItemRow = {
   itemCost: number | null;
   shippingCost: number | null;
   fees: number | null;
-  /** What the sale left: null when the purchase price is unknown or the order has several items. */
+  /** What the latest sale left: null when the purchase price is unknown or the order has several items. */
   margin: number | null;
+  /** Pieces bought, pieces sold, pieces left, and pieces in the latest sale (null before the first sale). */
+  quantity: number;
+  soldUnits: number;
+  remaining: number;
+  saleQuantity: number | null;
 };
 
 type SqlItem = {
@@ -67,10 +72,30 @@ type SqlItem = {
   shipping_cost: number | null;
   fees: number | null;
   margin: number | null;
+  // Added by the reseller quantities migration. Absent while production still
+  // runs the previous reseller_items: every item is then one piece.
+  quantity?: number | null;
+  sold_units?: number | null;
+  remaining?: number | null;
+  sale_quantity?: number | null;
 };
+
+/**
+ * Quantities of an item row. Before the quantities migration is applied the
+ * function returns no quantity columns: an item is then one piece, sold when
+ * it has an order line (the previous rule), so the pages keep working.
+ */
+function quantities(r: SqlItem): Pick<ItemRow, "quantity" | "soldUnits" | "remaining" | "saleQuantity"> {
+  if (r.quantity === undefined || r.quantity === null) {
+    const sold = r.status === "sold";
+    return { quantity: 1, soldUnits: sold ? 1 : 0, remaining: sold ? 0 : 1, saleQuantity: r.order_id ? 1 : null };
+  }
+  return { quantity: n(r.quantity), soldUnits: n(r.sold_units), remaining: n(r.remaining), saleQuantity: nn(r.sale_quantity) };
+}
 
 function toItem(r: SqlItem): ItemRow {
   return {
+    ...quantities(r),
     productId: r.product_id,
     name: r.name,
     unitCostE4: nn(r.unit_cost_e4),
@@ -108,7 +133,7 @@ export async function listItems(
   return { rows: ((data ?? []) as SqlItem[]).map(toItem), total: count ?? 0 };
 }
 
-export type StockOption = { id: string; name: string; unitCostE4: number | null; stockedOn: string };
+export type StockOption = { id: string; name: string; unitCostE4: number | null; stockedOn: string; /** Pieces left. */ remaining: number };
 
 export type SellContext = {
   /** Items in stock, most recent first (at most 1,000, searched in the browser). */
@@ -129,7 +154,13 @@ export const getSellContext = cache(async (store: Store): Promise<SellContext> =
   ]);
   check(stock.error, "stock options");
   return {
-    stock: ((stock.data ?? []) as SqlItem[]).map((r) => ({ id: r.product_id, name: r.name, unitCostE4: nn(r.unit_cost_e4), stockedOn: String(r.stocked_on).slice(0, 10) })),
+    stock: ((stock.data ?? []) as SqlItem[]).map((r) => ({
+      id: r.product_id,
+      name: r.name,
+      unitCostE4: nn(r.unit_cost_e4),
+      stockedOn: String(r.stocked_on).slice(0, 10),
+      remaining: quantities(r).remaining,
+    })),
     defaultChannel: defaultSalesChannel(last.data?.sales_channel, store.platform),
   };
 });
@@ -148,6 +179,7 @@ export type BestSale = { productId: string; name: string; netRevenue: number; ma
 export type ResellerHomeData = {
   metrics: Metrics;
   previous: Metrics | null;
+  /** In pieces: an item bought as a lot of 3 with 1 sold counts 2. */
   stock: { items: number; costMinor: number; itemsWithoutCost: number; staleItems: number };
   stale: ItemRow[];
   best: BestSale[];

@@ -991,6 +991,7 @@ export type Database = {
           price_minor: number | null;
           sku: string | null;
           source: string;
+          stock_quantity: number | null;
           store_id: string;
           unit_cost_e4: number | null;
           updated_at: string;
@@ -1008,6 +1009,7 @@ export type Database = {
           price_minor?: number | null;
           sku?: string | null;
           source?: string;
+          stock_quantity?: number | null;
           store_id: string;
           unit_cost_e4?: number | null;
           updated_at?: string;
@@ -1024,6 +1026,7 @@ export type Database = {
           price_minor?: number | null;
           sku?: string | null;
           source?: string;
+          stock_quantity?: number | null;
           store_id?: string;
           unit_cost_e4?: number | null;
           updated_at?: string;
@@ -1521,16 +1524,34 @@ export type Database = {
           order_id: string;
           ordered_at: string;
           product_id: string;
+          quantity: number;
           refunds: number;
+          remaining: number;
           sale_price: number;
+          sale_quantity: number;
           sales_channel: string;
           shipping_charged: number;
           shipping_cost: number;
           sold_on: string;
+          sold_units: number;
           status: string;
           stocked_on: string;
           unit_cost_e4: number;
         }[];
+      };
+      reseller_record_sale: {
+        Args: {
+          p_external_id: string;
+          p_fees_minor?: number;
+          p_gross_minor: number;
+          p_ordered_at: string;
+          p_product_id: string;
+          p_quantity: number;
+          p_sales_channel?: string;
+          p_shipping_cost_minor?: number;
+          p_store_id: string;
+        };
+        Returns: string;
       };
       reseller_stock_summary: {
         Args: { p_stale_before: string; p_store_id: string };

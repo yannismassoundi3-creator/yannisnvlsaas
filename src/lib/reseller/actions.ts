@@ -12,7 +12,7 @@ import { BUSINESS_MODELS } from "@/lib/onboarding/constants";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { writeOrder } from "@/lib/transactions/write";
-import { itemReference, saleNumber } from "./logic";
+import { itemReference, remainingPieces, saleNumber } from "./logic";
 import { itemInput, parseItem, parseSale, saleInput, type ItemInput, type SaleInput } from "./schema";
 
 /**
@@ -35,13 +35,28 @@ async function writeContext(limitKey: string) {
   return { ws, locale, t, c, error: null };
 }
 
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * PostgREST codes meaning the database does not have the quantities migration
+ * yet (the code can be deployed a few minutes before the SQL is run): unknown
+ * column in a write (PGRST204) or a read (42703), unknown function (PGRST202,
+ * 42883). Single pieces keep working through the previous path meanwhile.
+ */
+const MISSING_COLUMN = new Set(["PGRST204", "42703"]);
+const MISSING_FUNCTION = new Set(["PGRST202", "42883"]);
+
+/** stock_quantity to store: null for a single piece (the meaning of null), so single items never need the new column. */
+const storedQuantity = (quantity: number) => (quantity > 1 ? quantity : null);
+
 /** Inserts an item with a fresh internal reference (several pieces may share a name). */
 async function insertItem(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: Supabase,
   organizationId: string,
   storeId: string,
-  item: { name: string; unitCostE4: number | null; acquiredOn: string | null },
+  item: { name: string; unitCostE4: number | null; acquiredOn: string | null; quantity: number },
 ): Promise<{ ok: true; id: string; name: string; unit_cost_e4: number | null } | { ok: false; code: string | undefined }> {
+  const quantity = storedQuantity(item.quantity);
   for (let attempt = 0; attempt < 3; attempt++) {
     const { data, error } = await supabase
       .from("products")
@@ -53,6 +68,7 @@ async function insertItem(
         unit_cost_e4: item.unitCostE4,
         acquired_on: item.acquiredOn,
         source: "manual",
+        ...(quantity === null ? {} : { stock_quantity: quantity }),
       })
       .select("id, name, unit_cost_e4")
       .single();
@@ -62,7 +78,17 @@ async function insertItem(
   return { ok: false, code: "23505" };
 }
 
-/** Adds an item bought for resale: a product with its purchase price as unit cost. */
+function itemWriteError(code: string | undefined, t: (typeof resellerMessages)["en"], c: (typeof catalogCommon)["en"]) {
+  if (code === "42501") return c.paused;
+  if (code && MISSING_COLUMN.has(code)) return t.actions.quantityUnavailable;
+  return t.actions.itemSaveFailed;
+}
+
+/**
+ * Adds an item bought for resale: a product with its purchase price as unit
+ * cost and, for several identical pieces, their number (a lot price is
+ * divided by it, exactly, in parseItem).
+ */
 export async function addItem(input: ItemInput): Promise<Result<{ productId: string }>> {
   const { ws, locale, t, c, error: blocked } = await writeContext("product-write");
   if (blocked) return { ok: false, message: blocked };
@@ -72,12 +98,18 @@ export async function addItem(input: ItemInput): Promise<Result<{ productId: str
   if (!item.ok) return { ok: false, message: c.checkFields, fieldErrors: item.fieldErrors };
 
   const created = await insertItem(await createClient(), ws.organization.id, ws.activeStore.id, item.value);
-  if (!created.ok) return { ok: false, message: created.code === "42501" ? c.paused : t.actions.itemSaveFailed };
+  if (!created.ok) return { ok: false, message: itemWriteError(created.code, t, c) };
   refresh();
   return { ok: true, productId: created.id };
 }
 
-/** Edits an item's name, purchase price and purchase date. Its internal reference is kept. */
+/**
+ * Edits an item's name, purchase price, purchase date and number of pieces.
+ * Its internal reference is kept. The quantity may not go below the pieces
+ * already sold: checked here for a clear message, and enforced by the
+ * products_stock_quantity_guard trigger, which serialises with sales on the
+ * item's row lock.
+ */
 export async function updateItem(productId: string, input: ItemInput): Promise<Result> {
   const { ws, locale, t, c, error: blocked } = await writeContext("product-write");
   if (blocked) return { ok: false, message: blocked };
@@ -86,24 +118,57 @@ export async function updateItem(productId: string, input: ItemInput): Promise<R
   const item = parseItem(parsed.data, { locale, today: todayIn(ws.activeStore.timezone) });
   if (!item.ok) return { ok: false, message: c.checkFields, fieldErrors: item.fieldErrors };
   const supabase = await createClient();
+  // "*" so the read also works before the quantities migration (no stock_quantity column yet).
+  const { data: current } = await supabase.from("products").select("*").eq("id", productId).eq("store_id", ws.activeStore.id).maybeSingle();
+  if (!current) return { ok: false, message: t.actions.itemNotFound };
+  const hasQuantity = "stock_quantity" in current;
+  const quantityChanged = item.value.quantity !== ((hasQuantity ? current.stock_quantity : null) ?? 1);
+  if (quantityChanged) {
+    if (!hasQuantity) return { ok: false, message: t.actions.quantityUnavailable };
+    const sold = await soldUnits(supabase, productId);
+    if (item.value.quantity < sold) return { ok: false, message: c.checkFields, fieldErrors: { quantity: t.items.quantityBelowSold(sold) } };
+  }
   const { data, error } = await supabase
     .from("products")
-    .update({ name: item.value.name, unit_cost_e4: item.value.unitCostE4, acquired_on: item.value.acquiredOn })
+    .update({
+      name: item.value.name,
+      unit_cost_e4: item.value.unitCostE4,
+      acquired_on: item.value.acquiredOn,
+      ...(quantityChanged ? { stock_quantity: storedQuantity(item.value.quantity) } : {}),
+    })
     .eq("id", productId)
     .eq("store_id", ws.activeStore.id)
     .select("id");
-  if (error) return { ok: false, message: error.code === "42501" ? c.paused : t.actions.itemSaveFailed };
+  if (error?.code === "23514" && error.message.includes("stock_quantity_below_sold")) {
+    // A sale was recorded in the meantime.
+    const sold = Number(error.details) || (await soldUnits(supabase, productId));
+    return { ok: false, message: c.checkFields, fieldErrors: { quantity: t.items.quantityBelowSold(sold) } };
+  }
+  if (error) return { ok: false, message: itemWriteError(error.code, t, c) };
   if (!data?.length) return { ok: false, message: t.actions.itemNotFound };
   refresh();
   return { ok: true };
 }
 
+/** Pieces of an item already sold (sum of its order line quantities). */
+async function soldUnits(supabase: Supabase, productId: string): Promise<number> {
+  const { data } = await supabase.from("order_items").select("quantity").eq("product_id", productId).limit(10_000);
+  return (data ?? []).reduce((sum, l) => sum + Number(l.quantity ?? 0), 0);
+}
+
 /**
  * Records a sale in one action: an order (generated number, sale date at noon
  * local time, selling platform, optional shipping cost and platform fee) with
- * one line (quantity 1, the sale price, the item's purchase price as cost
- * snapshot). An item not yet in stock is created first. A stock item can be
- * sold once: resellers sell unique pieces.
+ * one line (the pieces sold, the total received for them, the item's
+ * purchase price as unit cost snapshot). An item not yet in stock is created
+ * first, with as many pieces as are sold.
+ *
+ * The write goes through public.reseller_record_sale, which locks the item
+ * row, checks the remaining pieces and writes the order and its line in one
+ * transaction: two quick sales of the last piece cannot both succeed. Until
+ * that function exists in the database (code deployed before the migration),
+ * single-piece sales use the previous path: the item must have no order line
+ * yet, checked just before the write (a narrow race, as before).
  */
 export async function sellItem(input: SaleInput): Promise<Result<{ orderId: string; productId: string }>> {
   const { ws, locale, t, c, error: blocked } = await writeContext("order");
@@ -116,20 +181,71 @@ export async function sellItem(input: SaleInput): Promise<Result<{ orderId: stri
   const v = sale.value;
   const supabase = await createClient();
 
+  const fail = (message: string, field?: string) => (field ? { ok: false as const, message: c.checkFields, fieldErrors: { [field]: message } } : { ok: false as const, message });
+  const notEnough = (remaining: number) => (remaining <= 0 ? fail(t.sell.alreadySold, "productId") : fail(t.sell.notEnough(remaining), "quantity"));
+
   let product: { id: string; name: string; unit_cost_e4: number | null };
   if (v.productId) {
-    const { data } = await supabase.from("products").select("id, name, unit_cost_e4").eq("id", v.productId).eq("store_id", store.id).maybeSingle();
-    if (!data) return { ok: false, message: c.checkFields, fieldErrors: { productId: t.sell.itemNotFound } };
-    const { count } = await supabase.from("order_items").select("id", { count: "exact", head: true }).eq("product_id", data.id);
-    if ((count ?? 0) > 0) return { ok: false, message: c.checkFields, fieldErrors: { productId: t.sell.alreadySold } };
+    // "*" so the read also works before the quantities migration (no stock_quantity column yet).
+    const { data } = await supabase.from("products").select("*").eq("id", v.productId).eq("store_id", store.id).maybeSingle();
+    if (!data) return fail(t.sell.itemNotFound, "productId");
+    // Early, friendly check; the database checks again under a row lock.
+    const remaining = remainingPieces("stock_quantity" in data ? data.stock_quantity : null, await soldUnits(supabase, data.id));
+    if (v.quantity > remaining) return notEnough(remaining);
     product = data;
   } else {
-    const created = await insertItem(supabase, ws.organization.id, store.id, { ...v.newItem!, acquiredOn: null });
-    if (!created.ok) return { ok: false, message: created.code === "42501" ? c.paused : t.actions.itemSaveFailed };
+    const created = await insertItem(supabase, ws.organization.id, store.id, { ...v.newItem!, acquiredOn: null, quantity: v.quantity });
+    if (!created.ok) return { ok: false, message: itemWriteError(created.code, t, c) };
     product = created;
   }
 
+  const done = async (orderId: string) => {
+    if (v.inboundEmailId) {
+      // The forwarded sale email is now confirmed (RLS: members of this organisation only).
+      await supabase
+        .from("inbound_emails")
+        .update({ status: "confirmed", order_id: orderId })
+        .eq("id", v.inboundEmailId)
+        .eq("store_id", store.id)
+        .eq("status", "pending");
+    }
+    refresh();
+    return { ok: true as const, orderId, productId: product.id };
+  };
+
   // Order numbers are unique per store: retry on the (rare) collision.
+  let legacy = false;
+  for (let attempt = 0; attempt < 3 && !legacy; attempt++) {
+    const { data: orderId, error } = await supabase.rpc("reseller_record_sale", {
+      p_store_id: store.id,
+      p_product_id: product.id,
+      p_quantity: v.quantity,
+      p_external_id: saleNumber(v.date),
+      p_ordered_at: zonedTimeToUtc(v.date, "12:00:00", store.timezone),
+      p_gross_minor: v.priceMinor,
+      p_shipping_cost_minor: v.shippingCostMinor ?? undefined,
+      p_fees_minor: v.platformFeeMinor ?? undefined,
+      p_sales_channel: v.channel,
+    });
+    if (!error && orderId) return done(orderId);
+    if (error?.code === "23505") continue;
+    if (error && MISSING_FUNCTION.has(error.code)) {
+      legacy = true;
+      break;
+    }
+    if (error?.message === "insufficient_stock") return notEnough(Number(error.details) || 0);
+    if (error?.message === "item_not_found") return fail(t.sell.itemNotFound, "productId");
+    if (error?.code === "42501") return fail(c.paused);
+    return fail(t.actions.saleSaveFailed);
+  }
+  if (!legacy) return fail(t.actions.saleSaveFailed);
+
+  // Previous path (database without the quantities migration): one piece per item.
+  if (v.quantity > 1) return fail(t.actions.quantityUnavailable);
+  if (v.productId) {
+    const { count } = await supabase.from("order_items").select("id", { count: "exact", head: true }).eq("product_id", product.id);
+    if ((count ?? 0) > 0) return fail(t.sell.alreadySold, "productId");
+  }
   for (let attempt = 0; attempt < 3; attempt++) {
     const written = await writeOrder(supabase, {
       organizationId: ws.organization.id,
@@ -144,22 +260,10 @@ export async function sellItem(input: SaleInput): Promise<Result<{ orderId: stri
       salesChannel: v.channel,
       lines: [{ productId: product.id, name: product.name, sku: null, quantity: 1, gross: v.priceMinor, discount: 0, unitCostE4: product.unit_cost_e4 }],
     });
-    if (written.ok) {
-      if (v.inboundEmailId) {
-        // The forwarded sale email is now confirmed (RLS: members of this organisation only).
-        await supabase
-          .from("inbound_emails")
-          .update({ status: "confirmed", order_id: written.orderId })
-          .eq("id", v.inboundEmailId)
-          .eq("store_id", store.id)
-          .eq("status", "pending");
-      }
-      refresh();
-      return { ok: true, orderId: written.orderId, productId: product.id };
-    }
+    if (written.ok) return done(written.orderId);
     if (written.reason !== "duplicate") break;
   }
-  return { ok: false, message: t.actions.saleSaveFailed };
+  return fail(t.actions.saleSaveFailed);
 }
 
 /** Switches how the store sells (owner or admin). Only the home page, menu and defaults change. */

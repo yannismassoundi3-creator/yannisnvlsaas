@@ -290,6 +290,8 @@ function HeadlineFigures({
 function StockCard({ data, store, locale, f, today }: { data: Awaited<ReturnType<typeof getResellerHome>>; store: Store; locale: Locale; f: Format; today: string }) {
   const t = resellerMessages[locale].home;
   const money = (v: number) => f.money(v, store.currency);
+  // The summary counts pieces: compare it with the pieces of the items listed.
+  const stalePiecesShown = data.stale.reduce((sum, item) => sum + item.remaining, 0);
   return (
     <Card aria-labelledby="stock-heading">
       <CardHeader
@@ -336,6 +338,7 @@ function StockCard({ data, store, locale, f, today }: { data: Awaited<ReturnType
                   <div className="min-w-0">
                     <p className="truncate text-md text-ink">{item.name}</p>
                     <p className="text-xs text-ink-3 tabular">
+                      {item.remaining > 1 ? `${resellerMessages[locale].items.inStockCount(item.remaining)} · ` : null}
                       {t.daysInStock(daysBetween(item.stockedOn, today))} ·{" "}
                       {item.unitCostE4 === null ? <span className="text-caution-700">{t.missingCost}</span> : t.boughtFor(money(e4ToMinor(item.unitCostE4, store.currency)))}
                     </p>
@@ -344,10 +347,10 @@ function StockCard({ data, store, locale, f, today }: { data: Awaited<ReturnType
                 </li>
               ))}
             </ul>
-            {data.stock.staleItems > data.stale.length ? (
+            {data.stock.staleItems > stalePiecesShown ? (
               <p className="px-5 pb-4 text-sm text-ink-3">
                 <Link href={"/app/items?tab=in_stock" as Route} className="font-medium text-emerald-700 hover:underline">
-                  {t.staleMore(data.stock.staleItems - data.stale.length)}
+                  {t.staleMore(data.stock.staleItems - stalePiecesShown)}
                 </Link>
               </p>
             ) : (

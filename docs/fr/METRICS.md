@@ -129,11 +129,16 @@ Les boutiques en mode revendeur suivent les mêmes règles ; seuls leurs écrans
   nul, car Vinted et Leboncoin facturent l'acheteur. Des frais ou un coût d'envoi saisis sur une vente sont enregistrés
   sur cette commande ; laissés vides, la règle de la boutique s'applique et la valeur est signalée comme estimation
   (zéro sauf si le vendeur modifie la règle).
-- **Le stock** est l'ensemble des articles sans ligne de commande. L'« argent immobilisé » est la somme de leurs prix
-  d'achat ; les articles sans prix d'achat sont comptés à part, jamais considérés comme gratuits. Les « articles qui
-  traînent » sont en stock depuis plus de 60 jours, à compter de la date d'achat, à défaut de la date d'ajout.
-- **Par article** (Mes articles), la marge d'une vente n'est affichée que si la commande ne compte qu'une ligne :
-  prix de vente + port facturé − remboursements − prix d'achat − coût d'envoi − frais, avec les mêmes règles
+- **Le stock** se compte en pièces : un article compte `stock_quantity` pièces (une si non renseigné), moins les
+  unités de ses ventes. L'« argent immobilisé » est le nombre de pièces restantes × leur prix d'achat par pièce,
+  arrondi par article ; les pièces sans prix d'achat sont comptées à part, jamais considérées comme gratuites. Les
+  « articles qui traînent » sont en stock depuis plus de 60 jours, à compter de la date d'achat, à défaut de la date
+  d'ajout. Un **prix de lot** est divisé par le nombre de pièces en arithmétique décimale exacte, arrondi au plus
+  proche (demi vers l'extérieur) à 4 décimales (10,00 pour 3 pièces = 3,3333 chacune) ; la fenêtre affiche la valeur
+  arrondie avant l'enregistrement.
+- **Par article** (Mes articles), la marge de la dernière vente n'est affichée que si la commande ne compte qu'une
+  ligne : prix de vente (total des pièces vendues) + port facturé − remboursements − prix d'achat × pièces vendues −
+  coût d'envoi − frais, avec les mêmes règles
   (enregistré ou estimé) que les rapports. Elle vaut « — » si le prix d'achat est inconnu.
 - **Par plateforme**, ventes et marges sont additionnées à partir des mêmes valeurs par commande que les totaux
   quotidiens ; les remboursements comptent à leur propre date, sous la plateforme de leur commande. Les dépenses

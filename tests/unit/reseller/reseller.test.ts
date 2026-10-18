@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { isResalePlatform, isReseller, PLATFORMS, SALES_CHANNELS, suggestedBusinessModel } from "@/lib/onboarding/constants";
-import { bestNameMatch, daysBetween, defaultSalesChannel, itemReference, nameSimilarity, randomBase32, saleNumber, staleBefore } from "@/lib/reseller/logic";
-import { itemInput, parseItem, parseSale, saleInput } from "@/lib/reseller/schema";
+import {
+  bestNameMatch,
+  daysBetween,
+  defaultSalesChannel,
+  itemReference,
+  lotUnitCostE4,
+  nameSimilarity,
+  randomBase32,
+  remainingPieces,
+  saleNumber,
+  staleBefore,
+} from "@/lib/reseller/logic";
+import { itemInput, parseItem, parseSale, saleInput, unitCostFromInput } from "@/lib/reseller/schema";
 
 const fixed = (n: number) => new Uint8Array(Array.from({ length: n }, (_, i) => i * 7));
 
@@ -87,11 +98,14 @@ describe("item validation", () => {
   const parse = (input: Record<string, string>) => parseItem(itemInput.parse(input), ctx);
 
   it("accepts a name alone (purchase price optional)", () => {
-    expect(parse({ name: "  Veste   en jean " })).toEqual({ ok: true, value: { name: "Veste en jean", unitCostE4: null, acquiredOn: null } });
+    expect(parse({ name: "  Veste   en jean " })).toEqual({ ok: true, value: { name: "Veste en jean", unitCostE4: null, acquiredOn: null, quantity: 1, costRounded: false } });
   });
 
   it("parses French and English decimals exactly into unit costs", () => {
-    expect(parse({ name: "Veste", purchasePrice: "6,50", acquiredOn: "2026-10-01" })).toEqual({ ok: true, value: { name: "Veste", unitCostE4: 65_000, acquiredOn: "2026-10-01" } });
+    expect(parse({ name: "Veste", purchasePrice: "6,50", acquiredOn: "2026-10-01" })).toEqual({
+      ok: true,
+      value: { name: "Veste", unitCostE4: 65_000, acquiredOn: "2026-10-01", quantity: 1, costRounded: false },
+    });
     expect(parse({ name: "Veste", purchasePrice: "6.5" })).toMatchObject({ ok: true, value: { unitCostE4: 65_000 } });
   });
 
@@ -103,6 +117,28 @@ describe("item validation", () => {
       expect(r.fieldErrors.purchasePrice).toBeTruthy();
       expect(r.fieldErrors.acquiredOn).toBe("Saisissez une date valide.");
     }
+  });
+
+  it("records several pieces at a price per piece", () => {
+    expect(parse({ name: "Polo Ralph Lauren", purchasePrice: "8", quantity: "3" })).toMatchObject({ ok: true, value: { quantity: 3, unitCostE4: 80_000, costRounded: false } });
+    expect(parse({ name: "Polo", quantity: "" })).toMatchObject({ ok: true, value: { quantity: 1 } });
+  });
+
+  it("divides a lot price by the number of pieces, exactly", () => {
+    expect(parse({ name: "T-shirts", purchasePrice: "24,00", quantity: "3", priceMode: "lot" })).toMatchObject({ ok: true, value: { quantity: 3, unitCostE4: 80_000, costRounded: false } });
+    expect(parse({ name: "T-shirts", purchasePrice: "20", quantity: "10", priceMode: "lot" })).toMatchObject({ ok: true, value: { unitCostE4: 20_000, costRounded: false } });
+    // 10 € for 3 pieces: 3.3333 € each, flagged as rounded.
+    expect(parse({ name: "T-shirts", purchasePrice: "10", quantity: "3", priceMode: "lot" })).toMatchObject({ ok: true, value: { unitCostE4: 33_333, costRounded: true } });
+    // A lot of one piece is the piece's price; no price stays unknown, never zero.
+    expect(parse({ name: "Sac", purchasePrice: "12,5", quantity: "1", priceMode: "lot" })).toMatchObject({ ok: true, value: { unitCostE4: 125_000 } });
+    expect(parse({ name: "Sac", purchasePrice: "", quantity: "4", priceMode: "lot" })).toMatchObject({ ok: true, value: { unitCostE4: null } });
+  });
+
+  it("rejects quantities outside 1 to 999, in the user's language", () => {
+    expect(parse({ name: "Polo", quantity: "0" })).toMatchObject({ ok: false, fieldErrors: { quantity: "Saisissez 1 ou plus." } });
+    expect(parse({ name: "Polo", quantity: "1000" })).toMatchObject({ ok: false, fieldErrors: { quantity: "Saisissez 999 ou moins." } });
+    expect(parse({ name: "Polo", quantity: "2,5" })).toMatchObject({ ok: false, fieldErrors: { quantity: expect.any(String) } });
+    expect(itemInput.safeParse({ name: "Polo", priceMode: "bulk" }).success).toBe(false);
   });
 
   it("bounds the raw input sizes", () => {
@@ -120,7 +156,7 @@ describe("sale validation", () => {
   it("records a stock item sold with a comma price", () => {
     expect(parse({ productId })).toEqual({
       ok: true,
-      value: { productId, newItem: null, priceMinor: 1850, channel: "vinted", date: "2026-10-17", shippingCostMinor: null, platformFeeMinor: null, inboundEmailId: null },
+      value: { productId, newItem: null, priceMinor: 1850, quantity: 1, channel: "vinted", date: "2026-10-17", shippingCostMinor: null, platformFeeMinor: null, inboundEmailId: null },
     });
   });
 
@@ -150,6 +186,11 @@ describe("sale validation", () => {
     expect(parse({ productId, inboundEmailId: productId })).toMatchObject({ ok: true, value: { inboundEmailId: productId } });
   });
 
+  it("records several pieces sold with the total received", () => {
+    expect(parse({ productId, quantity: "2", price: "30" })).toMatchObject({ ok: true, value: { quantity: 2, priceMinor: 3000 } });
+    expect(parse({ productId, quantity: "0" })).toMatchObject({ ok: false, fieldErrors: { quantity: expect.any(String) } });
+  });
+
   it("allows a zero price (an item given away still leaves its cost)", () => {
     expect(parse({ productId, price: "0" })).toMatchObject({ ok: true, value: { priceMinor: 0 } });
   });
@@ -157,5 +198,31 @@ describe("sale validation", () => {
   it("answers in English for English users", () => {
     const r = parseSale(saleInput.parse({ ...base, price: "" }), { ...ctx, locale: "en" });
     expect(r).toMatchObject({ ok: false, fieldErrors: { price: "Enter the sale price." } });
+  });
+});
+
+describe("lots and remaining pieces", () => {
+  it("divides lot prices with half-away-from-zero rounding to 4 decimals", () => {
+    expect(lotUnitCostE4(240_000, 3)).toEqual({ value: 80_000, rounded: false });
+    expect(lotUnitCostE4(100_000, 3)).toEqual({ value: 33_333, rounded: true });
+    expect(lotUnitCostE4(200_000, 3)).toEqual({ value: 66_667, rounded: true });
+    expect(lotUnitCostE4(5, 2)).toEqual({ value: 3, rounded: true }); // 0.00025 → 0.0003
+    expect(lotUnitCostE4(0, 7)).toEqual({ value: 0, rounded: false });
+    expect(() => lotUnitCostE4(100, 0)).toThrow();
+    expect(() => lotUnitCostE4(-1, 2)).toThrow();
+  });
+
+  it("parses typed lot prices like the server, for the live preview", () => {
+    expect(unitCostFromInput("24,00", "lot", 3, "fr")).toEqual({ ok: true, value: 80_000, rounded: false });
+    expect(unitCostFromInput("1 000,00", "lot", 7, "fr")).toEqual({ ok: true, value: 1_428_571, rounded: true });
+    expect(unitCostFromInput("24", "unit", 3, "fr")).toEqual({ ok: true, value: 240_000, rounded: false });
+    expect(unitCostFromInput("abc", "lot", 3, "fr")).toMatchObject({ ok: false });
+  });
+
+  it("counts remaining pieces, one when the quantity is unknown, never below zero", () => {
+    expect(remainingPieces(3, 2)).toBe(1);
+    expect(remainingPieces(null, 0)).toBe(1);
+    expect(remainingPieces(null, 1)).toBe(0);
+    expect(remainingPieces(2, 5)).toBe(0);
   });
 });

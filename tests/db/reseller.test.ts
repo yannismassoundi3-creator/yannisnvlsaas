@@ -181,6 +181,181 @@ describe("a quick sale feeds the existing reports", () => {
   });
 });
 
+describe("quantities (several identical pieces per item)", () => {
+  let erin: string;
+  let shop: { orgId: string; storeId: string };
+
+  beforeAll(async () => {
+    erin = await createUser();
+    shop = await onboard(erin, "reseller");
+  });
+
+  afterAll(async () => {
+    await cleanupUsers([erin]);
+  });
+
+  async function addItem(q: AsUser, opts: { name: string; costE4: number | null; quantity: number | null; daysAgo?: number }) {
+    const { rows } = await q<{ id: string }>(
+      "insert into public.products (organization_id, store_id, name, sku, unit_cost_e4, stock_quantity, acquired_on) values ($1, $2, $3, $4, $5, $6, current_date - $7::int) returning id",
+      [shop.orgId, shop.storeId, opts.name, `R-${Math.random().toString(36).slice(2, 12).toUpperCase()}`, opts.costE4, opts.quantity, opts.daysAgo ?? 1],
+    );
+    return rows[0].id;
+  }
+
+  /** What sellItem calls: one order with one line of `quantity` pieces for `grossMinor` in total. */
+  async function sell(q: AsUser, productId: string, quantity: number, grossMinor: number, hoursAgo = 0) {
+    const { rows } = await q<{ order_id: string }>(
+      "select public.reseller_record_sale($1, $2, $3, $4, now() - make_interval(hours => $6), $5, null, null, 'vinted') as order_id",
+      [shop.storeId, productId, quantity, `V-Q-${Math.random().toString(36).slice(2, 10).toUpperCase()}`, grossMinor, hoursAgo],
+    );
+    return rows[0].order_id;
+  }
+
+  /** Expects `run` to fail, then rolls back to before it so the transaction goes on. */
+  async function fails(q: AsUser, run: () => Promise<unknown>, pattern: RegExp) {
+    await q("savepoint before_failure");
+    await expect(run()).rejects.toThrow(pattern);
+    await q("rollback to savepoint before_failure");
+  }
+
+  it("bounds the number of pieces", async () => {
+    await asUser(erin, async (q) => {
+      await fails(q, () => addItem(q, { name: "Zero", costE4: null, quantity: 0 }), /stock_quantity_check/);
+      await fails(q, () => addItem(q, { name: "Huge", costE4: null, quantity: 100_001 }), /stock_quantity_check/);
+    });
+  });
+
+  it("computes the remaining pieces and keeps a partly sold item in stock with its latest sale", async () => {
+    await asUser(erin, async (q) => {
+      // A lot of 3 polos for 24.00: 8.00 each.
+      const polo = await addItem(q, { name: "Polo Ralph Lauren", costE4: 80_000, quantity: 3 });
+      const legacy = await addItem(q, { name: "Veste", costE4: 50_000, quantity: null });
+      const orderId = await sell(q, polo, 2, 3000, 1);
+
+      const line = await q("select quantity, gross_minor, unit_cost_e4 from public.order_items where order_id = $1", [orderId]);
+      expect(line.rows).toEqual([{ quantity: 2, gross_minor: 3000, unit_cost_e4: 80_000 }]);
+
+      const items = await q(
+        "select name, status, quantity, sold_units, remaining, sale_quantity, sale_price, item_cost, margin from public.reseller_items($1) order by name",
+        [shop.storeId],
+      );
+      expect(items.rows).toEqual([
+        { name: "Polo Ralph Lauren", status: "in_stock", quantity: 3, sold_units: 2, remaining: 1, sale_quantity: 2, sale_price: 3000, item_cost: 1600, margin: 1400 },
+        { name: "Veste", status: "in_stock", quantity: 1, sold_units: 0, remaining: 1, sale_quantity: null, sale_price: null, item_cost: null, margin: null },
+      ]);
+      // Partly sold: listed in stock and among the items with a sale.
+      const inStock = await q("select product_id from public.reseller_items($1, 'in_stock') order by name", [shop.storeId]);
+      expect(inStock.rows.map((r) => r.product_id)).toEqual([polo, legacy]);
+      const sold = await q("select product_id from public.reseller_items($1, 'sold')", [shop.storeId]);
+      expect(sold.rows.map((r) => r.product_id)).toEqual([polo]);
+
+      // The last piece: the item is sold, the latest sale is shown.
+      await sell(q, polo, 1, 1200);
+      const after = await q("select status, sold_units, remaining, sale_quantity, sale_price from public.reseller_items($1) where product_id = $2", [shop.storeId, polo]);
+      expect(after.rows[0]).toEqual({ status: "sold", sold_units: 3, remaining: 0, sale_quantity: 1, sale_price: 1200 });
+      const stockAfter = await q("select product_id from public.reseller_items($1, 'in_stock')", [shop.storeId]);
+      expect(stockAfter.rows.map((r) => r.product_id)).toEqual([legacy]);
+
+      // Units sold feed the reports like any order line.
+      const totals = await q("select sum(units)::int as units, sum(gross_sales)::int as gross, sum(cogs)::int as cogs from public.report_daily_totals($1, current_date - 1, current_date)", [shop.storeId]);
+      expect(totals.rows[0]).toEqual({ units: 3, gross: 4200, cogs: 2400 });
+    });
+  });
+
+  it("cannot oversell: the sale is refused and nothing is written", async () => {
+    await asUser(erin, async (q) => {
+      const lot = await addItem(q, { name: "T-shirts", costE4: 20_000, quantity: 2 });
+      await fails(q, () => sell(q, lot, 3, 900), /insufficient_stock/);
+      await sell(q, lot, 2, 900);
+      await fails(q, () => sell(q, lot, 1, 450), /insufficient_stock/);
+      // A single piece (no quantity, as before) sells once.
+      const single = await addItem(q, { name: "Sac", costE4: null, quantity: null });
+      await sell(q, single, 1, 2000);
+      await fails(q, () => sell(q, single, 1, 2000), /insufficient_stock/);
+      const { rows } = await q("select count(*)::int as n from public.orders where store_id = $1", [shop.storeId]);
+      expect(rows[0].n).toBe(2);
+      await fails(q, () => sell(q, lot, 0, 0), /invalid_quantity/);
+    });
+  });
+
+  it("serialises two quick sales of the last piece: only one succeeds", async () => {
+    const productId = await asUser(erin, (q) => addItem(q, { name: "Dernier polo", costE4: 80_000, quantity: 2 }), { commit: true });
+    await asUser(erin, (q) => sell(q, productId, 1, 1500), { commit: true });
+
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    let firstSold!: () => void;
+    const sold = new Promise<void>((r) => (firstSold = r));
+    const first = asUser(
+      erin,
+      async (q) => {
+        await sell(q, productId, 1, 1500);
+        firstSold();
+        await held; // keep the transaction (and the item's row lock) open
+      },
+      { commit: true },
+    );
+    await sold;
+    const second = asUser(erin, (q) => sell(q, productId, 1, 1500), { commit: true });
+    const secondResult = second.then(
+      () => "sold",
+      (e: Error) => e.message,
+    );
+    await new Promise((r) => setTimeout(r, 300));
+    release();
+    await first;
+    expect(await secondResult).toMatch(/insufficient_stock/);
+    const { rows } = await adminQuery("select sum(quantity)::int as units from public.order_items where product_id = $1", [productId]);
+    expect(rows[0].units).toBe(2);
+  });
+
+  it("counts the stock summary in pieces, with lot costs", async () => {
+    await asUser(erin, async (q) => {
+      await q("delete from public.products where store_id = $1 and not exists (select 1 from public.order_items i where i.product_id = products.id)", [shop.storeId]);
+      // A lot of 10 t-shirts for 20.00 (2.00 each), 4 sold; 3 lingering pieces without a price; one archived lot.
+      const tees = await addItem(q, { name: "Lot t-shirts", costE4: 20_000, quantity: 10 });
+      await sell(q, tees, 4, 2000);
+      await addItem(q, { name: "Chaussettes", costE4: null, quantity: 3, daysAgo: 90 });
+      const archived = await addItem(q, { name: "Archivé", costE4: 10_000, quantity: 5 });
+      await q("update public.products set archived_at = now() where id = $1", [archived]);
+      // A third of 10.00: 3.3333 each, 3 pieces → 9.9999 → 10.00 tied up.
+      await addItem(q, { name: "Lot pulls", costE4: 33_333, quantity: 3 });
+
+      const { rows } = await q("select * from public.reseller_stock_summary($1, current_date - 60)", [shop.storeId]);
+      expect(rows[0]).toEqual({ items: 6 + 3 + 3, cost_minor: 1200 + 1000, items_without_cost: 3, stale_items: 3 });
+    });
+  });
+
+  it("never lets the quantity go below the pieces sold", async () => {
+    await asUser(erin, async (q) => {
+      const lot = await addItem(q, { name: "Jeans", costE4: 50_000, quantity: 4 });
+      await sell(q, lot, 3, 6000);
+      await fails(q, () => q("update public.products set stock_quantity = 2 where id = $1", [lot]), /stock_quantity_below_sold/);
+      await q("update public.products set stock_quantity = 3 where id = $1", [lot]);
+      await q("update public.products set stock_quantity = 6 where id = $1", [lot]);
+      const { rows } = await q("select remaining from public.reseller_items($1) where product_id = $2", [shop.storeId, lot]);
+      expect(rows[0].remaining).toBe(3);
+      // Edits that keep the quantity never trip the guard, even on old data with more units sold than pieces.
+      const old = await addItem(q, { name: "Ancien", costE4: null, quantity: null });
+      const order = await q<{ id: string }>("insert into public.orders (organization_id, store_id, external_id, ordered_at) values ($1, $2, 'OLD-1', now()) returning id", [shop.orgId, shop.storeId]);
+      await q("insert into public.order_items (organization_id, order_id, position, product_id, name, quantity, gross_minor) values ($1, $2, 0, $3, 'Ancien', 5, 100)", [shop.orgId, order.rows[0].id, old]);
+      await q("update public.products set name = 'Ancien modèle', stock_quantity = null where id = $1", [old]);
+      const status = await q("select status, remaining from public.reseller_items($1) where product_id = $2", [shop.storeId, old]);
+      expect(status.rows[0]).toEqual({ status: "sold", remaining: 0 });
+    });
+  });
+
+  it("does not sell another organisation's items", async () => {
+    const productId = await asUser(erin, (q) => addItem(q, { name: "Privé", costE4: null, quantity: 2 }), { commit: true });
+    await expect(
+      asUser(bob, (q) =>
+        q("select public.reseller_record_sale($1, $2, 1, 'V-X', now(), 100)", [shop.storeId, productId]),
+      ),
+    ).rejects.toThrow(/item_not_found/);
+    await expect(asUser(null, (q) => q("select public.reseller_record_sale($1, $2, 1, 'V-X', now(), 100)", [shop.storeId, productId]))).rejects.toThrow(/permission denied/);
+  });
+});
+
 describe("access control on the new paths", () => {
   it("returns nothing from another organisation's store", async () => {
     await asUser(alice, async (q) => {

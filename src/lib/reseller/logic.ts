@@ -1,4 +1,5 @@
 import { addDays, isValidDateString } from "@/lib/dates";
+import { divideRoundHalfAwayFromZero } from "@/lib/finance/decimal";
 import { isPlatformId, type PlatformId } from "@/lib/onboarding/constants";
 
 /**
@@ -8,6 +9,29 @@ import { isPlatformId, type PlatformId } from "@/lib/onboarding/constants";
 
 /** Items in stock for more than this many days are listed as "items that linger". */
 export const STALE_AFTER_DAYS = 60;
+
+/** Most pieces recorded at once in the "Add an item" dialog (the database accepts up to 100,000). */
+export const MAX_ITEM_QUANTITY = 999;
+
+/**
+ * Unit cost of one piece of a lot: the lot price (e4) divided by the number of
+ * pieces, rounded half away from zero to 4 decimals like every unit cost.
+ * `rounded` is true when the division is not exact (e.g. 10 € for 3 pieces →
+ * 3.3333 € each), so the interface can say the value was rounded instead of
+ * losing a fraction of a cent silently.
+ */
+export function lotUnitCostE4(lotCostE4: number, quantity: number): { value: number; rounded: boolean } {
+  if (!Number.isSafeInteger(lotCostE4) || lotCostE4 < 0) throw new RangeError("Invalid lot cost");
+  if (!Number.isSafeInteger(quantity) || quantity < 1) throw new RangeError("Invalid quantity");
+  const total = BigInt(lotCostE4);
+  const pieces = BigInt(quantity);
+  return { value: Number(divideRoundHalfAwayFromZero(total, pieces)), rounded: total % pieces !== 0n };
+}
+
+/** Pieces left of an item: bought minus sold, never below zero (null quantity = one piece). */
+export function remainingPieces(quantity: number | null | undefined, soldUnits: number): number {
+  return Math.max(0, (quantity ?? 1) - soldUnits);
+}
 
 /** Crockford base32: no I, L, O or U, so references read and type back unambiguously. */
 const BASE32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";

@@ -106,11 +106,16 @@ billing_events (Stripe event log, service role only)       private.rate_limits
 
 - **Reseller mode.** `stores.business_model` is `ecommerce` (imports orders, costs and ads) or `reseller` (people
   who resell items one by one on Vinted, Leboncoin, eBay or Vestiaire Collective). Reseller data reuses the same
-  tables, so every report, export and policy applies unchanged: an item is a `products` row (purchase price in
-  `unit_cost_e4`, optional `acquired_on`), a sale is an `orders` row with one `order_items` line (quantity 1, cost
-  snapshot, generated number `V-YYYYMMDD-XXXXXX`) and `orders.sales_channel` records where it sold. An item with an
-  order line is sold; without one it is in stock. Writes go through `src/lib/reseller/actions.ts` and the shared
-  `writeOrder` path (`src/lib/transactions/write.ts`, also used by manual orders); reads through
+  tables, so every report, export and policy applies unchanged: an item is a `products` row (purchase price per
+  piece in `unit_cost_e4`, optional `acquired_on`, `stock_quantity` identical pieces, null meaning one; a lot price
+  is divided exactly by the number of pieces, rounded to 4 decimals), a sale is an `orders` row with one
+  `order_items` line (the pieces sold, the total received, cost snapshot per piece, generated number
+  `V-YYYYMMDD-XXXXXX`) and `orders.sales_channel` records where it sold. Remaining pieces = `stock_quantity` − the
+  quantities of the item's order lines; an item is in stock while one remains, sold once none does. Quick sales go
+  through `public.reseller_record_sale`, which locks the item row and checks the remaining pieces before writing the
+  order, so concurrent sales cannot oversell; a trigger keeps `stock_quantity` at or above the pieces sold. Writes go
+  through `src/lib/reseller/actions.ts` (falling back to the shared `writeOrder` path, `src/lib/transactions/write.ts`,
+  for single pieces while a database lacks the quantities migration); reads through
   `src/lib/data/reseller.ts` and the SQL functions `reseller_items`, `reseller_stock_summary` and
   `report_channel_breakdown`. The home page, navigation and onboarding adapt to the mode.
 - **Sales received by email.** Sellers forward their sale-notification emails to a private address

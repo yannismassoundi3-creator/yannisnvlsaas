@@ -155,24 +155,40 @@ async function Items({ searchParams }: { searchParams: PageProps<"/[lang]/app/it
   );
 }
 
+/**
+ * One row per item. Items of several pieces show their quantities ("3 in
+ * stock", "1 sold · 2 left") and, once sold at least once, their latest sale
+ * (its price is the total of that sale, for all its pieces).
+ */
 function ItemLine({ item, store, locale, f, today, canWrite }: { item: ItemRow; store: Store; locale: Locale; f: Format; today: string; canWrite: boolean }) {
   const t = resellerMessages[locale].items;
   const money = (v: number) => f.money(v, store.currency);
   const cost = item.unitCostE4 === null ? null : e4ToMinor(item.unitCostE4, store.currency);
   const platform = item.salesChannel && isPlatformId(item.salesChannel) ? platformName(item.salesChannel, locale) : null;
+  const several = item.quantity > 1;
+  const hasSale = item.soldUnits > 0 && item.orderId !== null;
+  const status =
+    item.remaining === 0 ? (
+      <Badge tone="positive">{several ? t.soldAll(item.soldUnits) : t.soldBadge}</Badge>
+    ) : item.soldUnits > 0 ? (
+      <Badge tone="info">{t.soldRemaining(item.soldUnits, item.remaining)}</Badge>
+    ) : (
+      <Badge tone="neutral">{several ? t.inStockCount(item.remaining) : t.inStockBadge}</Badge>
+    );
+  const saleLabel = item.saleQuantity !== null && item.saleQuantity > 1 ? t.salePieces(item.saleQuantity) : several ? t.lastSalePrice : t.salePrice;
   return (
     <li className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-2">
           <span className="text-md font-medium break-words text-ink">{item.name}</span>
-          {item.status === "sold" ? <Badge tone="positive">{t.soldBadge}</Badge> : <Badge tone="neutral">{t.inStockBadge}</Badge>}
+          {status}
           {item.archived ? <Badge tone="outline">{t.archivedBadge}</Badge> : null}
         </p>
         <p className="mt-0.5 text-xs text-ink-3 tabular">
-          {item.status === "sold" && item.soldOn
+          {hasSale && item.soldOn
             ? platform
-              ? t.soldOn(f.date(item.soldOn), platform)
-              : t.soldOnNoPlatform(f.date(item.soldOn))
+              ? (several ? t.lastSoldOn : t.soldOn)(f.date(item.soldOn), platform)
+              : (several ? t.lastSoldOnNoPlatform : t.soldOnNoPlatform)(f.date(item.soldOn))
             : item.acquiredOn
               ? t.bought(f.date(item.acquiredOn))
               : t.added(f.date(item.stockedOn))}
@@ -180,13 +196,13 @@ function ItemLine({ item, store, locale, f, today, canWrite }: { item: ItemRow; 
       </div>
       <dl className="grid grid-cols-3 gap-3 text-sm sm:w-80 sm:shrink-0">
         <div>
-          <dt className="text-xs text-ink-3">{t.purchasePrice}</dt>
+          <dt className="text-xs text-ink-3">{several ? t.purchasePriceEach : t.purchasePrice}</dt>
           <dd className="tabular">{cost === null ? <Badge tone="caution">{t.missingCost}</Badge> : money(cost)}</dd>
         </div>
-        {item.status === "sold" ? (
+        {hasSale ? (
           <>
             <div>
-              <dt className="text-xs text-ink-3">{t.salePrice}</dt>
+              <dt className="text-xs text-ink-3">{saleLabel}</dt>
               <dd className="tabular">{item.salePrice === null ? "—" : money(item.salePrice)}</dd>
             </div>
             <div>
@@ -198,20 +214,25 @@ function ItemLine({ item, store, locale, f, today, canWrite }: { item: ItemRow; 
           </>
         ) : null}
       </dl>
-      <div className="flex items-center justify-end gap-1 sm:w-44 sm:shrink-0">
-        {item.status === "in_stock" ? (
-          <>
-            {!item.archived ? <SellButton productId={item.productId} size="md" icon={false} label={t.sell} aria-label={t.sellLabel(item.name)} className="mr-1" /> : null}
-            <StockItemActions productId={item.productId} name={item.name} unitCostE4={item.unitCostE4} acquiredOn={item.acquiredOn} currency={store.currency} today={today} disabled={!canWrite} />
-          </>
-        ) : item.orderId ? (
-          <>
-            <Link href={`/app/transactions/orders/${item.orderId}` as Route} className="mr-2 text-sm font-medium text-emerald-700 hover:underline">
-              {t.saleDetails}
-            </Link>
-            <UndoSaleButton orderId={item.orderId} name={item.name} />
-          </>
+      <div className="flex flex-wrap items-center justify-end gap-1 sm:w-52 sm:shrink-0">
+        {item.remaining > 0 && !item.archived ? <SellButton productId={item.productId} size="md" icon={false} label={t.sell} aria-label={t.sellLabel(item.name)} className="mr-1" /> : null}
+        {hasSale ? (
+          <Link href={`/app/transactions/orders/${item.orderId}` as Route} className="mr-2 text-sm font-medium text-emerald-700 hover:underline">
+            {t.saleDetails}
+          </Link>
         ) : null}
+        <StockItemActions
+          productId={item.productId}
+          name={item.name}
+          unitCostE4={item.unitCostE4}
+          acquiredOn={item.acquiredOn}
+          quantity={item.quantity}
+          soldUnits={item.soldUnits}
+          currency={store.currency}
+          today={today}
+          disabled={!canWrite}
+        />
+        {hasSale ? <UndoSaleButton orderId={item.orderId!} name={item.name} /> : null}
       </div>
     </li>
   );

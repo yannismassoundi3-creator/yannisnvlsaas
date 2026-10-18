@@ -117,11 +117,15 @@ Stores in reseller mode use the same rules; their screens only present them diff
 - **Fees.** Reseller stores start with a zero fee rule and a zero default shipping cost, because Vinted and Leboncoin
   charge the buyer. A fee or shipping cost entered on a sale is recorded on that order; when left empty, the store
   rule applies and the value is labelled as an estimate (zero unless the seller changes the rule).
-- **Stock** is the set of items with no order line. "Money tied up" is the sum of their purchase prices; items
-  without a purchase price are counted separately, never assumed free. "Items that linger" have been in stock for more
-  than 60 days, counted from the purchase date, else from the date the item was added.
-- **Per item** (My items), the margin of a sale is shown only when the order has a single line:
-  sale price + shipping charged − refunds − purchase price − shipping cost − fees, with the same recorded-or-estimated
+- **Stock** counts pieces: an item has `stock_quantity` pieces (one when unset), minus the units of its sales. "Money
+  tied up" is the remaining pieces × their purchase price per piece, rounded per item; pieces without a purchase
+  price are counted separately, never assumed free. "Items that linger" have been in stock for more than 60 days,
+  counted from the purchase date, else from the date the item was added. A **lot price** is divided by the number of
+  pieces with exact decimal arithmetic and rounded half away from zero to 4 decimals (10.00 for 3 pieces = 3.3333
+  each); the dialog shows the rounded value before saving.
+- **Per item** (My items), the margin of the latest sale is shown only when the order has a single line:
+  sale price (total for the pieces sold) + shipping charged − refunds − purchase price × pieces sold − shipping cost
+  − fees, with the same recorded-or-estimated
   rules as the reports. It is "—" when the purchase price is unknown.
 - **Per platform**, sales and margins are summed from the same per-order values as the daily totals; refunds count on
   their own date under the platform of their order. Variable expenses and ad spend stay at store level: they are

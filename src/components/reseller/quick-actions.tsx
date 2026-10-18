@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, PackagePlus, Plus, Search, Tag } from "lucide-react";
+import { ChevronDown, Minus, PackagePlus, Plus, Search, Tag } from "lucide-react";
 import { createContext, useContext, useEffect, useId, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -14,7 +14,8 @@ import { toInputDecimal } from "@/lib/finance/input";
 import { e4ToInputValue } from "@/lib/finance/money";
 import { platformName, SALES_CHANNELS, type PlatformId } from "@/lib/onboarding/constants";
 import { addItem, sellItem, updateItem } from "@/lib/reseller/actions";
-import { nameTokens } from "@/lib/reseller/logic";
+import { MAX_ITEM_QUANTITY, nameTokens } from "@/lib/reseller/logic";
+import { unitCostFromInput, type PriceMode } from "@/lib/reseller/schema";
 import { cn } from "@/lib/utils";
 
 /**
@@ -26,7 +27,7 @@ import { cn } from "@/lib/utils";
  * open them (e.g. the "Sold" button of an item that lingers in stock).
  */
 
-export type StockOption = { id: string; name: string; unitCostE4: number | null; stockedOn: string };
+export type StockOption = { id: string; name: string; unitCostE4: number | null; stockedOn: string; /** Pieces left. */ remaining: number };
 
 /** Values that prefill the sale form, e.g. from a forwarded sale email. */
 export type SalePrefill = { price?: string; channel?: PlatformId; title?: string | null; productId?: string | null; inboundEmailId?: string };
@@ -132,10 +133,62 @@ function FormError({ message }: { message: string | null }) {
   ) : null;
 }
 
+/** Whole number typed in a quantity field, or null while it is not one. */
+function typedQuantity(value: string): number | null {
+  const trimmed = value.trim();
+  return /^\d{1,6}$/.test(trimmed) ? Number(trimmed) : null;
+}
+
+/** Number field with large − and + buttons (phone first), bounded to [min, max]. */
+function QuantityStepper({
+  id,
+  value,
+  onChange,
+  min,
+  max,
+  error,
+  hint,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  min: number;
+  max: number;
+  error?: string;
+  hint?: boolean;
+}) {
+  const t = resellerMessages[useLocale()].add;
+  const current = typedQuantity(value) ?? min;
+  const set = (n: number) => onChange(String(Math.min(max, Math.max(min, n))));
+  return (
+    <div className="flex items-stretch gap-1">
+      <Button type="button" variant="secondary" className="h-12 w-11 shrink-0 px-0" aria-label={t.decrease} aria-controls={id} disabled={current <= min} onClick={() => set(current - 1)}>
+        <Minus aria-hidden />
+      </Button>
+      <Input
+        id={id}
+        inputSize="lg"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        className="px-1 text-center tabular"
+        value={value}
+        onChange={(e) => onChange(e.target.value.replace(/[^\d]/g, "").slice(0, 6))}
+        onBlur={() => set(typedQuantity(value) ?? min)}
+        autoComplete="off"
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy(id, { hint, error })}
+      />
+      <Button type="button" variant="secondary" className="h-12 w-11 shrink-0 px-0" aria-label={t.increase} aria-controls={id} disabled={current >= max} onClick={() => set(current + 1)}>
+        <Plus aria-hidden />
+      </Button>
+    </div>
+  );
+}
+
 // -----------------------------------------------------------------------------
 // Add / edit an item
 // -----------------------------------------------------------------------------
-type ItemValues = { name: string; purchasePrice: string; acquiredOn: string };
+type ItemValues = { name: string; purchasePrice: string; acquiredOn: string; quantity: string; priceMode: PriceMode };
 
 function ItemFormFields({
   id,
@@ -145,6 +198,7 @@ function ItemFormFields({
   currency,
   today,
   nameRef,
+  soldUnits = 0,
 }: {
   id: string;
   values: ItemValues;
@@ -153,8 +207,20 @@ function ItemFormFields({
   currency: string;
   today: string;
   nameRef: React.RefObject<HTMLInputElement | null>;
+  /** Pieces already sold (edit): the quantity cannot go below. */
+  soldUnits?: number;
 }) {
-  const t = resellerMessages[useLocale()].add;
+  const locale = useLocale();
+  const f = useFormat();
+  const t = resellerMessages[locale].add;
+  const quantity = typedQuantity(values.quantity) ?? 1;
+  const several = quantity > 1;
+  const lot = several && values.priceMode === "lot";
+  // Live per-piece cost of a lot, computed exactly like the server does (4 decimals, half away from zero).
+  const perPiece = lot && values.purchasePrice.trim() ? unitCostFromInput(values.purchasePrice, "lot", quantity, locale) : null;
+  const preview = perPiece?.ok && perPiece.value !== null ? (perPiece.rounded ? t.perItemRounded : t.perItem)(f.unitCost(perPiece.value, currency)) : null;
+  const priceLabel = lot ? t.purchasePriceLot : several ? t.purchasePriceEach : t.purchasePrice;
+  const minQuantity = Math.max(1, soldUnits);
   return (
     <>
       <Field htmlFor={`${id}-name`} label={t.name} error={errors.name}>
@@ -173,18 +239,20 @@ function ItemFormFields({
         />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field htmlFor={`${id}-cost`} label={t.purchasePrice} optional error={errors.purchasePrice}>
-          <Input
-            id={`${id}-cost`}
-            inputSize="lg"
-            inputMode="decimal"
-            leading={currencySymbol(currency)}
-            value={values.purchasePrice}
-            onChange={(e) => setValues({ ...values, purchasePrice: e.target.value })}
-            autoComplete="off"
-            enterKeyHint="done"
-            aria-invalid={errors.purchasePrice ? true : undefined}
-            aria-describedby={describedBy(`${id}-cost`, { error: errors.purchasePrice })}
+        <Field
+          htmlFor={`${id}-qty`}
+          label={t.quantity}
+          error={errors.quantity}
+          hint={soldUnits > 0 ? resellerMessages[locale].items.alreadySoldHint(soldUnits) : undefined}
+        >
+          <QuantityStepper
+            id={`${id}-qty`}
+            value={values.quantity}
+            onChange={(quantity) => setValues({ ...values, quantity })}
+            min={minQuantity}
+            max={Math.max(MAX_ITEM_QUANTITY, minQuantity)}
+            error={errors.quantity}
+            hint={soldUnits > 0}
           />
         </Field>
         <Field htmlFor={`${id}-date`} label={t.acquiredOn} optional error={errors.acquiredOn}>
@@ -199,7 +267,44 @@ function ItemFormFields({
           />
         </Field>
       </div>
-      {!errors.purchasePrice ? <p className="-mt-2 text-xs text-ink-3">{t.purchasePriceHint}</p> : null}
+      {several ? (
+        <fieldset>
+          <legend className="mb-1.5 text-sm font-medium text-ink">{t.priceMode}</legend>
+          <div className="grid grid-cols-2 gap-2">
+            {(["unit", "lot"] as const).map((mode) => (
+              <label
+                key={mode}
+                className={cn(
+                  "flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors",
+                  values.priceMode === mode ? "border-navy-800 bg-navy-50 text-ink ring-1 ring-navy-800" : "border-line-strong text-ink-2 hover:bg-hover",
+                )}
+              >
+                <input type="radio" name={`${id}-price-mode`} value={mode} checked={values.priceMode === mode} onChange={() => setValues({ ...values, priceMode: mode })} className="accent-navy-800" />
+                {mode === "unit" ? t.priceUnit : t.priceLot}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
+      <Field htmlFor={`${id}-cost`} label={priceLabel} optional error={errors.purchasePrice}>
+        <Input
+          id={`${id}-cost`}
+          inputSize="lg"
+          inputMode="decimal"
+          leading={currencySymbol(currency)}
+          value={values.purchasePrice}
+          onChange={(e) => setValues({ ...values, purchasePrice: e.target.value })}
+          autoComplete="off"
+          enterKeyHint="done"
+          aria-invalid={errors.purchasePrice ? true : undefined}
+          aria-describedby={describedBy(`${id}-cost`, { hint: !errors.purchasePrice, error: errors.purchasePrice })}
+        />
+      </Field>
+      {!errors.purchasePrice ? (
+        <p id={`${id}-cost-hint`} className={cn("-mt-2 text-xs", preview ? "font-medium text-ink-2 tabular" : "text-ink-3")} aria-live="polite">
+          {preview ?? t.purchasePriceHint}
+        </p>
+      ) : null}
     </>
   );
 }
@@ -208,7 +313,7 @@ function AddItemContent({ currency, today, onDone }: { currency: string; today: 
   const id = useId();
   const locale = useLocale();
   const t = resellerMessages[locale].add;
-  const blank: ItemValues = { name: "", purchasePrice: "", acquiredOn: today };
+  const blank: ItemValues = { name: "", purchasePrice: "", acquiredOn: today, quantity: "1", priceMode: "unit" };
   const [values, setValues] = useState(blank);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -245,7 +350,8 @@ function AddItemContent({ currency, today, onDone }: { currency: string; today: 
               setFormError(r.fieldErrors ? null : r.message);
               return;
             }
-            toast.success(t.added(values.name.trim()));
+            const pieces = typedQuantity(values.quantity) ?? 1;
+            toast.success(pieces > 1 ? t.addedPieces(values.name.trim(), pieces) : t.added(values.name.trim()));
             setErrors({});
             setFormError(null);
             if (keepGoing) {
@@ -284,7 +390,7 @@ export function EditItemDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   productId: string;
-  initial: { name: string; unitCostE4: number | null; acquiredOn: string | null };
+  initial: { name: string; unitCostE4: number | null; acquiredOn: string | null; quantity: number; soldUnits: number };
   currency: string;
   today: string;
 }) {
@@ -295,6 +401,8 @@ export function EditItemDialog({
     name: initial.name,
     purchasePrice: initial.unitCostE4 === null ? "" : toInputDecimal(e4ToInputValue(initial.unitCostE4), locale),
     acquiredOn: initial.acquiredOn ?? "",
+    quantity: String(initial.quantity),
+    priceMode: "unit",
   };
   const [values, setValues] = useState(start);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -339,7 +447,7 @@ export function EditItemDialog({
               });
             }}
           >
-            <ItemFormFields id={id} values={values} setValues={setValues} errors={errors} currency={currency} today={today} nameRef={nameRef} />
+            <ItemFormFields id={id} values={values} setValues={setValues} errors={errors} currency={currency} today={today} nameRef={nameRef} soldUnits={initial.soldUnits} />
             <FormError message={formError} />
             <div className="flex justify-end pt-1">
               <Button type="submit" size="lg" loading={pending} className="w-full sm:w-auto">
@@ -399,6 +507,7 @@ function SellContent({
     date: today,
     shippingCost: "",
     platformFee: "",
+    quantity: "1",
   });
   const [feesOpen, setFeesOpen] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -430,6 +539,10 @@ function SellContent({
   };
 
   const costLabel = (e4: number | null) => (e4 === null ? resellerMessages[locale].home.missingCost : f.unitCost(e4, currency));
+  // Several pieces left: the seller says how many were sold, and the price becomes the total received.
+  const remaining = mode === "chosen" && chosen ? chosen.remaining : 1;
+  const showQuantity = remaining > 1;
+  const quantity = showQuantity ? (typedQuantity(values.quantity) ?? 1) : 1;
 
   return (
     <DialogContent
@@ -456,6 +569,7 @@ function SellContent({
               shippingCost: values.shippingCost,
               platformFee: values.platformFee,
               inboundEmailId: prefill?.inboundEmailId ?? "",
+              quantity: showQuantity ? values.quantity : "1",
             }).catch(() => null);
             if (!r) return setFormError(resellerMessages[locale].actions.saleSaveFailed);
             if (!r.ok) {
@@ -476,8 +590,14 @@ function SellContent({
               <p className="text-xs font-medium text-ink-3">{t.chosen}</p>
               <p className="truncate text-md font-semibold text-ink">{chosen.name}</p>
               <p className="text-xs text-ink-3 tabular">
-                {costLabel(chosen.unitCostE4)} · {t.boughtOn(f.date(chosen.stockedOn))}
+                {costLabel(chosen.unitCostE4)} · {chosen.remaining > 1 ? `${t.inStock(chosen.remaining)} · ` : null}
+                {t.boughtOn(f.date(chosen.stockedOn))}
               </p>
+              {errors.productId ? (
+                <p role="alert" className="mt-1 text-xs font-medium text-negative-700">
+                  {errors.productId}
+                </p>
+              ) : null}
             </div>
             <Button
               type="button"
@@ -580,7 +700,10 @@ function SellContent({
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-md text-ink">{item.name}</span>
-                      <span className="block text-xs text-ink-3">{t.boughtOn(f.date(item.stockedOn))}</span>
+                      <span className="block text-xs text-ink-3">
+                        {item.remaining > 1 ? `${t.inStock(item.remaining)} · ` : null}
+                        {t.boughtOn(f.date(item.stockedOn))}
+                      </span>
                     </span>
                     <span className="shrink-0 text-sm text-ink-2 tabular">{costLabel(item.unitCostE4)}</span>
                   </button>
@@ -605,7 +728,12 @@ function SellContent({
 
         {/* The sale */}
         <div className="grid grid-cols-2 gap-3">
-          <Field htmlFor={`${id}-price`} label={t.price} error={errors.price} className="col-span-2 sm:col-span-1">
+          {showQuantity ? (
+            <Field htmlFor={`${id}-qty`} label={t.quantity} error={errors.quantity} className="col-span-2 sm:col-span-1">
+              <QuantityStepper id={`${id}-qty`} value={values.quantity} onChange={(q) => setValues({ ...values, quantity: q })} min={1} max={remaining} error={errors.quantity} />
+            </Field>
+          ) : null}
+          <Field htmlFor={`${id}-price`} label={quantity > 1 ? t.priceTotal : t.price} error={errors.price} className="col-span-2 sm:col-span-1">
             <Input
               ref={priceRef}
               id={`${id}-price`}
@@ -635,7 +763,7 @@ function SellContent({
         </div>
         {!errors.price ? (
           <p id={`${id}-price-hint`} className="-mt-2 text-xs text-ink-3">
-            {t.priceHint}
+            {quantity > 1 ? t.priceTotalHint(quantity) : t.priceHint}
           </p>
         ) : null}
 
