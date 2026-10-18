@@ -58,6 +58,18 @@ développement, exécutée avec `npx supabase`) et la CLI Stripe pour tester les
    vente transférés (validés ou ignorés depuis 30 jours, en attente depuis 90 jours). Sur
    un autre hébergeur, appelez le point de terminaison chaque jour avec `Authorization: Bearer $CRON_SECRET`.
 
+### Alternative : Render
+
+`render.yaml` est un Blueprint Render avec le service web (Francfort, instance Starter, `next start`) et la tâche
+quotidienne de maintenance. Dans Render : **New → Blueprint**, choisissez le dépôt, puis renseignez les valeurs
+marquées `sync: false` (les mêmes que sur Vercel ; `APP_URL` et `NEXT_PUBLIC_SITE_URL` sont l'adresse publique, par
+ex. `https://narixia.onrender.com` ou votre domaine). Mesuré sur ce code : le serveur utilise environ 150 Mo en
+fonctionnement (l'instance Starter en a 512) ; `next build` a atteint environ 1,1 Go en local : si un build échoue
+faute de mémoire sur Render, utilisez une instance plus grande pour le build ou réduisez le nombre de workers. Après
+le changement d'hébergeur, mettez à jour la **Site URL** et les **Redirect URLs** de Supabase, créez un endpoint de
+webhook Stripe pour la nouvelle adresse (et son secret dans `STRIPE_WEBHOOK_SECRET`), puis faites le test de fumée
+ci-dessous. Gardez un seul hébergeur actif pour le webhook Stripe et la tâche quotidienne.
+
 ## 3. Stripe
 
 Suivez [BILLING.md](BILLING.md) : produit et prix, portail client, point de terminaison du webhook

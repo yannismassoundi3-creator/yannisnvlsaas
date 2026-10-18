@@ -1,0 +1,78 @@
+# Render Blueprint: an alternative to Vercel for hosting the app (see docs/DEPLOYMENT.md, "Render").
+# Values marked `sync: false` are entered in the Render dashboard when the Blueprint is created;
+# never commit real credentials.
+services:
+  - type: web
+    name: narixia
+    runtime: node
+    region: frankfurt
+    plan: starter
+    branch: claude/modest-sagan-udzp3y
+    buildCommand: npm ci && npm run build
+    # Calls the Next.js binary directly: an npm wrapper process would cost memory on a 512 MB instance.
+    startCommand: node_modules/.bin/next start
+    healthCheckPath: /robots.txt
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_PRO_MONTHLY
+        sync: false
+      - key: STRIPE_LIVE_ENABLED
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: NEXT_PUBLIC_SUPPORT_EMAIL
+        sync: false
+      - key: NEXT_PUBLIC_COMPANY_LEGAL_NAME
+        sync: false
+      - key: NEXT_PUBLIC_COMPANY_ADDRESS
+        sync: false
+      - key: NEXT_PUBLIC_COMPANY_COUNTRY
+        sync: false
+      - key: NEXT_PUBLIC_DATA_REGION
+        sync: false
+      - key: NEXT_PUBLIC_HOSTING_PROVIDER
+        value: Render
+      - key: NEXT_PUBLIC_HOSTING_REGION
+        value: "Union européenne (Francfort, Allemagne)"
+      - key: NEXT_PUBLIC_EMAIL_PROVIDER
+        sync: false
+      - key: NEXT_PUBLIC_EMAIL_REGION
+        sync: false
+
+  # Daily maintenance (same schedule as vercel.json): prunes rate limits, abandoned uploads and old forwarded emails.
+  - type: cron
+    name: narixia-maintenance
+    runtime: node
+    region: frankfurt
+    plan: starter
+    branch: claude/modest-sagan-udzp3y
+    schedule: "17 3 * * *"
+    buildCommand: "true"
+    startCommand: >-
+      node -e "fetch(process.env.APP_URL + '/api/cron/maintenance', { headers: { authorization: 'Bearer ' + process.env.CRON_SECRET } })
+      .then(async (r) => { console.log(r.status, await r.text()); if (!r.ok) process.exit(1); })
+      .catch((e) => { console.error(e.message); process.exit(1); })"
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Public address of the app, same value as NEXT_PUBLIC_SITE_URL (e.g. https://narixia.onrender.com).
+      - key: APP_URL
+        sync: false
+      - key: CRON_SECRET
+        sync: false

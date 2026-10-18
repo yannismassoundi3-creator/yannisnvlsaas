@@ -55,6 +55,18 @@ with `npx supabase`), and the Stripe CLI for local webhook testing.
    days, pending after 90). On another host, call the endpoint daily with
    `Authorization: Bearer $CRON_SECRET`.
 
+### Alternative: Render
+
+`render.yaml` is a Render Blueprint with the web service (Frankfurt, Starter instance, `next start`) and the daily
+maintenance cron job. In Render: **New → Blueprint**, pick the repository, then fill in the values marked
+`sync: false` (the same as on Vercel; `APP_URL` and `NEXT_PUBLIC_SITE_URL` are the public address, e.g.
+`https://narixia.onrender.com` or your domain). Measured on this codebase: the server uses about 150 MB at runtime
+(the Starter instance has 512 MB); `next build` peaked at about 1.1 GB locally, so if a build fails for lack of
+memory on Render, use a larger instance for builds or build with fewer workers. After switching hosts, update the
+Supabase **Site URL** and **Redirect URLs**, create a Stripe webhook endpoint for the new address (and set its
+signing secret in `STRIPE_WEBHOOK_SECRET`), then run the smoke test below. Keep a single host active for the Stripe
+webhook and the cron job.
+
 ## 3. Stripe
 
 Follow [BILLING.md](BILLING.md): product and price, customer portal, webhook endpoint
