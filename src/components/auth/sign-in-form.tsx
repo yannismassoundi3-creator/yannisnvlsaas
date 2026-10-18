@@ -14,7 +14,7 @@ import { authFormMessages } from "@/i18n/messages/auth-forms";
 import { safeNextPath } from "@/lib/auth/redirect";
 import { authErrorMessage, isEmailValid } from "@/lib/auth/validation";
 import { getBrowserClient } from "@/lib/supabase/browser";
-import { CODE_LENGTH, CodeInput, codeErrorMessage } from "./email-code";
+import { CodeInput, codeErrorMessage, isCodeComplete } from "./email-code";
 
 type Mode = "password" | "code";
 
@@ -91,7 +91,7 @@ export function SignInForm() {
     event.preventDefault();
     if (!codeSent) return sendCode();
     setError(null);
-    if (code.length !== CODE_LENGTH) return setError(t.code.enterCode);
+    if (!isCodeComplete(code)) return setError(t.code.enterCode);
     setPending(true);
     const { error: verifyError } = await getBrowserClient().auth.verifyOtp({ email: email.trim(), token: code, type: "email" });
     if (verifyError) {
@@ -161,7 +161,7 @@ export function SignInForm() {
               value={code}
               onValueChange={(value) => {
                 setCode(value);
-                clearIfFixed(t.code.enterCode, value.length === CODE_LENGTH);
+                clearIfFixed(t.code.enterCode, isCodeComplete(value));
               }}
               required
               autoFocus

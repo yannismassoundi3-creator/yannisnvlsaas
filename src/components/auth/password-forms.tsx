@@ -15,7 +15,7 @@ import { authFormMessages } from "@/i18n/messages/auth-forms";
 import { authErrorMessage, isEmailValid, isPasswordValid, passwordChecks } from "@/lib/auth/validation";
 import { getBrowserClient } from "@/lib/supabase/browser";
 import { cn } from "@/lib/utils";
-import { CODE_LENGTH, CodeInput, codeErrorMessage } from "./email-code";
+import { CodeInput, codeErrorMessage, isCodeComplete } from "./email-code";
 
 export function ForgotPasswordForm() {
   const locale = useLocale();
@@ -185,7 +185,7 @@ export function ResendConfirmation() {
   async function confirmWithCode(event: FormEvent) {
     event.preventDefault();
     setCodeError(null);
-    if (code.length !== CODE_LENGTH) return setCodeError(authFormMessages[locale].code.enterCode);
+    if (!isCodeComplete(code)) return setCodeError(authFormMessages[locale].code.enterCode);
     setVerifying(true);
     const { error } = await getBrowserClient().auth.verifyOtp({ email, token: code, type: "email" });
     if (error) {
