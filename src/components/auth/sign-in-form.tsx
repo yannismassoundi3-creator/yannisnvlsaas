@@ -26,7 +26,7 @@ export function SignInForm() {
   const t = authFormMessages[locale];
   const next = safeNextPath(params.get("next"));
   const [mode, setMode] = useState<Mode>("password");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(params.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);

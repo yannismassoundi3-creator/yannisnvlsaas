@@ -235,6 +235,12 @@ export function ResendConfirmation() {
           {c.submit}
         </Button>
       </form>
+      <div className="space-y-2 rounded-md border border-line p-4">
+        <p className="text-sm text-ink-2">{c.alreadyConfirmed}</p>
+        <Button asChild variant="secondary" className="w-full">
+          <Link href={`/sign-in?email=${encodeURIComponent(email)}`}>{c.signInHere}</Link>
+        </Button>
+      </div>
       {state === "sent" ? <Alert tone="positive">{t.sent}</Alert> : null}
       {state === "error" && message ? <Alert tone="negative">{message}</Alert> : null}
       <Button variant="secondary" onClick={resend} loading={state === "sending"} disabled={state === "sent"}>

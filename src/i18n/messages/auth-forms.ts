@@ -61,9 +61,11 @@ export const authFormMessages = defineMessages({
       changeEmail: "Use a different email",
     },
     confirmCode: {
-      prompt: "The email also contains a 6-digit code. You can enter it here instead of opening the link.",
+      prompt: "Reading the email on another device, like your phone? Enter the code it contains here: this device will be the one signed in.",
       label: "Confirmation code",
       submit: "Confirm my email",
+      alreadyConfirmed: "Already opened the link on another device? Your account is confirmed: sign in here with your email and password.",
+      signInHere: "Sign in on this device",
     },
     resend: {
       sentTo: "We sent a confirmation link to",
@@ -133,9 +135,11 @@ export const authFormMessages = defineMessages({
       changeEmail: "Utiliser une autre adresse",
     },
     confirmCode: {
-      prompt: "L'e-mail contient aussi un code à 6 chiffres. Vous pouvez le saisir ici au lieu d'ouvrir le lien.",
+      prompt: "Vous lisez l'e-mail sur un autre appareil, comme votre téléphone ? Saisissez ici le code qu'il contient : c'est cet appareil-ci qui sera connecté.",
       label: "Code de confirmation",
       submit: "Confirmer mon e-mail",
+      alreadyConfirmed: "Vous avez déjà cliqué sur le lien depuis un autre appareil ? Votre compte est confirmé : connectez-vous ici avec votre e-mail et votre mot de passe.",
+      signInHere: "Se connecter sur cet appareil",
     },
     resend: {
       sentTo: "Nous avons envoyé un lien de confirmation à",
