@@ -259,3 +259,18 @@ export const getResellerHome = cache(async (store: Store, range: DateRange, comp
     hasAnyData: (anyProduct.count ?? 0) > 0 || (anyOrder.count ?? 0) > 0,
   };
 });
+
+/**
+ * Pieces in stock across the workspace's real reseller stores (not archived,
+ * at least one piece left): what the free plan's limit counts, like the
+ * products_free_stock_limit trigger. Null when it cannot be read.
+ */
+export const countStockPieces = cache(async (stores: readonly Store[]): Promise<number | null> => {
+  const resellerStores = stores.filter((s) => !s.is_demo && s.business_model === "reseller");
+  if (resellerStores.length === 0) return 0;
+  const client = await createClient();
+  const today = new Date().toISOString().slice(0, 10);
+  const results = await Promise.all(resellerStores.map((s) => client.rpc("reseller_stock_summary", { p_store_id: s.id, p_stale_before: today }).maybeSingle()));
+  if (results.some((r) => r.error)) return null;
+  return results.reduce((sum, r) => sum + n(r.data?.items), 0);
+});

@@ -2,15 +2,18 @@
 
 import type { Route } from "next";
 import { redirect } from "next/navigation";
+import { z } from "zod";
+import type { PaidPlanId } from "@/config/plans";
 import type { Locale } from "@/i18n/config";
 import { billingMessages } from "@/i18n/messages/account-billing";
 import { getRequestLocale } from "@/i18n/request";
 import { track } from "@/lib/analytics/track";
 import { audit } from "@/lib/audit";
 import { requireWorkspace } from "@/lib/auth/workspace";
-import { isStripeConfigured, publicEnv, serverEnv } from "@/lib/env";
+import { isResellerCheckoutConfigured, isStripeConfigured, publicEnv, serverEnv } from "@/lib/env";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isResellerOnly } from "./entitlements";
 import { getStripe, isLiveCheckoutBlocked } from "./stripe";
 
 type Failure = { ok: false; message: string };
@@ -45,23 +48,37 @@ async function ensureCustomer(organizationId: string, organizationName: string, 
   return saved?.stripe_customer_id ?? customer.id;
 }
 
+const paidPlan = z.enum(["pro", "reseller"]);
+
 /**
- * Sends the owner to Stripe Checkout for Pro. While the free trial has more
- * than two days left, the subscription starts with a trial ending when the
- * Narixia trial ends, so the first charge happens then. Access is granted
- * only when Stripe's webhook confirms the subscription.
+ * Sends the owner to Stripe Checkout for Pro or Revendeur. While the free
+ * trial has more than two days left, the subscription starts with a trial
+ * ending when the Narixia trial ends, so the first charge happens then.
+ * Access is granted only when Stripe's webhook confirms the subscription.
+ *
+ * The Revendeur plan uses its own price (STRIPE_PRICE_RESELLER_MONTHLY) and is
+ * offered only to workspaces whose stores are all in reseller mode, once the
+ * database knows the plan; it never falls back to the Pro price.
  */
-export async function startCheckout(): Promise<Failure> {
+export async function startCheckout(plan: PaidPlanId = "pro"): Promise<Failure> {
   const ws = await requireWorkspace();
   const locale = await getRequestLocale();
   const t = billingMessages[locale].actions;
+  const parsed = paidPlan.safeParse(plan);
+  if (!parsed.success) return { ok: false, message: t.checkoutFailed };
   if (ws.role !== "owner") return { ok: false, message: t.ownerOnly };
   if (!isStripeConfigured() || isLiveCheckoutBlocked()) return { ok: false, message: t.notConfigured };
+  if (parsed.data === "reseller") {
+    if (!isResellerCheckoutConfigured() || !ws.entitlements.resellerPlans) return { ok: false, message: t.resellerUnavailable };
+    if (!isResellerOnly(ws.stores)) return { ok: false, message: t.resellerOnly };
+  }
   if (ws.entitlements.access === "pro") return { ok: false, message: t.alreadyPro };
   if (ws.entitlements.access === "grace") return { ok: false, message: t.grace };
   if (!(await consumeRateLimit(`checkout:${ws.user.id}`, 10, 3600))) return { ok: false, message: t.tooMany };
 
   const env = serverEnv();
+  const price = parsed.data === "reseller" ? env.stripePriceResellerMonthly : env.stripePriceProMonthly;
+  if (!price) return { ok: false, message: t.resellerUnavailable };
   let url: string | null = null;
   try {
     const customer = await ensureCustomer(ws.organization.id, ws.organization.name, ws.user.email);
@@ -73,9 +90,9 @@ export async function startCheckout(): Promise<Failure> {
         locale: STRIPE_LOCALE[locale],
         customer,
         client_reference_id: ws.organization.id,
-        line_items: [{ price: env.stripePriceProMonthly, quantity: 1 }],
-        subscription_data: { metadata: { organization_id: ws.organization.id }, ...(trialEnd ? { trial_end: trialEnd } : {}) },
-        metadata: { organization_id: ws.organization.id },
+        line_items: [{ price, quantity: 1 }],
+        subscription_data: { metadata: { organization_id: ws.organization.id, plan: parsed.data }, ...(trialEnd ? { trial_end: trialEnd } : {}) },
+        metadata: { organization_id: ws.organization.id, plan: parsed.data },
         payment_method_collection: "always",
         billing_address_collection: env.stripeAutomaticTax ? "required" : "auto",
         automatic_tax: { enabled: env.stripeAutomaticTax },
@@ -83,7 +100,7 @@ export async function startCheckout(): Promise<Failure> {
         success_url: `${publicEnv.siteUrl}/app/billing?checkout=success`,
         cancel_url: `${publicEnv.siteUrl}/app/billing?checkout=cancelled`,
       },
-      { idempotencyKey: `checkout-${ws.organization.id}-${Math.floor(Date.now() / 60_000)}` },
+      { idempotencyKey: `checkout-${ws.organization.id}-${parsed.data}-${Math.floor(Date.now() / 60_000)}` },
     );
     url = session.url;
   } catch (error) {
@@ -92,7 +109,7 @@ export async function startCheckout(): Promise<Failure> {
   }
   if (!url) return { ok: false, message: t.checkoutFailed };
 
-  audit("billing.checkout_started", { organizationId: ws.organization.id, actorId: ws.user.id });
+  audit("billing.checkout_started", { organizationId: ws.organization.id, actorId: ws.user.id }, undefined, { plan: parsed.data });
   track("checkout_initiated", { organizationId: ws.organization.id, userId: ws.user.id });
   redirect(url as Route);
 }

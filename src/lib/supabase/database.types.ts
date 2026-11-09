@@ -1365,7 +1365,9 @@ export type Database = {
           current_period_end: string | null;
           grace_ends_at: string | null;
           organization_id: string | null;
+          paid_plan: string | null;
           past_due_since: string | null;
+          stock_limit: number | null;
           subscription_id: string | null;
           subscription_status: string | null;
           trial_ends_at: string | null;

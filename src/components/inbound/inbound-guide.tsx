@@ -5,12 +5,14 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Alert } from "@/components/ui/feedback";
 import type { Locale } from "@/i18n/config";
 import { inboundMessages } from "@/i18n/messages/inbound";
+import { planMessages } from "@/i18n/messages/plans";
 import { CopyAddress, RegenerateAddressButton } from "./inbound-client";
 
 /**
  * "Receive my sales automatically": the store's private address with a copy
  * button and step-by-step Gmail instructions. Says "coming soon" when the
- * inbound provider is not configured.
+ * inbound provider is not configured, and points to the paid plans on the
+ * free plan (the address is not shown: emails would be refused).
  */
 export function InboundGuide({
   address,
@@ -19,6 +21,7 @@ export function InboundGuide({
   disabled,
   showInboxLink = false,
   headingId = "inbound-guide",
+  upgrade = false,
 }: {
   /** null when the feature is not configured. */
   address: string | null;
@@ -27,14 +30,29 @@ export function InboundGuide({
   disabled: boolean;
   showInboxLink?: boolean;
   headingId?: string;
+  /** Free plan: sales received by email need a paid plan. */
+  upgrade?: boolean;
 }) {
   const t = inboundMessages[locale].guide;
+  const p = planMessages[locale];
   return (
     <Card aria-labelledby={headingId}>
       <CardHeader id={headingId} title={t.title} description={t.intro} />
       <CardBody className="space-y-5">
         {address === null ? (
           <Alert tone="info">{t.comingSoon}</Alert>
+        ) : upgrade ? (
+          <Alert
+            tone="info"
+            title={p.inboundTitle}
+            action={
+              <Link href="/app/billing" className="text-sm font-medium text-emerald-700 hover:underline">
+                {p.seePlans}
+              </Link>
+            }
+          >
+            {p.inboundText}
+          </Alert>
         ) : (
           <>
             <div className="space-y-2">

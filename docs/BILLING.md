@@ -13,22 +13,32 @@ webhook events**, never from the redirect back from Checkout.
 
 ## Commercial terms (configurable)
 
-Defined in `src/config/plans.ts`. The displayed Pro price comes from `NEXT_PUBLIC_PRO_PRICE_MINOR` /
-`NEXT_PUBLIC_PRO_PRICE_CURRENCY`; **the amount charged always comes from the Stripe Price** in
-`STRIPE_PRICE_PRO_MONTHLY`, so keep them identical.
+Defined in `src/config/plans.ts`. The displayed prices come from `NEXT_PUBLIC_PRO_PRICE_MINOR`,
+`NEXT_PUBLIC_RESELLER_PRICE_MINOR` (default 799) and `NEXT_PUBLIC_PRO_PRICE_CURRENCY`; **the amount charged always
+comes from the Stripe Price** in `STRIPE_PRICE_PRO_MONTHLY` or `STRIPE_PRICE_RESELLER_MONTHLY`, so keep them identical.
 
-| | Free trial | Pro (proposed €19/month) |
-| --- | --- | --- |
-| Length | 14 days from workspace creation, no card | Monthly subscription |
-| Real stores | 1 (the sample store does not count) | 3 |
-| Rows per CSV file / per month | 5,000 / 20,000 | 100,000 / 1,000,000 |
-| History in dashboards and reports | Last 90 days | Last 3 years |
-| CSV exports, PDF and CSV reports | — | Yes |
-| Product and campaign filters | — | Yes |
+| | Free trial | Free ("Gratuit") | Reseller ("Revendeur", €7.99/month) | Pro (€19/month) |
+| --- | --- | --- | --- | --- |
+| Who | Every new workspace | Workspaces whose real stores are all in reseller mode, after the trial | Resellers | Online stores (and resellers) |
+| Length | 14 days from workspace creation, no card | No limit, no card | Monthly subscription | Monthly subscription |
+| Items in stock (reseller mode) | Unlimited | **30 pieces** (sold items do not count) | Unlimited | Unlimited |
+| Listings written by AI (50/month by default) | Yes, when configured | — | Yes, when configured | Yes, when configured |
+| Sales received by email | Yes, when configured | — | Yes, when configured | Yes, when configured |
+| E-commerce mode (imports of orders, products, ads) | Yes | — (stores stay in reseller mode) | — (stores stay in reseller mode) | Yes |
+| Real stores | 1 (the sample store does not count) | 1 | 3 | 3 |
+| Rows per CSV file / per month | 5,000 / 20,000 | 5,000 / 20,000 | 100,000 / 1,000,000 | 100,000 / 1,000,000 |
+| History in dashboards and reports | Last 90 days | Last 3 years (the items list is never limited) | Last 3 years | Last 3 years |
+| CSV exports, PDF and CSV reports | — | — | Yes | Yes |
+| Product and campaign filters | — | — | Yes | Yes |
+| Full account data export (Settings) | Yes | Yes | Yes | Yes |
 
-The trial length (14 days) and payment grace period (7 days) are defined both in `src/config/plans.ts` and in
-`private.trial_period()` / `private.payment_grace_period()` in the database, which enforces them. A database test
-fails if the two drift apart.
+The trial length (14 days), the payment grace period (7 days) and the free plan's stock limit (30 pieces) are defined
+both in `src/config/plans.ts` and in `private.trial_period()` / `private.payment_grace_period()` /
+`private.free_stock_limit()` in the database, which enforces them. A database test fails if they drift apart.
+
+"AI listings" and "sales received by email" exist only when their configuration is set (`ANTHROPIC_API_KEY`;
+`INBOUND_*`): until then the app shows them as "coming soon", and so do the pricing page and plan descriptions. The
+pricing page is prerendered, so it reads that configuration at build time: redeploy after setting the variables.
 
 ## Access levels
 
@@ -39,19 +49,43 @@ The database computes the access level of each organisation (`private.org_access
 | `pro` | A subscription is `active` or `trialing` | Pro limits |
 | `grace` | A subscription is `past_due` for less than 7 days | Pro limits, banner asking to update the payment method |
 | `trial` | No live subscription and the 14-day trial has not ended | Trial limits, countdown banner (caution in the last 3 days) |
+| `free` | No live subscription, trial ended, and every real store is in reseller mode (`private.org_is_reseller_only`) | Reseller mode keeps working (writes allowed by RLS): sales, edits, deletions, photos, dashboards and the full data export. At most 30 pieces in stock, enforced by the `products_free_stock_limit` trigger (error `free_stock_limit`, shown as « Vous avez atteint 30 articles en stock avec l'offre gratuite… »). No AI listings (`reserve_listing_analysis` raises `plan_required`), no sales received by email (the webhook answers 403 and the `inbound_emails_plan` trigger refuses the insert), no switch to e-commerce (`stores_business_model_plan`, error `ecommerce_requires_pro`). |
 | `expired` | Otherwise | Data is kept but read-only: no imports or edits (enforced by RLS), dashboards and reports paused. Billing, settings and the full data export stay available. |
+
+`pro` and `grace` cover both paid plans. `organization_entitlements.paid_plan` says which one (`pro` or `reseller`,
+from `subscriptions.plan`; Pro wins if both exist) and `stock_limit` gives the free plan's limit. A Revendeur
+subscription keeps its stores in reseller mode (same trigger as the free plan); everything else is identical to Pro.
 
 `src/lib/billing/entitlements.ts` turns the level into plan limits and interface state. Plan limits are enforced on
 the server: store count by a database trigger, import sizes in the import actions, exports and reports in their
 routes. Hiding a button is never the only control.
 
+## Free plan and Revendeur plan: database migration
+
+The free plan, the stock limit and the `reseller` plan live in `supabase/migrations/20261109100000_reseller_plans.sql`.
+It is idempotent and can be pasted in the Supabase SQL editor after the earlier migrations. The application detects
+it (`organization_entitlements.paid_plan`) and behaves as before until it is applied:
+
+| | Before the SQL | After the SQL |
+| --- | --- | --- |
+| Reseller workspace after its trial | `expired`: read-only, as before | `free`: reseller mode with 30 pieces in stock |
+| Revendeur offer on Billing | « Bientôt disponible » (disabled) | Available when `STRIPE_PRICE_RESELLER_MONTHLY` is set |
+| Webhook for a Revendeur price | Stored as `pro` (full access) | Stored as `reseller` |
+| E-commerce workspaces, trial, Pro, grace period | Unchanged | Unchanged |
+
 ## Flows
 
 ### Subscribe
 
-1. The owner clicks **Subscribe** on Billing. `startCheckout` (server action) checks the role, the current access
-   level and a rate limit, creates or reuses the Stripe customer (idempotency key per organisation), and creates a
-   Checkout Session in `subscription` mode.
+Billing shows the offers that fit the workspace: **Revendeur** first (recommended) and Pro as an option when every real
+store is in reseller mode, **Pro** alone otherwise.
+
+1. The owner clicks the offer's button on Billing. `startCheckout(plan)` (server action) checks the role, the current
+   access level and a rate limit, creates or reuses the Stripe customer (idempotency key per organisation), and
+   creates a Checkout Session in `subscription` mode with the plan's own price. The Revendeur plan also needs
+   `STRIPE_PRICE_RESELLER_MONTHLY`, the reseller plans migration in the database and a reseller-only workspace;
+   otherwise its button is disabled with « Bientôt disponible » and the action refuses. **A Revendeur click never
+   falls back to the Pro price.**
 2. While the free trial has more than two days left, the subscription is created with `trial_end` set to the end
    of the Narixia trial: the card is collected now and **the first charge happens when the trial ends**, as the
    button and the page state. With two days or less left (Stripe requires a trial end at least 48 hours ahead),
@@ -86,7 +120,7 @@ Endpoint: `POST /api/stripe/webhook` (`src/app/api/stripe/webhook/route.ts`).
 
 | Event | Handling |
 | --- | --- |
-| `checkout.session.completed`, `checkout.session.async_payment_succeeded` | Links the Stripe customer to the organisation, then syncs the subscription |
+| `checkout.session.completed`, `checkout.session.async_payment_succeeded` | Links the Stripe customer to the organisation, then syncs the subscription (and its plan) |
 | `customer.subscription.created`, `.updated`, `.deleted`, `.paused`, `.resumed`, `.pending_update_applied`, `.pending_update_expired` | Syncs the subscription |
 | `invoice.paid`, `invoice.payment_succeeded`, `invoice.payment_failed`, `invoice.payment_action_required`, `invoice.marked_uncollectible` | Syncs the invoice's subscription and records the invoice outcome |
 | anything else | Recorded as `ignored` |
@@ -101,8 +135,13 @@ Guarantees:
   if no newer event was applied first (`stripe_event_at`).
 - **Retries.** Processing errors return `500` so Stripe retries with backoff; the error is kept on the event row
   for support.
-- **Audit.** `billing_events` keeps the type, outcome, organisation and a summary (status, invoice id and amount)
-  of every event. It is readable only with the service role.
+- **Audit.** `billing_events` keeps the type, outcome, organisation and a summary (status, plan, invoice id and
+  amount) of every event. It is readable only with the service role.
+- **Plan.** The subscription's price decides `subscriptions.plan`: `STRIPE_PRICE_RESELLER_MONTHLY` gives
+  `reseller`, any other price `pro` (as every subscription did before). A plan change in the customer portal arrives
+  as `customer.subscription.updated`, already in the list above: **no new event type is needed**. If the database
+  does not have the reseller plans migration yet, a Revendeur subscription is stored as `pro` (full access) instead of
+  failing.
 
 The SDK (`stripe` 23) is pinned to API version **`2026-09-30.endive`**. Create the webhook endpoint with the same
 API version so payloads match the code (Invoice → subscription is read from `invoice.parent.subscription_details`,
@@ -111,9 +150,12 @@ billing periods from subscription items).
 ## Setup in Stripe test mode
 
 1. Create a Stripe account and stay in **test mode**.
-2. **Product and price:** Product catalogue → Add product "Narixia Pro" → recurring price, monthly, €19.00 (or your
+2. **Products and prices:** Product catalogue → Add product "Narixia Pro" → recurring price, monthly, €19.00 (or your
    price). Copy the price id (`price_…`) into `STRIPE_PRICE_PRO_MONTHLY`, and set `NEXT_PUBLIC_PRO_PRICE_MINOR` and
-   `NEXT_PUBLIC_PRO_PRICE_CURRENCY` to match.
+   `NEXT_PUBLIC_PRO_PRICE_CURRENCY` to match. Then Add product "Narixia Revendeur" → recurring price, monthly,
+   €7.99 in EUR. Copy its price id into `STRIPE_PRICE_RESELLER_MONTHLY` (and `NEXT_PUBLIC_RESELLER_PRICE_MINOR` if
+   you choose another amount than 799). To let customers switch between the two plans themselves, add both products
+   to the customer portal's "Subscriptions → switch plans" setting (optional).
 3. **API key:** Developers → API keys → secret key (`sk_test_…`) into `STRIPE_SECRET_KEY`. A restricted key
    (`rk_test_…`) also works if it allows Customers, Checkout Sessions, Subscriptions, Invoices and Billing Portal.
 4. **Customer portal:** Settings → Billing → Customer portal. Enable cancellation (at period end recommended),
@@ -181,7 +223,7 @@ Billing says so until **`STRIPE_LIVE_ENABLED=true`** is set. Set it only when ev
 
 - Run the test-mode end-to-end test above on the production deployment (with test keys) and keep the results.
 - Create the live product, price, portal configuration and webhook endpoint (live mode has separate objects).
-- Set the live `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and `STRIPE_PRICE_PRO_MONTHLY`, then
-  `STRIPE_LIVE_ENABLED=true`, and redeploy.
+- Set the live `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO_MONTHLY` and
+  `STRIPE_PRICE_RESELLER_MONTHLY`, then `STRIPE_LIVE_ENABLED=true`, and redeploy.
 - Make one real purchase with your own card, check the webhook events, the invoice and the portal, then refund it
   from the Stripe Dashboard.

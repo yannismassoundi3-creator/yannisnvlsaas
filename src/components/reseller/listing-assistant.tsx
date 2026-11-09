@@ -1,6 +1,7 @@
 "use client";
 
 import { Copy, Sparkles, X } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,19 +12,21 @@ import { toast } from "@/components/ui/toaster";
 import type { Locale } from "@/i18n/config";
 import { useLocale } from "@/i18n/client";
 import { listingMessages, type ListingErrorCode } from "@/i18n/messages/listing";
+import { planMessages } from "@/i18n/messages/plans";
 import { platformName } from "@/lib/onboarding/constants";
 import { CONDITIONS, type Condition, type Confidence, type Listing, type ListingPlatform } from "@/lib/listing/schema";
 
 /**
  * "Write the listing with AI" in the "Add an item" dialog. Shown once photos
  * are ready. Off ("coming soon") until the server has an API key and the
- * database has the AI migration. The listing is a suggestion: every field can
+ * database has the AI migration; on the free plan it points to the paid
+ * plans instead. The listing is a suggestion: every field can
  * be edited, the price is labelled as an estimate without market data, and
  * nothing is stored (the seller copies what they need; "Use this title" fills
  * the item name, saved only with the item).
  */
 
-type Status = { status: "loading" } | { status: "unavailable" } | { status: "paused" } | { status: "ready"; remaining: number; limit: number };
+type Status = { status: "loading" } | { status: "unavailable" } | { status: "paused" } | { status: "upgrade" } | { status: "ready"; remaining: number; limit: number };
 
 type Draft = {
   title: string;
@@ -117,7 +120,7 @@ export function ListingAssistant({
       .then((r) => r.json())
       .then((body: { status?: string; remaining?: number; limit?: number }) => {
         if (body.status === "ready" && typeof body.remaining === "number") setStatus({ status: "ready", remaining: body.remaining, limit: body.limit ?? body.remaining });
-        else setStatus({ status: body.status === "paused" ? "paused" : "unavailable" });
+        else setStatus({ status: body.status === "paused" ? "paused" : body.status === "upgrade" ? "upgrade" : "unavailable" });
       })
       .catch(() => {
         if (!abort.signal.aborted) setStatus({ status: "unavailable" });
@@ -167,6 +170,24 @@ export function ListingAssistant({
   };
 
   const set = (patch: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...patch } : d));
+
+  if (status.status === "upgrade") {
+    const p = planMessages[locale];
+    return (
+      <section aria-labelledby={`${id}-title`} className="space-y-2 rounded-md border border-line bg-sunken/60 p-3.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 id={`${id}-title`} className="text-sm font-medium text-ink">
+            {t.button}
+          </h3>
+          <Badge tone="info">{p.aiTitle}</Badge>
+        </div>
+        <p className="text-xs text-ink-3">{p.aiText}</p>
+        <Link href="/app/billing" className="inline-block text-sm font-medium text-emerald-700 hover:underline">
+          {p.seePlans}
+        </Link>
+      </section>
+    );
+  }
 
   if (status.status === "unavailable") {
     return (
@@ -224,7 +245,7 @@ export function ListingAssistant({
         <Alert
           tone="negative"
           action={
-            error !== "quota" && error !== "paused" && error !== "signIn" ? (
+            error !== "quota" && error !== "paused" && error !== "upgrade" && error !== "signIn" ? (
               <Button type="button" size="sm" variant="secondary" onClick={() => void analyse()}>
                 {t.retry}
               </Button>

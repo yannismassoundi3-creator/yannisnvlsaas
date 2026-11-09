@@ -1,5 +1,6 @@
 import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { planForPrice } from "@/config/plans";
 import type { Database, Json } from "@/lib/supabase/database.types";
 
 /**
@@ -18,7 +19,9 @@ const iso = (seconds: number | null | undefined) => (seconds ? new Date(seconds 
 /**
  * Maps a Stripe subscription to our row. The grace period starts the first
  * time the subscription is seen past due and is kept while it stays so.
- * Billing periods live on subscription items in current API versions.
+ * Billing periods live on subscription items in current API versions. The
+ * plan comes from the price: the Revendeur price (STRIPE_PRICE_RESELLER_MONTHLY)
+ * is "reseller", any other price "pro" (see planForPrice).
  */
 export function subscriptionRow(
   sub: Pick<Stripe.Subscription, "id" | "status" | "cancel_at_period_end" | "cancel_at" | "canceled_at" | "ended_at" | "trial_end"> & {
@@ -27,6 +30,7 @@ export function subscriptionRow(
   organizationId: string,
   eventAt: Date,
   previous: { past_due_since: string | null } | null,
+  resellerPriceId: string | null = null,
 ): SubscriptionRow {
   const status = (STATUSES as readonly string[]).includes(sub.status) ? (sub.status as (typeof STATUSES)[number]) : "incomplete";
   const item = sub.items?.data?.[0];
@@ -34,6 +38,7 @@ export function subscriptionRow(
     id: sub.id,
     organization_id: organizationId,
     status,
+    plan: planForPrice(item?.price?.id, resellerPriceId),
     price_id: item?.price?.id ?? null,
     current_period_start: iso(item?.current_period_start),
     current_period_end: iso(item?.current_period_end),
@@ -51,6 +56,8 @@ export type ProcessDeps = {
   admin: Admin;
   /** Latest state from Stripe, so out-of-order deliveries cannot regress a subscription. */
   retrieveSubscription: (id: string) => Promise<Stripe.Subscription>;
+  /** STRIPE_PRICE_RESELLER_MONTHLY: subscriptions to this price get the "reseller" plan. */
+  resellerPriceId?: string | null;
 };
 
 export type ProcessOutcome = { status: "processed" | "ignored"; organizationId: string | null; summary: Record<string, string | number | boolean | null> };
@@ -86,10 +93,21 @@ export async function syncSubscription(deps: ProcessDeps, subscriptionId: string
   if (customerId) {
     await deps.admin.from("billing_customers").upsert({ organization_id: organizationId, stripe_customer_id: customerId }, { onConflict: "organization_id", ignoreDuplicates: true });
   }
-  const row = subscriptionRow(sub, organizationId, eventAt, previous);
-  const { error } = await deps.admin.from("subscriptions").upsert(row, { onConflict: "id" });
+  const row = subscriptionRow(sub, organizationId, eventAt, previous, deps.resellerPriceId ?? null);
+  let { error } = await deps.admin.from("subscriptions").upsert(row, { onConflict: "id" });
+  if (error?.code === "23514" && row.plan === "reseller") {
+    // The database does not accept the "reseller" plan yet (reseller plans
+    // migration not applied): keep the subscription as before, with Pro access.
+    console.warn("[billing] reseller plan not in the database yet, stored as pro", { subscription: sub.id });
+    row.plan = "pro";
+    ({ error } = await deps.admin.from("subscriptions").upsert(row, { onConflict: "id" }));
+  }
   if (error) throw new Error(`subscription upsert failed: ${error.code}`);
-  return { status: "processed", organizationId, summary: { subscription: sub.id, status: row.status as string, cancel_at_period_end: row.cancel_at_period_end ?? false } };
+  return {
+    status: "processed",
+    organizationId,
+    summary: { subscription: sub.id, status: row.status as string, plan: row.plan ?? "pro", cancel_at_period_end: row.cancel_at_period_end ?? false },
+  };
 }
 
 const SUBSCRIPTION_EVENTS = new Set([

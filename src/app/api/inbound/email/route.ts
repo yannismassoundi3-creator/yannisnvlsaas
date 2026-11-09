@@ -19,6 +19,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
  *   a stored message, so the endpoint never reveals which tokens exist.
  * - Deliveries are idempotent per store (MessageID); retries store nothing new.
  * - Rate limited per store. Email content is never logged.
+ * - Paid plans and the trial only: a workspace on the free plan gets 403
+ *   (Postmark does not retry it) and nothing is stored; the database refuses
+ *   such inserts too (inbound_emails_plan).
  *
  * Successful and unknown-token deliveries answer 200: Postmark retries any
  * other status (except 403), which would only repeat a delivery we accepted.
@@ -118,6 +121,9 @@ export async function POST(request: Request) {
     return new Response("Temporary failure", { status: 500 });
   }
   if (!store) return Response.json(ACCEPTED);
+
+  const { data: access } = await admin.from("organization_entitlements").select("access").eq("organization_id", store.organization_id).maybeSingle();
+  if (access?.access === "free") return new Response("Sales received by email need a paid plan", { status: 403 });
 
   if (!(await consumeRateLimit(`inbound:${store.id}`, PER_STORE_PER_HOUR, 3600))) {
     return new Response("Too many messages", { status: 429, headers: { "Retry-After": "3600" } });

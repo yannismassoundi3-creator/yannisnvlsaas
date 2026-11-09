@@ -125,7 +125,8 @@ export const marketingLegal = defineMessages({
       trialLead: (days: number) =>
         `New accounts receive a free trial of ${days} days. No payment card is required to start, and you are never charged automatically at the end of the trial. Trial accounts are subject to the limits shown on the`,
       trialLink: "pricing page",
-      trialRest: ". When the trial ends without a subscription, your data is kept and remains available for export, while analytics and imports are paused.",
+      trialRest:
+        ". When the trial ends without a subscription, your data is kept and remains available for export. Workspaces whose stores are all in reseller mode move to the free plan, with the stock limit shown on the pricing page; for other workspaces, analytics and imports are paused.",
       paymentTitle: "4. Subscriptions and payment",
       payment: (graceDays: number) => [
         "Paid plans are billed in advance for each billing period through our payment provider, Stripe.",
@@ -293,7 +294,7 @@ export const marketingLegal = defineMessages({
         `Les nouveaux comptes bénéficient d'un essai gratuit de ${days} jours. Aucune carte bancaire n'est requise pour commencer, et vous n'êtes jamais prélevé automatiquement à la fin de l'essai. Les comptes en essai sont soumis aux limites indiquées sur la`,
       trialLink: "page des tarifs",
       trialRest:
-        ". Lorsque l'essai se termine sans abonnement, vos données sont conservées et restent disponibles à l'export, tandis que les analyses et les imports sont suspendus.",
+        ". Lorsque l'essai se termine sans abonnement, vos données sont conservées et restent disponibles à l'export. Les espaces dont toutes les boutiques sont en mode revendeur passent à l'offre gratuite, avec la limite de stock indiquée sur la page des tarifs ; pour les autres espaces, les analyses et les imports sont suspendus.",
       paymentTitle: "4. Abonnements et paiement",
       payment: (graceDays: number) => [
         "Les offres payantes sont facturées d'avance pour chaque période de facturation par l'intermédiaire de notre prestataire de paiement, Stripe.",

@@ -49,7 +49,7 @@ const { GET, POST } = await import("@/app/api/listing/route");
 const Anthropic = (await import("@anthropic-ai/sdk")).default;
 
 const ORG = "11111111-1111-4111-8111-111111111111";
-const workspace = (canWrite = true) => ({ user: { id: "user-1" }, organization: { id: ORG, name: "Org" }, entitlements: { canWrite } });
+const workspace = (canWrite = true, paidFeatures = canWrite) => ({ user: { id: "user-1" }, organization: { id: ORG, name: "Org" }, entitlements: { canWrite, paidFeatures } });
 
 const listing = {
   title: "Veste en jean bleue",
@@ -228,6 +228,19 @@ describe("POST /api/listing", () => {
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
+  it("refuses the free plan before reserving, and maps the database refusal", async () => {
+    mocks.workspace.mockResolvedValueOnce(workspace(true, false));
+    const res = await post();
+    expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe("upgrade");
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    mocks.rpc.mockResolvedValueOnce({ data: null, error: { code: "42501", message: "plan_required" } });
+    const refused = await post();
+    expect(refused.status).toBe(403);
+    expect((await refused.json()).code).toBe("upgrade");
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
   it("refuses bodies over 5 MB", async () => {
     const big = "A".repeat(5 * 1024 * 1024 + 10);
     const res = await post({ images: [big], locale: "fr" });
@@ -262,6 +275,11 @@ describe("GET /api/listing", () => {
 
   it("returns the remaining analyses", async () => {
     expect(await (await GET()).json()).toEqual({ status: "ready", remaining: 12, limit: 50 });
+  });
+
+  it("points the free plan to the paid plans", async () => {
+    mocks.workspace.mockResolvedValueOnce(workspace(true, false));
+    expect(await (await GET()).json()).toEqual({ status: "upgrade" });
   });
 
   it("says unavailable while the ai_usage table does not exist", async () => {

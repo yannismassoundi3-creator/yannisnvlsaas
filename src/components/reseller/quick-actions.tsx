@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown, Minus, PackagePlus, Plus, Search, Tag } from "lucide-react";
+import Link from "next/link";
 import { createContext, useContext, useEffect, useId, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -14,6 +15,7 @@ import { toInputDecimal } from "@/lib/finance/input";
 import { e4ToInputValue } from "@/lib/finance/money";
 import { platformName, SALES_CHANNELS, type PlatformId } from "@/lib/onboarding/constants";
 import { listingMessages } from "@/i18n/messages/listing";
+import { planMessages } from "@/i18n/messages/plans";
 import { thumbnail } from "@/lib/photos/browser";
 import { addItem, attachItemPhoto, sellItem, updateItem } from "@/lib/reseller/actions";
 import { MAX_ITEM_QUANTITY, nameTokens } from "@/lib/reseller/logic";
@@ -139,12 +141,22 @@ export function SellButton({
 
 type FieldErrors = Record<string, string>;
 
-function FormError({ message }: { message: string | null }) {
-  return message ? (
-    <p role="alert" className="text-sm font-medium text-negative-700">
-      {message}
-    </p>
-  ) : null;
+/** `upgrade`: the free plan's stock limit refused the write; a link leads to the plans. */
+type FormErrorState = { message: string; upgrade?: boolean } | null;
+
+function FormError({ error }: { error: FormErrorState }) {
+  const locale = useLocale();
+  if (!error) return null;
+  return (
+    <div role="alert" className="space-y-1 text-sm font-medium text-negative-700">
+      <p>{error.message}</p>
+      {error.upgrade ? (
+        <Link href="/app/billing" className="inline-block text-emerald-700 underline-offset-2 hover:underline">
+          {planMessages[locale].seePlans}
+        </Link>
+      ) : null}
+    </div>
+  );
 }
 
 /** Whole number typed in a quantity field, or null while it is not one. */
@@ -330,7 +342,7 @@ function AddItemContent({ currency, today, onDone }: { currency: string; today: 
   const blank: ItemValues = { name: "", purchasePrice: "", acquiredOn: today, quantity: "1", priceMode: "unit" };
   const [values, setValues] = useState(blank);
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<FormErrorState>(null);
   // Busy only while the action runs: the page refresh that follows must not block the next item.
   const [saving, setSaving] = useState(false);
   const [, startTransition] = useTransition();
@@ -374,10 +386,10 @@ function AddItemContent({ currency, today, onDone }: { currency: string; today: 
             const r = await addItem(values).catch(() => null);
             if (r?.ok) await saveThumbnail(r.productId);
             setSaving(false);
-            if (!r) return setFormError(resellerMessages[locale].actions.itemSaveFailed);
+            if (!r) return setFormError({ message: resellerMessages[locale].actions.itemSaveFailed });
             if (!r.ok) {
               setErrors(r.fieldErrors ?? {});
-              setFormError(r.fieldErrors ? null : r.message);
+              setFormError(r.fieldErrors ? null : { message: r.message, upgrade: r.upgrade });
               return;
             }
             const pieces = typedQuantity(values.quantity) ?? 1;
@@ -405,7 +417,7 @@ function AddItemContent({ currency, today, onDone }: { currency: string; today: 
           price={values.purchasePrice}
           onUseTitle={(title) => setValues((v) => ({ ...v, name: title }))}
         />
-        <FormError message={formError} />
+        <FormError error={formError} />
         <div className="flex flex-col gap-2 pt-1 sm:flex-row-reverse">
           <Button type="submit" size="lg" loading={saving} className="w-full sm:w-auto">
             <PackagePlus aria-hidden />
@@ -448,7 +460,7 @@ export function EditItemDialog({
   };
   const [values, setValues] = useState(start);
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<FormErrorState>(null);
   const [pending, startTransition] = useTransition();
   const nameRef = useRef<HTMLInputElement>(null);
   return (
@@ -478,10 +490,10 @@ export function EditItemDialog({
               e.preventDefault();
               startTransition(async () => {
                 const r = await updateItem(productId, values).catch(() => null);
-                if (!r) return setFormError(resellerMessages[locale].actions.itemSaveFailed);
+                if (!r) return setFormError({ message: resellerMessages[locale].actions.itemSaveFailed });
                 if (!r.ok) {
                   setErrors(r.fieldErrors ?? {});
-                  setFormError(r.fieldErrors ? null : r.message);
+                  setFormError(r.fieldErrors ? null : { message: r.message, upgrade: r.upgrade });
                   return;
                 }
                 toast.success(t.saved);
@@ -490,7 +502,7 @@ export function EditItemDialog({
             }}
           >
             <ItemFormFields id={id} values={values} setValues={setValues} errors={errors} currency={currency} today={today} nameRef={nameRef} soldUnits={initial.soldUnits} />
-            <FormError message={formError} />
+            <FormError error={formError} />
             <div className="flex justify-end pt-1">
               <Button type="submit" size="lg" loading={pending} className="w-full sm:w-auto">
                 {t.save}
@@ -553,7 +565,7 @@ function SellContent({
   });
   const [feesOpen, setFeesOpen] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<FormErrorState>(null);
   const [pending, startTransition] = useTransition();
   const searchRef = useRef<HTMLInputElement>(null);
   const priceRef = useRef<HTMLInputElement>(null);
@@ -613,10 +625,10 @@ function SellContent({
               inboundEmailId: prefill?.inboundEmailId ?? "",
               quantity: showQuantity ? values.quantity : "1",
             }).catch(() => null);
-            if (!r) return setFormError(resellerMessages[locale].actions.saleSaveFailed);
+            if (!r) return setFormError({ message: resellerMessages[locale].actions.saleSaveFailed });
             if (!r.ok) {
               setErrors(r.fieldErrors ?? {});
-              setFormError(r.fieldErrors ? null : r.message);
+              setFormError(r.fieldErrors ? null : { message: r.message, upgrade: r.upgrade });
               if (r.fieldErrors?.shippingCost || r.fieldErrors?.platformFee) setFeesOpen(true);
               return;
             }
@@ -838,7 +850,7 @@ function SellContent({
           </div>
         </div>
 
-        <FormError message={formError} />
+        <FormError error={formError} />
         <Button type="submit" size="lg" variant="accent" loading={pending} className="w-full">
           <Tag aria-hidden />
           {t.submit}

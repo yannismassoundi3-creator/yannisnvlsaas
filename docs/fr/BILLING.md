@@ -14,22 +14,49 @@ redirection de retour depuis Checkout.
 
 ## Conditions commerciales (configurables)
 
-Définies dans `src/config/plans.ts`. Le prix Pro affiché provient de `NEXT_PUBLIC_PRO_PRICE_MINOR` /
-`NEXT_PUBLIC_PRO_PRICE_CURRENCY` ; **le montant facturé provient toujours du Price Stripe** défini dans
-`STRIPE_PRICE_PRO_MONTHLY`, gardez-les donc identiques.
+Définies dans `src/config/plans.ts`. Les prix affichés proviennent de `NEXT_PUBLIC_PRO_PRICE_MINOR`,
+`NEXT_PUBLIC_RESELLER_PRICE_MINOR` (799 par défaut) et `NEXT_PUBLIC_PRO_PRICE_CURRENCY` ; **le montant facturé provient
+toujours du Price Stripe** défini dans `STRIPE_PRICE_PRO_MONTHLY` ou `STRIPE_PRICE_RESELLER_MONTHLY`, gardez-les donc
+identiques.
 
-| | Essai gratuit | Pro (proposé à 19 €/mois) |
+| | Essai gratuit | Gratuit | Revendeur (7,99 €/mois) | Pro (19 €/mois) |
+| --- | --- | --- | --- | --- |
+| Pour qui | Tout nouvel espace de travail | Espaces dont toutes les vraies boutiques sont en mode revendeur, après l'essai | Revendeurs | Boutiques en ligne (et revendeurs) |
+| Durée | 14 jours à partir de la création de l'espace de travail, sans carte | Sans limite, sans carte | Abonnement mensuel | Abonnement mensuel |
+| Articles en stock (mode revendeur) | Illimité | **30 pièces** (les articles vendus ne comptent pas) | Illimité | Illimité |
+| Annonces générées par IA (50/mois par défaut) | Oui, si configuré | — | Oui, si configuré | Oui, si configuré |
+| Ventes reçues par e-mail | Oui, si configuré | — | Oui, si configuré | Oui, si configuré |
+| Mode e-commerce (imports de commandes, produits, publicité) | Oui | — (les boutiques restent en mode revendeur) | — (les boutiques restent en mode revendeur) | Oui |
+| Vraies boutiques | 1 (la boutique d'exemple ne compte pas) | 1 | 3 | 3 |
+| Lignes par fichier CSV / par mois | 5 000 / 20 000 | 5 000 / 20 000 | 100 000 / 1 000 000 | 100 000 / 1 000 000 |
+| Historique dans les tableaux de bord et les rapports | 90 derniers jours | 3 dernières années (la liste des articles n'est jamais limitée) | 3 dernières années | 3 dernières années |
+| Exports CSV, rapports PDF et CSV | — | — | Oui | Oui |
+| Filtres par produit et par campagne | — | — | Oui | Oui |
+| Export complet des données du compte (Paramètres) | Oui | Oui | Oui | Oui |
+
+La durée de l'essai gratuit (14 jours), la période de grâce en cas d'échec de paiement (7 jours) et la limite de stock
+de l'offre gratuite (30 pièces) sont définies à la fois dans `src/config/plans.ts` et dans `private.trial_period()` /
+`private.payment_grace_period()` / `private.free_stock_limit()` dans la base de données, qui les applique. Un test de
+base de données échoue si elles divergent.
+
+Les « annonces générées par IA » et les « ventes reçues par e-mail » n'existent que si leur configuration est définie
+(`ANTHROPIC_API_KEY` ; `INBOUND_*`) : d'ici là, l'application les affiche comme « bientôt disponibles », tout comme la
+page des tarifs et les descriptions d'offres. La page des tarifs est pré-rendue : elle lit cette configuration au
+moment du build, redéployez donc après avoir défini les variables.
+
+## Offre gratuite et offre Revendeur : migration de la base de données
+
+L'offre gratuite, la limite de stock et l'offre `reseller` se trouvent dans
+`supabase/migrations/20261109100000_reseller_plans.sql`. Le fichier est idempotent et peut être collé dans l'éditeur
+SQL de Supabase après les migrations précédentes. L'application le détecte (`organization_entitlements.paid_plan`) et
+se comporte comme avant tant qu'il n'est pas appliqué :
+
+| | Avant le SQL | Après le SQL |
 | --- | --- | --- |
-| Durée | 14 jours à partir de la création de l'espace de travail, sans carte | Abonnement mensuel |
-| Vraies boutiques | 1 (la boutique d'exemple ne compte pas) | 3 |
-| Lignes par fichier CSV / par mois | 5 000 / 20 000 | 100 000 / 1 000 000 |
-| Historique dans les tableaux de bord et les rapports | 90 derniers jours | 3 dernières années |
-| Exports CSV, rapports PDF et CSV | — | Oui |
-| Filtres par produit et par campagne | — | Oui |
-
-La durée de l'essai gratuit (14 jours) et la période de grâce en cas d'échec de paiement (7 jours) sont définies à la
-fois dans `src/config/plans.ts` et dans `private.trial_period()` / `private.payment_grace_period()` dans la base de
-données, qui les applique. Un test de base de données échoue si les deux divergent.
+| Espace revendeur après son essai | `expired` : lecture seule, comme avant | `free` : mode revendeur avec 30 pièces en stock |
+| Offre Revendeur sur la page Facturation | « Bientôt disponible » (désactivée) | Disponible si `STRIPE_PRICE_RESELLER_MONTHLY` est défini |
+| Webhook pour un prix Revendeur | Enregistré comme `pro` (accès complet) | Enregistré comme `reseller` |
+| Espaces e-commerce, essai, Pro, période de grâce | Inchangés | Inchangés |
 
 ## Niveaux d'accès
 
@@ -41,7 +68,13 @@ La base de données calcule le niveau d'accès de chaque organisation (`private.
 | `pro` | Un abonnement est `active` ou `trialing` | Limites Pro |
 | `grace` | Un abonnement est `past_due` depuis moins de 7 jours | Limites Pro, bandeau demandant de mettre à jour le moyen de paiement |
 | `trial` | Aucun abonnement en cours et l'essai gratuit de 14 jours n'est pas terminé | Limites de l'essai gratuit, bandeau de compte à rebours (avertissement pendant les 3 derniers jours) |
+| `free` | Aucun abonnement en cours, essai terminé, et toutes les vraies boutiques sont en mode revendeur (`private.org_is_reseller_only`) | Le mode revendeur continue (écritures autorisées par la RLS) : ventes, modifications, suppressions, photos, tableaux de bord et export complet des données. Au plus 30 pièces en stock, appliqué par le trigger `products_free_stock_limit` (erreur `free_stock_limit`, affichée « Vous avez atteint 30 articles en stock avec l'offre gratuite… »). Pas d'annonces IA (`reserve_listing_analysis` lève `plan_required`), pas de ventes reçues par e-mail (le webhook répond 403 et le trigger `inbound_emails_plan` refuse l'insertion), pas de passage en e-commerce (`stores_business_model_plan`, erreur `ecommerce_requires_pro`). |
 | `expired` | Dans tous les autres cas | Les données sont conservées mais en lecture seule : ni import ni modification (appliqué par la RLS), tableaux de bord et rapports suspendus. La facturation, les réglages et l'export complet des données restent disponibles. |
+
+`pro` et `grace` couvrent les deux offres payantes. `organization_entitlements.paid_plan` indique laquelle (`pro` ou
+`reseller`, depuis `subscriptions.plan` ; Pro l'emporte si les deux existent) et `stock_limit` donne la limite de
+l'offre gratuite. Un abonnement Revendeur garde ses boutiques en mode revendeur (même trigger que l'offre gratuite) ;
+tout le reste est identique à Pro.
 
 `src/lib/billing/entitlements.ts` traduit le niveau en limites de l'offre et en état de l'interface. Les limites de
 l'offre sont appliquées côté serveur : le nombre de boutiques par un trigger de la base de données, la taille des
@@ -52,9 +85,15 @@ seul contrôle.
 
 ### S'abonner
 
-1. Le propriétaire clique sur **Subscribe** (s'abonner) sur la page Billing (facturation). `startCheckout` (server
-   action) vérifie le rôle, le niveau d'accès actuel et une limite de débit, crée ou réutilise le client Stripe (clé
-   d'idempotence par organisation), et crée une Checkout Session en mode `subscription`.
+La page Facturation affiche les offres adaptées à l'espace : **Revendeur** en premier (recommandée) et Pro en option
+quand toutes les vraies boutiques sont en mode revendeur, **Pro** seule sinon.
+
+1. Le propriétaire clique sur le bouton de l'offre sur la page Facturation. `startCheckout(plan)` (server action)
+   vérifie le rôle, le niveau d'accès actuel et une limite de débit, crée ou réutilise le client Stripe (clé
+   d'idempotence par organisation), et crée une Checkout Session en mode `subscription` avec le prix propre à l'offre.
+   L'offre Revendeur exige aussi `STRIPE_PRICE_RESELLER_MONTHLY`, la migration des offres revendeur dans la base et un
+   espace uniquement revendeur ; sinon son bouton est désactivé avec « Bientôt disponible » et l'action refuse. **Un
+   clic sur Revendeur ne bascule jamais sur le prix Pro.**
 2. Tant qu'il reste plus de deux jours d'essai gratuit, l'abonnement est créé avec `trial_end` fixé à la fin de
    l'essai Narixia : la carte est enregistrée immédiatement et **le premier prélèvement a lieu à la fin de l'essai**,
    comme l'indiquent le bouton et la page. S'il reste deux jours ou moins (Stripe exige une fin d'essai au moins
@@ -108,8 +147,13 @@ Garanties :
   que si aucun événement plus récent n'a été appliqué avant (`stripe_event_at`).
 - **Nouvelles tentatives.** Les erreurs de traitement renvoient `500` afin que Stripe réessaie avec un délai
   croissant ; l'erreur est conservée sur la ligne de l'événement pour le support.
-- **Audit.** `billing_events` conserve le type, l'issue, l'organisation et un résumé (statut, identifiant et montant
-  de la facture) de chaque événement. Cette table n'est lisible qu'avec le rôle de service.
+- **Audit.** `billing_events` conserve le type, l'issue, l'organisation et un résumé (statut, offre, identifiant et
+  montant de la facture) de chaque événement. Cette table n'est lisible qu'avec le rôle de service.
+- **Offre.** Le prix de l'abonnement détermine `subscriptions.plan` : `STRIPE_PRICE_RESELLER_MONTHLY` donne
+  `reseller`, tout autre prix `pro` (comme tous les abonnements auparavant). Un changement d'offre dans le portail
+  client arrive en `customer.subscription.updated`, déjà dans la liste ci-dessus : **aucun nouveau type d'événement
+  n'est nécessaire**. Si la base n'a pas encore la migration des offres revendeur, un abonnement Revendeur est
+  enregistré comme `pro` (accès complet) au lieu d'échouer.
 
 Le SDK (`stripe` 23) est figé sur la version d'API **`2026-09-30.endive`**. Créez le point d'accès webhook avec la même
 version d'API pour que les contenus correspondent au code (le lien facture → abonnement est lu dans
@@ -118,9 +162,13 @@ version d'API pour que les contenus correspondent au code (le lien facture → a
 ## Configuration en mode test Stripe
 
 1. Créez un compte Stripe et restez en **mode test**.
-2. **Produit et prix :** Catalogue de produits → Ajouter un produit « Narixia Pro » → prix récurrent, mensuel,
+2. **Produits et prix :** Catalogue de produits → Ajouter un produit « Narixia Pro » → prix récurrent, mensuel,
    19,00 € (ou votre prix). Copiez l'identifiant du prix (`price_…`) dans `STRIPE_PRICE_PRO_MONTHLY`, et réglez
-   `NEXT_PUBLIC_PRO_PRICE_MINOR` et `NEXT_PUBLIC_PRO_PRICE_CURRENCY` en conséquence.
+   `NEXT_PUBLIC_PRO_PRICE_MINOR` et `NEXT_PUBLIC_PRO_PRICE_CURRENCY` en conséquence. Puis Ajouter un produit « Narixia
+   Revendeur » → prix récurrent, mensuel, 7,99 € en EUR. Copiez son identifiant de prix dans
+   `STRIPE_PRICE_RESELLER_MONTHLY` (et `NEXT_PUBLIC_RESELLER_PRICE_MINOR` si vous choisissez un autre montant que 799).
+   Pour que les clients changent eux-mêmes d'offre, ajoutez les deux produits au réglage « Abonnements → changer
+   d'offre » du portail client (facultatif).
 3. **Clé API :** Développeurs → Clés API → clé secrète (`sk_test_…`) dans `STRIPE_SECRET_KEY`. Une clé restreinte
    (`rk_test_…`) fonctionne aussi si elle autorise Customers, Checkout Sessions, Subscriptions, Invoices et Billing
    Portal.
@@ -203,7 +251,7 @@ les nouveaux paiements Checkout restent désactivés et la page Billing l'indiqu
   et conservez les résultats.
 - Créez le produit, le prix, la configuration du portail et le point d'accès webhook en mode production (le mode
   production a des objets distincts).
-- Définissez les valeurs de production de `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` et `STRIPE_PRICE_PRO_MONTHLY`,
-  puis `STRIPE_LIVE_ENABLED=true`, et redéployez.
+- Définissez les valeurs de production de `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO_MONTHLY` et
+  `STRIPE_PRICE_RESELLER_MONTHLY`, puis `STRIPE_LIVE_ENABLED=true`, et redéployez.
 - Effectuez un achat réel avec votre propre carte, vérifiez les événements webhook, la facture et le portail, puis
   remboursez-le depuis le Dashboard Stripe.

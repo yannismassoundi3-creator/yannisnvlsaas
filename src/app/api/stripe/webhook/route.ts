@@ -51,6 +51,7 @@ export async function POST(request: Request) {
     const outcome = await processStripeEvent(event, {
       admin,
       retrieveSubscription: (id) => getStripe().subscriptions.retrieve(id),
+      resellerPriceId: env.stripePriceResellerMonthly,
     });
     await recordOutcome(admin, event.id, outcome);
     if (outcome.status === "processed" && outcome.organizationId) {

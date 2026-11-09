@@ -11,7 +11,7 @@ import { Faq } from "@/components/marketing/faq";
 import { PreviewTabs } from "@/components/marketing/preview-tabs";
 import { PricingCards } from "@/components/marketing/pricing-cards";
 import { Button } from "@/components/ui/button";
-import { TRIAL_DAYS } from "@/config/plans";
+import { FREE_STOCK_ITEMS, TRIAL_DAYS } from "@/config/plans";
 import { site, siteCopy } from "@/config/site";
 import { localizedPath, type Locale } from "@/i18n/config";
 import type { Format } from "@/i18n/format";
@@ -20,6 +20,7 @@ import { marketingHome } from "@/i18n/messages/marketing-home";
 import { getFormat, getLocale } from "@/i18n/server";
 import { getMarketingDemo, type MarketingDemo } from "@/lib/demo/marketing";
 import { buildAdvertisingKpis } from "@/lib/finance/kpis";
+import { featureAvailability } from "@/lib/features";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
@@ -390,8 +391,8 @@ function HowItWorks({ locale }: { locale: Locale }) {
 function PricingSection({ locale }: { locale: Locale }) {
   const t = marketingHome[locale].pricing;
   return (
-    <Section id="pricing" eyebrow={t.eyebrow} title={t.title} intro={<p>{t.intro}</p>} className="border-t border-line bg-surface">
-      <PricingCards locale={locale} />
+    <Section id="pricing" eyebrow={t.eyebrow} title={t.title} intro={<p>{t.intro(FREE_STOCK_ITEMS)}</p>} className="border-t border-line bg-surface">
+      <PricingCards locale={locale} features={featureAvailability()} />
       <p className="mt-6 text-sm text-ink-3">
         <Link href={localizedPath("/pricing", locale)} className="font-medium text-emerald-700 hover:underline">
           {t.compare}

@@ -30,8 +30,10 @@ missing data are always labelled, and contribution margin is never presented as 
 - **Sample store** with clearly labelled demo data, separate from real stores.
 - **Accounts:** email and password or a 6-digit code sent by email, verification by link or code, password reset, four-step onboarding, organisations with
   roles, several stores (Pro), full data export and account deletion.
-- **Billing:** 14-day trial without a card, Pro plan via Stripe Checkout and the customer portal, verified and
-  idempotent webhooks, grace period on failed payments, entitlements enforced by the database.
+- **Billing:** 14-day trial without a card, then a free plan for resellers (up to 30 items in stock), the Reseller
+  plan (€7.99/month, unlimited stock) and the Pro plan for online stores (€19/month) via Stripe Checkout and the
+  customer portal, verified and idempotent webhooks, grace period on failed payments, entitlements enforced by the
+  database.
 - **Marketing site** with pricing, FAQ, glossary of financial terms, legal pages, sitemap and social images.
 - **English and French:** public pages in both languages (English at the root, French under `/fr`, chosen from the browser language); the app, emails, PDF reports and CSV exports follow the language picked in Settings or the language switch. Numbers and dates are formatted for the language. Translations are typed modules in `src/i18n/messages/`.
 
@@ -79,6 +81,7 @@ Every variable is listed and explained in [`.env.example`](.env.example). The es
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes | Supabase project |
 | `SUPABASE_SECRET_KEY` | yes | Server-only key for webhooks, deletion, audit and rate limits |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO_MONTHLY` | for billing | Stripe test or live keys |
+| `STRIPE_PRICE_RESELLER_MONTHLY` | for the Reseller plan | Monthly price of the Reseller plan; without it the offer says "coming soon" |
 | `STRIPE_LIVE_ENABLED` | for live payments | Explicit opt-in before live keys can start checkouts |
 | `CRON_SECRET` | in production | Protects the daily maintenance endpoint |
 | `NEXT_PUBLIC_COMPANY_*`, `NEXT_PUBLIC_SUPPORT_EMAIL` | before launch | Company details on the legal pages |

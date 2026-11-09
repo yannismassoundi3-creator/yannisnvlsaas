@@ -111,7 +111,7 @@ async function Settings({ searchParams }: { searchParams: PageProps<"/[lang]/app
         ) : null}
 
         {section === "store" && store && isReseller(store) ? (
-          <InboundGuide address={storeInboundAddress(store.inbound_token)} locale={locale} canRegenerate={ws.role !== "member"} disabled={!canWrite} showInboxLink />
+          <InboundGuide address={storeInboundAddress(store.inbound_token)} locale={locale} canRegenerate={ws.role !== "member"} disabled={!canWrite} showInboxLink upgrade={ws.entitlements.access === "free"} />
         ) : null}
 
         {section === "stores" ? (
@@ -121,7 +121,7 @@ async function Settings({ searchParams }: { searchParams: PageProps<"/[lang]/app
               description={t.storesCount(realStores.length, ws.entitlements.limits.stores)}
               actions={
                 ws.role !== "member" ? (
-                  <AddStoreDialog disabled={!canWrite || atLimit} reason={atLimit ? (ws.entitlements.plan === "pro" ? t.limitReached : t.trialLimit) : undefined} />
+                  <AddStoreDialog disabled={!canWrite || atLimit} reason={atLimit ? (ws.entitlements.paidPlan !== null ? t.limitReached : t.trialLimit) : undefined} />
                 ) : null
               }
             />
@@ -151,7 +151,7 @@ async function Settings({ searchParams }: { searchParams: PageProps<"/[lang]/app
                   {canWrite ? <SampleStoreButton demoStoreId={null} /> : null}
                 </div>
               )}
-              {atLimit && ws.entitlements.plan !== "pro" ? (
+              {atLimit && ws.entitlements.paidPlan === null ? (
                 <p className="mt-3 text-sm text-ink-3">
                   {t.trialOneStore}{" "}
                   <Link href="/app/billing" className="font-medium text-emerald-700 hover:underline">

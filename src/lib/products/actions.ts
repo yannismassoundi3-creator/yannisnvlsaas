@@ -2,6 +2,7 @@
 
 import { refresh } from "next/cache";
 import { z } from "zod";
+import { FREE_STOCK_ITEMS } from "@/config/plans";
 import { requireStore } from "@/lib/auth/workspace";
 import { parseUserAmount, parseUserUnitCost } from "@/lib/finance/input";
 import { normalizeText } from "@/lib/imports/normalize";
@@ -11,6 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Locale } from "@/i18n/config";
 import { catalogCommon } from "@/i18n/messages/catalog-common";
 import { productsMessages } from "@/i18n/messages/catalog-products";
+import { planMessages } from "@/i18n/messages/plans";
 import { getRequestLocale } from "@/i18n/request";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; message: string; fieldErrors?: Record<string, string> };
@@ -71,6 +73,8 @@ export async function createProduct(input: z.input<typeof productInput>): Promis
     .insert({ organization_id: ws.organization.id, store_id: ws.activeStore.id, source: "manual", ...product.value })
     .select("id")
     .single();
+  // Free plan (reseller stores): the database refuses stock beyond the limit.
+  if (error?.message === "free_stock_limit") return { ok: false, message: planMessages[locale].freeStockLimit(Number(error.details) || FREE_STOCK_ITEMS) };
   if (error || !data) return { ok: false, message: dbMessage(error?.code, locale) };
   refresh();
   return { ok: true, productId: data.id };

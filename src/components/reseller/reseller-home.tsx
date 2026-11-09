@@ -8,6 +8,7 @@ import { AddItemButton, QuickActionsProvider, SellButton } from "@/components/re
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { Alert } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableContainer, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import type { Locale } from "@/i18n/config";
@@ -15,11 +16,12 @@ import type { Format } from "@/i18n/format";
 import { kpiMessages } from "@/i18n/messages/dashboard-kpis";
 import { overviewMessages } from "@/i18n/messages/dashboard-overview";
 import { inboundMessages } from "@/i18n/messages/inbound";
+import { planMessages } from "@/i18n/messages/plans";
 import { resellerMessages } from "@/i18n/messages/reseller";
 import { rangeQuery } from "@/lib/analytics/range";
 import type { ReadyWorkspace, Store } from "@/lib/auth/workspace";
 import { countPendingInbound } from "@/lib/data/inbound";
-import { getResellerHome, getSellContext } from "@/lib/data/reseller";
+import { countStockPieces, getResellerHome, getSellContext } from "@/lib/data/reseller";
 import { ReportsPausedError, type ReportPeriod } from "@/lib/data/reports";
 import { definitionsFor, METRIC_POLARITY, type Metrics } from "@/lib/finance/metrics";
 import { e4ToMinor } from "@/lib/finance/money";
@@ -79,9 +81,15 @@ export async function ResellerHome({ ws, period, initial, locale, f }: Props) {
   );
   if (!ws.entitlements.canViewAnalytics) return paused;
 
-  let data, sell, pendingEmails;
+  const stockLimit = ws.entitlements.stockLimit;
+  let data, sell, pendingEmails, stockPieces;
   try {
-    [data, sell, pendingEmails] = await Promise.all([getResellerHome(store, period.range, period.comparison, period.today), getSellContext(store), countPendingInbound(store)]);
+    [data, sell, pendingEmails, stockPieces] = await Promise.all([
+      getResellerHome(store, period.range, period.comparison, period.today),
+      getSellContext(store),
+      countPendingInbound(store),
+      stockLimit !== null ? countStockPieces(ws.stores) : null,
+    ]);
   } catch (error) {
     if (error instanceof ReportsPausedError) return paused;
     throw error;
@@ -113,6 +121,21 @@ export async function ResellerHome({ ws, period, initial, locale, f }: Props) {
         </CardBody>
       </Card>
     ) : null;
+  // Free plan: pieces in stock against the limit, with a link to the plans.
+  const freePlan =
+    stockLimit !== null && stockPieces !== null ? (
+      <Alert
+        tone={stockPieces >= stockLimit ? "caution" : "info"}
+        title={planMessages[locale].freeUsage(stockPieces, stockLimit)}
+        action={
+          <Link href="/app/billing" className="text-sm font-medium text-emerald-700 hover:underline">
+            {planMessages[locale].upgrade}
+          </Link>
+        }
+      >
+        {stockPieces >= stockLimit ? planMessages[locale].freeStockLimit(stockLimit) : planMessages[locale].freeUsageHint}
+      </Alert>
+    ) : null;
   const actions = (
     <div className="grid grid-cols-2 gap-3">
       <AddItemButton className="h-14 w-full text-lg" />
@@ -126,6 +149,7 @@ export async function ResellerHome({ ws, period, initial, locale, f }: Props) {
         <div className="space-y-6">
           <PageHeader eyebrow={store.name} title={t.title} />
           {actions}
+          {freePlan}
           {notice}
           <Card>
             <CardBody className="space-y-4 py-6">
@@ -147,6 +171,7 @@ export async function ResellerHome({ ws, period, initial, locale, f }: Props) {
         <div className="space-y-6">
           {header}
           {actions}
+          {freePlan}
           {notice}
           <HeadlineFigures metrics={data.metrics} previous={data.previous} currency={store.currency} locale={locale} f={f} comparisonDays={period.comparison ? period.days : null} />
           <StockCard data={data} store={store} locale={locale} f={f} today={period.today} />

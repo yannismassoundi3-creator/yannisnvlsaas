@@ -39,6 +39,8 @@ export function serverEnv() {
     stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
     stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
     stripePriceProMonthly: process.env.STRIPE_PRICE_PRO_MONTHLY ?? "",
+    /** Recurring monthly price of the Revendeur plan. Empty: the offer says "coming soon"; never falls back to Pro. */
+    stripePriceResellerMonthly: process.env.STRIPE_PRICE_RESELLER_MONTHLY?.trim() ?? "",
     stripeAutomaticTax: process.env.STRIPE_AUTOMATIC_TAX === "true",
     /** Explicit operator opt-in before live keys may start checkouts (see docs/BILLING.md). */
     stripeLiveEnabled: process.env.STRIPE_LIVE_ENABLED === "true",
@@ -55,4 +57,9 @@ export function serverEnv() {
 export function isStripeConfigured(): boolean {
   const env = serverEnv();
   return Boolean(env.stripeSecretKey && env.stripePriceProMonthly);
+}
+
+/** The Revendeur plan can be bought on this deployment (Stripe configured and its own price set). */
+export function isResellerCheckoutConfigured(): boolean {
+  return isStripeConfigured() && Boolean(serverEnv().stripePriceResellerMonthly);
 }

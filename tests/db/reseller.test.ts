@@ -376,13 +376,31 @@ describe("access control on the new paths", () => {
     await expect(asUser(null, (q) => q("select * from public.reseller_items($1)", [aliceShop.storeId]))).rejects.toThrow(/permission denied/);
   });
 
-  it("makes the mode read-only and pauses the item lists once the trial has expired", async () => {
+  it("moves a reseller-only workspace to the free plan after the trial: lists stay readable, the store stays in reseller mode", async () => {
     await expireTrial(bobShop.orgId);
-    await expect(asUser(bob, (q) => q("update public.stores set business_model = 'ecommerce' where id = $1", [bobShop.storeId]))).rejects.toThrow(/row-level security/);
-    await expect(asUser(bob, (q) => q("select * from public.reseller_items($1)", [bobShop.storeId]))).rejects.toThrow(/paused/);
-    // Data stays readable for export.
-    const { rows } = await asUser(bob, (q) => q("select count(*)::int as n from public.stores where id = $1", [bobShop.storeId]));
-    expect(rows[0].n).toBe(1);
-    await adminQuery("update public.organizations set trial_ends_at = now() + interval '14 days' where id = $1", [bobShop.orgId]);
+    try {
+      expect((await adminQuery("select private.org_access($1) as a", [bobShop.orgId])).rows[0].a).toBe("free");
+      await expect(asUser(bob, (q) => q("update public.stores set business_model = 'ecommerce' where id = $1", [bobShop.storeId]))).rejects.toThrow(/ecommerce_requires_pro/);
+      await asUser(bob, (q) => q("select * from public.reseller_items($1)", [bobShop.storeId]));
+      const { rows } = await asUser(bob, (q) => q("select count(*)::int as n from public.stores where id = $1", [bobShop.storeId]));
+      expect(rows[0].n).toBe(1);
+    } finally {
+      await adminQuery("update public.organizations set trial_ends_at = now() + interval '14 days' where id = $1", [bobShop.orgId]);
+    }
+  });
+
+  it("makes an e-commerce workspace read-only and pauses its lists once the trial has expired", async () => {
+    await adminQuery("update public.stores set business_model = 'ecommerce' where id = $1", [bobShop.storeId]);
+    await expireTrial(bobShop.orgId);
+    try {
+      await expect(asUser(bob, (q) => q("update public.stores set business_model = 'reseller' where id = $1", [bobShop.storeId]))).rejects.toThrow(/row-level security/);
+      await expect(asUser(bob, (q) => q("select * from public.reseller_items($1)", [bobShop.storeId]))).rejects.toThrow(/paused/);
+      // Data stays readable for export.
+      const { rows } = await asUser(bob, (q) => q("select count(*)::int as n from public.stores where id = $1", [bobShop.storeId]));
+      expect(rows[0].n).toBe(1);
+    } finally {
+      await adminQuery("update public.organizations set trial_ends_at = now() + interval '14 days' where id = $1", [bobShop.orgId]);
+      await adminQuery("update public.stores set business_model = 'reseller' where id = $1", [bobShop.storeId]);
+    }
   });
 });

@@ -3,6 +3,7 @@
 import { CreditCard, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
+import type { PaidPlanId } from "@/config/plans";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toaster";
@@ -10,18 +11,18 @@ import { useLocale } from "@/i18n/client";
 import { billingMessages } from "@/i18n/messages/account-billing";
 import { openBillingPortal, startCheckout } from "@/lib/billing/actions";
 
-export function SubscribeButton({ label, disabled }: { label: string; disabled?: boolean }) {
+export function SubscribeButton({ label, plan = "pro", disabled, variant = "accent" }: { label: string; plan?: PaidPlanId; disabled?: boolean; variant?: "accent" | "secondary" }) {
   const [pending, startTransition] = useTransition();
   return (
     <Button
-      variant="accent"
+      variant={variant}
       size="lg"
       disabled={disabled}
       loading={pending}
       onClick={() =>
         startTransition(async () => {
           // On success the action redirects to Stripe Checkout.
-          const result = await startCheckout();
+          const result = await startCheckout(plan);
           if (result && !result.ok) toast.error(result.message);
         })
       }
@@ -55,7 +56,7 @@ export function PortalButton({ disabled }: { disabled?: boolean }) {
 
 /**
  * After returning from Checkout, waits for Stripe's webhook to confirm the
- * subscription. The page never shows Pro as active before that.
+ * subscription. The page never shows a plan as active before that.
  */
 export function CheckoutConfirmation({ confirmed }: { confirmed: boolean }) {
   const t = billingMessages[useLocale()];

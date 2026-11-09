@@ -37,9 +37,10 @@ présentée comme un bénéfice net.
 - **Boutique d'exemple** avec des données de démonstration clairement signalées, séparée des vraies boutiques.
 - **Comptes :** e-mail et mot de passe ou code à 6 chiffres reçu par e-mail, vérification par lien ou par code, réinitialisation du mot de passe, prise en main en quatre
   étapes, organisations avec rôles, plusieurs boutiques (Pro), export complet des données et suppression du compte.
-- **Facturation :** essai gratuit de 14 jours sans carte, offre Pro via Stripe Checkout et le portail client, webhooks
-  vérifiés et idempotents, période de grâce en cas d'échec de paiement, droits d'accès appliqués par la base de
-  données.
+- **Facturation :** essai gratuit de 14 jours sans carte, puis offre gratuite pour les revendeurs (jusqu'à 30 articles
+  en stock), offre Revendeur (7,99 €/mois, stock illimité) et offre Pro pour les boutiques en ligne (19 €/mois) via
+  Stripe Checkout et le portail client, webhooks vérifiés et idempotents, période de grâce en cas d'échec de
+  paiement, droits d'accès appliqués par la base de données.
 - **Site marketing** avec tarifs, FAQ, glossaire des termes financiers, pages légales, sitemap et images pour les
   réseaux sociaux.
 - **Anglais et français :** pages publiques dans les deux langues (anglais à la racine, français sous `/fr`, choisi selon la langue du navigateur) ; l'application, les e-mails, les rapports PDF et les exports CSV suivent la langue choisie dans les paramètres ou via le sélecteur de langue. Les nombres et les dates sont formatés selon la langue. Les traductions sont des modules typés dans `src/i18n/messages/`.
@@ -90,6 +91,7 @@ Chaque variable est listée et expliquée dans [`.env.example`](.env.example). L
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | oui | Projet Supabase |
 | `SUPABASE_SECRET_KEY` | oui | Clé réservée au serveur pour les webhooks, la suppression, l'audit et les limites de débit |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO_MONTHLY` | pour la facturation | Clés Stripe de test ou de production |
+| `STRIPE_PRICE_RESELLER_MONTHLY` | pour l'offre Revendeur | Prix mensuel de l'offre Revendeur ; sans lui, l'offre indique « Bientôt disponible » |
 | `STRIPE_LIVE_ENABLED` | pour les paiements réels | Activation explicite avant que les clés de production puissent lancer des paiements Checkout |
 | `CRON_SECRET` | en production | Protège le point d'accès de maintenance quotidienne |
 | `NEXT_PUBLIC_COMPANY_*`, `NEXT_PUBLIC_SUPPORT_EMAIL` | avant le lancement | Informations sur l'entreprise affichées dans les pages légales |

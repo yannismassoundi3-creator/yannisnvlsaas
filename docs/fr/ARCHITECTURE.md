@@ -109,7 +109,9 @@ billing_events (Stripe event log, service role only)       private.rate_limits
 - **Provenance.** Les enregistrements portent `source` (`manual`, `csv`, `demo`, et des valeurs réservées aux futures
   intégrations) et `import_job_id`, ce qui rend l'annulation possible et prépare les intégrations de plateformes.
 - Les **droits d'accès** sont calculés, jamais stockés : la vue `organization_entitlements` déduit le niveau d'accès
-  des dates d'essai et du dernier abonnement.
+  des dates d'essai, du dernier abonnement et, après l'essai, du fait que toutes les vraies boutiques sont en mode
+  revendeur (offre gratuite, 30 pièces en stock, appliquée par un trigger sur `products`) ; `subscriptions.plan`
+  indique si un abonnement est Pro ou Revendeur.
 
 - **Mode revendeur.** `stores.business_model` vaut `ecommerce` (import des commandes, des coûts et des publicités) ou
   `reseller` (personnes qui revendent des articles un par un sur Vinted, Leboncoin, eBay ou Vestiaire Collective). Les

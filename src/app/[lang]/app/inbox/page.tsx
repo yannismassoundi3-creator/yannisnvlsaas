@@ -44,8 +44,10 @@ async function InboxContent() {
   const t = inboundMessages[locale].inbox;
   const enabled = inboundConfig().enabled;
   const canWrite = ws.entitlements.canWrite;
+  // Free plan: sales received by email need a paid plan (the guide links to the plans).
+  const upgrade = ws.entitlements.access === "free";
   const guide = (
-    <InboundGuide address={storeInboundAddress(store.inbound_token)} locale={locale} canRegenerate={ws.role !== "member"} disabled={!canWrite} />
+    <InboundGuide address={storeInboundAddress(store.inbound_token)} locale={locale} canRegenerate={ws.role !== "member"} disabled={!canWrite} upgrade={upgrade} />
   );
 
   let entries: InboundEntry[] = [];
@@ -78,7 +80,7 @@ async function InboxContent() {
               </li>
             ))}
           </ul>
-        ) : enabled ? (
+        ) : enabled && !upgrade ? (
           <Card>
             <EmptyState icon={<Inbox aria-hidden />} title={t.emptyTitle} description={t.emptyBody} />
           </Card>

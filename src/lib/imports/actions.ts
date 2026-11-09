@@ -2,8 +2,10 @@
 
 import { refresh } from "next/cache";
 import { z } from "zod";
+import { FREE_STOCK_ITEMS } from "@/config/plans";
 import { INTL_LOCALE, isLocale } from "@/i18n/config";
 import { importActions } from "@/i18n/messages/imports-actions";
+import { planMessages } from "@/i18n/messages/plans";
 import { getRequestLocale } from "@/i18n/request";
 import { track, trackFirst } from "@/lib/analytics/track";
 import { audit } from "@/lib/audit";
@@ -213,6 +215,8 @@ export async function commitImportBatch(jobId: string): Promise<Result<{ done: b
     // Undo whatever earlier batches wrote, so a failed import never leaves partial data.
     await supabase.from("import_jobs").update({ status: "failed", error_message: t.stoppedUndoneShort }).eq("id", jobId);
     const undo = await supabase.rpc("import_rollback", { p_job: jobId });
+    // Free plan (reseller stores): the products went past the stock limit.
+    if (error.message === "free_stock_limit" && !undo.error) return { ok: false, message: planMessages[await getRequestLocale()].freeStockLimit(Number(error.details) || FREE_STOCK_ITEMS) };
     return { ok: false, message: undo.error ? t.stoppedPartial : t.stoppedUndone };
   }
 

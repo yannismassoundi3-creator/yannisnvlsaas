@@ -1,10 +1,12 @@
+import { DEFAULT_AI_LISTINGS_PER_MONTH } from "@/config/plans";
+
 /**
  * Monthly cap of AI listings per organisation. Pure helpers (unit-tested); the
  * counter itself lives in public.ai_usage and is only changed by
  * public.reserve_listing_analysis / public.release_listing_analysis.
  */
 
-export const DEFAULT_MONTHLY_LIMIT = 50;
+export const DEFAULT_MONTHLY_LIMIT = DEFAULT_AI_LISTINGS_PER_MONTH;
 /** Highest cap accepted from the environment (the database refuses more than 10,000). */
 export const MAX_MONTHLY_LIMIT = 10_000;
 

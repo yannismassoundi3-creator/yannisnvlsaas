@@ -102,7 +102,9 @@ billing_events (Stripe event log, service role only)       private.rate_limits
 - **Provenance.** Records carry `source` (`manual`, `csv`, `demo`, and reserved values for future integrations) and
   `import_job_id`, which makes undo possible and prepares platform integrations.
 - **Entitlements** are computed, never stored: the `organization_entitlements` view derives the access level from
-  the trial dates and the latest subscription.
+  the trial dates, the latest subscription and, after the trial, whether every real store is in reseller mode (free
+  plan, 30 pieces in stock, enforced by a trigger on `products`); `subscriptions.plan` says whether a subscription is
+  Pro or Revendeur.
 
 - **Reseller mode.** `stores.business_model` is `ecommerce` (imports orders, costs and ads) or `reseller` (people
   who resell items one by one on Vinted, Leboncoin, eBay or Vestiaire Collective). Reseller data reuses the same

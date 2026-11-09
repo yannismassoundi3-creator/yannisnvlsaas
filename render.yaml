@@ -32,6 +32,8 @@ services:
         sync: false
       - key: STRIPE_PRICE_PRO_MONTHLY
         sync: false
+      - key: STRIPE_PRICE_RESELLER_MONTHLY
+        sync: false
       - key: STRIPE_LIVE_ENABLED
         sync: false
       - key: CRON_SECRET

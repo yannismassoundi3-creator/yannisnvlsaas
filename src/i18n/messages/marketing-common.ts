@@ -53,12 +53,16 @@ export const marketingCommon = defineMessages({
       productViews: "Product views",
     },
     pricingCards: {
-      forDays: (days: number) => `for ${days} days`,
-      startTrial: "Start your free trial",
-      noCard: "No payment card required. Nothing is charged automatically.",
+      freeAudience: "Resellers",
+      resellerAudience: "Resellers",
+      proAudience: "Online stores",
+      forever: "with no time limit",
       perMonth: "per month, VAT may apply",
+      startFree: "Start for free",
       startWithTrial: "Start with the free trial",
-      upgradeNote: "Upgrade from your trial whenever you are ready. Cancel anytime.",
+      resellerBadge: "Recommended",
+      freeNote: (limit: number, days: number) => `No payment card. Up to ${limit} items in stock, after a ${days}-day trial of everything.`,
+      trialNote: (days: number) => `${days}-day free trial, no card. Cancel anytime.`,
     },
     faq: {
       calculate: {
@@ -83,8 +87,8 @@ export const marketingCommon = defineMessages({
       },
       trial: {
         q: "How does the free trial work?",
-        a: (days: number, price: string) =>
-          `You get ${days} days of the core product without entering a payment card. When the trial ends, nothing is charged: you can upgrade to Pro for ${price} per month, and your data stays available to export or delete.`,
+        a: (days: number, proPrice: string, resellerPrice: string, limit: number) =>
+          `You get ${days} days of the whole product without entering a payment card. When the trial ends, nothing is charged. If you resell items (Vinted, Leboncoin, eBay…), you keep using Narixia for free with up to ${limit} items in stock, or choose the Reseller plan for ${resellerPrice} per month for unlimited stock. An online store can subscribe to Pro for ${proPrice} per month; otherwise its data stays available to export or delete.`,
       },
       attribution: {
         q: "How does Narixia handle advertising attribution?",
@@ -145,12 +149,16 @@ export const marketingCommon = defineMessages({
       productViews: "Vues du produit",
     },
     pricingCards: {
-      forDays: (days: number) => `pendant ${days} jours`,
-      startTrial: "Commencer l'essai gratuit",
-      noCard: "Aucune carte bancaire requise. Rien n'est prélevé automatiquement.",
+      freeAudience: "Revendeurs",
+      resellerAudience: "Revendeurs",
+      proAudience: "Boutiques en ligne",
+      forever: "sans limite de durée",
       perMonth: "par mois, TVA éventuelle en sus",
+      startFree: "Commencer gratuitement",
       startWithTrial: "Commencer par l'essai gratuit",
-      upgradeNote: "Passez à Pro depuis votre essai quand vous le souhaitez. Résiliable à tout moment.",
+      resellerBadge: "Recommandé",
+      freeNote: (limit: number, days: number) => `Sans carte bancaire. Jusqu'à ${limit} articles en stock, après ${days} jours d'essai de tout le produit.`,
+      trialNote: (days: number) => `Essai gratuit de ${days} jours, sans carte. Résiliable à tout moment.`,
     },
     faq: {
       calculate: {
@@ -175,8 +183,8 @@ export const marketingCommon = defineMessages({
       },
       trial: {
         q: "Comment fonctionne l'essai gratuit ?",
-        a: (days: number, price: string) =>
-          `Vous disposez de ${days} jours avec les fonctions essentielles, sans saisir de carte bancaire. À la fin de l'essai, rien n'est prélevé : vous pouvez passer à Pro pour ${price} par mois, et vos données restent disponibles pour être exportées ou supprimées.`,
+        a: (days: number, proPrice: string, resellerPrice: string, limit: number) =>
+          `Vous disposez de ${days} jours avec tout le produit, sans saisir de carte bancaire. À la fin de l'essai, rien n'est prélevé. Si vous revendez des articles (Vinted, Leboncoin, eBay…), vous continuez gratuitement avec jusqu'à ${limit} articles en stock, ou vous choisissez l'offre Revendeur à ${resellerPrice} par mois pour un stock illimité. Une boutique en ligne peut s'abonner à Pro pour ${proPrice} par mois ; sinon, ses données restent disponibles pour être exportées ou supprimées.`,
       },
       attribution: {
         q: "Comment Narixia gère-t-il l'attribution publicitaire ?",

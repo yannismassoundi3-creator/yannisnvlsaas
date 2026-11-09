@@ -171,7 +171,7 @@ export async function createStore(input: z.input<typeof newStoreInput>): Promise
   if (Object.keys(fieldErrors).length) return { ok: false, message: t.checkFields, fieldErrors };
   const realStores = ws.stores.filter((s) => !s.is_demo).length;
   if (realStores >= ws.entitlements.limits.stores) {
-    return { ok: false, message: ws.entitlements.plan === "pro" ? t.maxStores : t.trialStores };
+    return { ok: false, message: ws.entitlements.paidPlan !== null ? t.maxStores : t.trialStores };
   }
 
   const supabase = await createClient();

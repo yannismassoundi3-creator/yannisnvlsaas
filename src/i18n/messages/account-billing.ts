@@ -7,10 +7,10 @@ export const billingMessages = defineMessages({
     title: "Billing",
     description: "Your plan, payments and invoices. Payments are handled by Stripe; Narixia never sees or stores card details.",
     status: {
-      trialingTitle: (date: string | null) => "Pro, first payment on " + (date ?? "the end of your trial"),
+      trialingTitle: (plan: string, date: string | null) => `${plan}, first payment on ` + (date ?? "the end of your trial"),
       trialingBody: "Your subscription is set up. You will be charged for the first month when the trial period ends.",
-      activeTitle: "Pro is active",
-      endsBody: (date: string | null) => `Your subscription ends on ${date ?? "the end of the period"} and will not renew. You keep Pro until then.`,
+      activeTitle: (plan: string) => `${plan} is active`,
+      endsBody: (date: string | null) => `Your subscription ends on ${date ?? "the end of the period"} and will not renew. You keep your plan until then.`,
       renewsBody: (date: string | null) => `Renews on ${date}.`,
       thanksBody: "Thank you for subscribing.",
       graceTitle: "Your last payment failed",
@@ -20,6 +20,11 @@ export const billingMessages = defineMessages({
         `Free trial: ${daysLeft === 0 ? "ends today" : `${daysLeft} ${daysLeft === 1 ? "day" : "days"} left`}`,
       trialBody: (date: string | null) =>
         `The trial ends on ${date ?? "—"}. Nothing is charged automatically: after the trial, dashboards and imports pause until you subscribe, and your data is kept.`,
+      trialBodyReseller: (date: string | null, limit: number) =>
+        `The trial ends on ${date ?? "—"}. Nothing is charged automatically: after the trial, you move to the free plan (up to ${limit} items in stock) unless you choose a plan.`,
+      freeTitle: "Free plan",
+      freeBody: (count: number | null, limit: number) =>
+        `${count === null ? "" : `You have ${count} ${count === 1 ? "item" : "items"} in stock out of ${limit}. `}The free plan keeps the reseller mode with up to ${limit} items in stock; your sales history stays visible. The Reseller plan adds unlimited stock, AI listings and sales received by email.`,
       pausedTitle: "Access is paused",
       pausedBody:
         "Your trial or subscription has ended. Your data is kept and can be exported from Settings. Subscribe to resume dashboards, reports and imports.",
@@ -39,8 +44,13 @@ export const billingMessages = defineMessages({
     taxExcluded: "Prices exclude VAT where it applies.",
     planTitle: (name: string) => `${name} plan`,
     perMonth: (taxNote: string) => `per month · ${taxNote}`,
-    subscribeAfterTrial: "Subscribe, first payment after the trial",
-    subscribeFor: (price: string) => `Subscribe for ${price}/month`,
+    subscribeAfterTrial: (plan: string) => `Choose ${plan}, first payment after the trial`,
+    subscribeFor: (plan: string, price: string) => `Choose ${plan} for ${price}/month`,
+    recommended: "Recommended for resellers",
+    currentPlan: "Your plan",
+    comingSoon: "Coming soon",
+    resellerSoon: "The Reseller plan cannot be bought on this site yet. Meanwhile, you keep the free plan after your trial.",
+    offersTitle: "Choose your plan",
     ownerOnly: "Only the account owner can change the plan or payment details.",
     keepTrialDays: (price: string, date: string | null) =>
       `Subscribing now keeps your remaining trial days: the first ${price} charge happens when the trial ends on ${date}. Cancel before then and nothing is charged.`,
@@ -48,7 +58,9 @@ export const billingMessages = defineMessages({
     howTrial: (days: number) => `${days}-day free trial, no card.`,
     howTrialBody: "Nothing is charged unless you subscribe.",
     howMonthly: "Monthly, cancel anytime.",
-    howMonthlyBody: "Cancel in the billing portal; Pro stays active until the end of the paid month.",
+    howMonthlyBody: "Cancel in the billing portal; your plan stays active until the end of the paid month.",
+    howFree: "Free for resellers.",
+    howFreeBody: (limit: number) => `After the trial, a workspace in reseller mode keeps working for free with up to ${limit} items in stock.`,
     howGrace: (days: number) => `${days} days of grace.`,
     howGraceBody: (days: number) => `If a renewal payment fails, you keep access for ${days} days while Stripe retries.`,
     howData: "Your data stays yours.",
@@ -70,13 +82,15 @@ export const billingMessages = defineMessages({
     waitingTitle: "Still waiting for confirmation",
     confirmingTitle: "Confirming your subscription with Stripe…",
     waitingBody: "Stripe has not confirmed the payment yet. This can take a few minutes; reload this page later. You will not be charged twice.",
-    confirmingBody: "Pro is activated as soon as Stripe confirms the subscription. This usually takes a few seconds.",
+    confirmingBody: "Your plan is activated as soon as Stripe confirms the subscription. This usually takes a few seconds.",
     // Server actions
     actions: {
       notConfigured: "Payments are not set up on this deployment yet. No payment can be taken.",
       ownerOnly: "Only the account owner can manage billing.",
-      alreadyPro: "Your Pro subscription is already active.",
-      grace: "Update your payment method in the billing portal to keep Pro.",
+      alreadyPro: "Your subscription is already active. Change plans from the billing portal.",
+      grace: "Update your payment method in the billing portal to keep your plan.",
+      resellerUnavailable: "The Reseller plan is not available yet. You can choose Pro or keep the free plan.",
+      resellerOnly: "The Reseller plan is for stores in reseller mode. Choose Pro for an online store.",
       tooMany: "Too many attempts. Please try again later.",
       checkoutFailed: "We could not open the payment page. Please try again in a moment.",
       noCustomer: "There is no billing account yet. Subscribe first.",
@@ -89,11 +103,11 @@ export const billingMessages = defineMessages({
     description:
       "Votre offre, vos paiements et vos factures. Les paiements sont gérés par Stripe ; Narixia ne voit ni ne conserve jamais vos données de carte.",
     status: {
-      trialingTitle: (date: string | null) => "Pro, premier paiement le " + (date ?? "dernier jour de votre essai gratuit"),
+      trialingTitle: (plan: string, date: string | null) => `${plan}, premier paiement le ` + (date ?? "dernier jour de votre essai gratuit"),
       trialingBody: "Votre abonnement est en place. Le premier mois vous sera facturé à la fin de la période d'essai.",
-      activeTitle: "Pro est actif",
+      activeTitle: (plan: string) => `L'offre ${plan} est active`,
       endsBody: (date: string | null) =>
-        `Votre abonnement prend fin le ${date ?? "dernier jour de la période"} et ne sera pas renouvelé. Vous conservez Pro jusque-là.`,
+        `Votre abonnement prend fin le ${date ?? "dernier jour de la période"} et ne sera pas renouvelé. Vous conservez votre offre jusque-là.`,
       renewsBody: (date: string | null) => `Renouvellement le ${date}.`,
       thanksBody: "Merci pour votre abonnement.",
       graceTitle: "Votre dernier paiement a échoué",
@@ -103,6 +117,11 @@ export const billingMessages = defineMessages({
         `Essai gratuit : ${daysLeft === 0 ? "se termine aujourd'hui" : `${daysLeft} ${plural("fr", daysLeft ?? 0, "jour restant", "jours restants")}`}`,
       trialBody: (date: string | null) =>
         `L'essai gratuit se termine le ${date ?? "—"}. Rien n'est prélevé automatiquement : après l'essai, les tableaux de bord et les imports sont suspendus jusqu'à votre abonnement, et vos données sont conservées.`,
+      trialBodyReseller: (date: string | null, limit: number) =>
+        `L'essai gratuit se termine le ${date ?? "—"}. Rien n'est prélevé automatiquement : après l'essai, vous passez à l'offre gratuite (jusqu'à ${limit} articles en stock), sauf si vous choisissez une offre.`,
+      freeTitle: "Offre gratuite",
+      freeBody: (count: number | null, limit: number) =>
+        `${count === null ? "" : `Vous avez ${count} ${plural("fr", count, "article", "articles")} en stock sur ${limit}. `}L'offre gratuite garde le mode revendeur avec jusqu'à ${limit} articles en stock ; votre historique de ventes reste visible. L'offre Revendeur ajoute le stock illimité, les annonces IA et les ventes reçues par e-mail.`,
       pausedTitle: "Accès suspendu",
       pausedBody:
         "Votre essai gratuit ou votre abonnement est terminé. Vos données sont conservées et peuvent être exportées depuis les paramètres. Abonnez-vous pour retrouver tableaux de bord, rapports et imports.",
@@ -122,8 +141,13 @@ export const billingMessages = defineMessages({
     taxExcluded: "Prix HT, TVA en sus le cas échéant.",
     planTitle: (name: string) => `Offre ${name}`,
     perMonth: (taxNote: string) => `par mois · ${taxNote}`,
-    subscribeAfterTrial: "S'abonner, premier paiement après l'essai",
-    subscribeFor: (price: string) => `S'abonner pour ${price}/mois`,
+    subscribeAfterTrial: (plan: string) => `Choisir l'offre ${plan}, premier paiement après l'essai`,
+    subscribeFor: (plan: string, price: string) => `Choisir l'offre ${plan} pour ${price}/mois`,
+    recommended: "Recommandé pour les revendeurs",
+    currentPlan: "Votre offre",
+    comingSoon: "Bientôt disponible",
+    resellerSoon: "L'offre Revendeur n'est pas encore disponible à l'achat sur ce site. En attendant, vous gardez l'offre gratuite après votre essai.",
+    offersTitle: "Choisissez votre offre",
     ownerOnly: "Seul le propriétaire du compte peut modifier l'offre ou les informations de paiement.",
     keepTrialDays: (price: string, date: string | null) =>
       `En vous abonnant maintenant, vous conservez les jours d'essai restants : le premier prélèvement de ${price} aura lieu à la fin de l'essai, le ${date}. Annulez avant cette date et rien ne sera facturé.`,
@@ -131,7 +155,9 @@ export const billingMessages = defineMessages({
     howTrial: (days: number) => `${days} jours d'essai gratuit, sans carte.`,
     howTrialBody: "Rien n'est facturé si vous ne vous abonnez pas.",
     howMonthly: "Mensuel, sans engagement.",
-    howMonthlyBody: "Résiliez depuis le portail de facturation ; Pro reste actif jusqu'à la fin du mois payé.",
+    howMonthlyBody: "Résiliez depuis le portail de facturation ; votre offre reste active jusqu'à la fin du mois payé.",
+    howFree: "Gratuit pour les revendeurs.",
+    howFreeBody: (limit: number) => `Après l'essai, un espace en mode revendeur continue gratuitement avec jusqu'à ${limit} articles en stock.`,
     howGrace: (days: number) => `${days} jours de délai de grâce.`,
     howGraceBody: (days: number) => `Si un paiement de renouvellement échoue, vous conservez l'accès pendant ${days} jours, le temps que Stripe retente le paiement.`,
     howData: "Vos données restent les vôtres.",
@@ -153,12 +179,14 @@ export const billingMessages = defineMessages({
     confirmingTitle: "Confirmation de votre abonnement auprès de Stripe…",
     waitingBody:
       "Stripe n'a pas encore confirmé le paiement. Cela peut prendre quelques minutes ; rechargez cette page plus tard. Vous ne serez pas facturé deux fois.",
-    confirmingBody: "Pro est activé dès que Stripe confirme l'abonnement. Cela prend généralement quelques secondes.",
+    confirmingBody: "Votre offre est activée dès que Stripe confirme l'abonnement. Cela prend généralement quelques secondes.",
     actions: {
       notConfigured: "Les paiements ne sont pas encore configurés sur ce déploiement. Aucun paiement ne peut être encaissé.",
       ownerOnly: "Seul le propriétaire du compte peut gérer la facturation.",
-      alreadyPro: "Votre abonnement Pro est déjà actif.",
-      grace: "Mettez à jour votre moyen de paiement dans le portail de facturation pour conserver Pro.",
+      alreadyPro: "Votre abonnement est déjà actif. Changez d'offre depuis le portail de facturation.",
+      grace: "Mettez à jour votre moyen de paiement dans le portail de facturation pour conserver votre offre.",
+      resellerUnavailable: "L'offre Revendeur n'est pas encore disponible. Vous pouvez choisir Pro ou garder l'offre gratuite.",
+      resellerOnly: "L'offre Revendeur est réservée aux boutiques en mode revendeur. Choisissez Pro pour une boutique en ligne.",
       tooMany: "Trop de tentatives. Veuillez réessayer plus tard.",
       checkoutFailed: "Impossible d'ouvrir la page de paiement. Veuillez réessayer dans un instant.",
       noCustomer: "Aucun compte de facturation pour le moment. Abonnez-vous d'abord.",

@@ -15,7 +15,8 @@ import { createClient } from "@/lib/supabase/server";
  * Listings written with AI from item photos.
  *
  *   GET   whether the feature is available and how many analyses are left
- *         this month: { status: "unavailable" | "paused" | "ready", remaining?, limit? }
+ *         this month: { status: "unavailable" | "paused" | "upgrade" | "ready", remaining?, limit? }
+ *         ("upgrade": the free plan, which does not include AI listings)
  *   POST  one analysis: { images: base64[], name?, price?, locale }
  *         → { ok: true, listing, remaining, limit, test } or { ok: false, code, message }
  *
@@ -40,6 +41,7 @@ export async function GET() {
   const c = await config();
   if (!c.enabled) return json({ status: "unavailable" });
   if (!ws.entitlements.canWrite) return json({ status: "paused" });
+  if (!ws.entitlements.paidFeatures) return json({ status: "upgrade" });
   const supabase = await createClient();
   const { data, error } = await supabase.from("ai_usage").select("used").eq("organization_id", ws.organization.id).eq("period", usagePeriod()).maybeSingle();
   if (error) {
@@ -97,6 +99,7 @@ export async function POST(request: Request) {
   const c = await config();
   if (!c.enabled) return fail("unavailable", 503);
   if (!ws.entitlements.canWrite) return fail("paused", 403);
+  if (!ws.entitlements.paidFeatures) return fail("upgrade", 403);
 
   const raw = await readLimited(request, LISTING_LIMITS.maxBodyBytes);
   if (raw === null) return fail("too_large", 413);
@@ -123,6 +126,8 @@ export async function POST(request: Request) {
     .maybeSingle();
   if (error || !reserved) {
     if (error?.message === "quota_exhausted") return fail("quota", 429);
+    // The free plan (checked again by the database, which is the reference).
+    if (error?.message === "plan_required") return fail("upgrade", 403);
     if (error?.code === "42501") return fail("paused", 403);
     if (!isMissingObject(error?.code)) console.error("[listing-ai] reservation failed", { code: error?.code });
     return fail("unavailable", 503);

@@ -120,8 +120,9 @@ export const marketingHome = defineMessages({
     },
     pricing: {
       eyebrow: "Pricing",
-      title: "Simple pricing for small stores.",
-      intro: "Start with a free trial. Upgrade when Narixia earns its place in your week.",
+      title: "Simple pricing for resellers and small stores.",
+      intro: (limit: number) =>
+        `Start with a free trial of everything. Resellers then stay free up to ${limit} items in stock; upgrade when Narixia earns its place in your week.`,
       compare: "Compare plans in detail",
     },
     faq: { eyebrow: "Questions", title: "Frequently asked questions" },
@@ -253,8 +254,9 @@ export const marketingHome = defineMessages({
     },
     pricing: {
       eyebrow: "Tarifs",
-      title: "Des tarifs simples pour les petites boutiques.",
-      intro: "Commencez par un essai gratuit. Passez à Pro quand Narixia a prouvé son utilité dans votre semaine.",
+      title: "Des tarifs simples pour les revendeurs et les petites boutiques.",
+      intro: (limit: number) =>
+        `Commencez par un essai gratuit de tout le produit. Les revendeurs restent ensuite gratuits jusqu'à ${limit} articles en stock ; passez à une offre payante quand Narixia a prouvé son utilité dans votre semaine.`,
       compare: "Comparer les offres en détail",
     },
     faq: { eyebrow: "Questions", title: "Questions fréquentes" },

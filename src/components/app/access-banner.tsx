@@ -1,16 +1,19 @@
-import { AlertTriangle, Clock, FlaskConical, Lock } from "lucide-react";
+import { AlertTriangle, Clock, FlaskConical, Lock, Package } from "lucide-react";
 import Link from "next/link";
 import type { ReadyWorkspace, Store } from "@/lib/auth/workspace";
+import { planMessages } from "@/i18n/messages/plans";
 import { shellBanners } from "@/i18n/messages/shell-banners";
 import { getFormat, getLocale } from "@/i18n/server";
 import { cn } from "@/lib/utils";
 
 /**
  * Status bar above every application page: trial countdown, payment problems,
- * expired access and the demo-data notice. Always text plus icon, never colour alone.
+ * the free plan, expired access and the demo-data notice. Always text plus
+ * icon, never colour alone.
  */
 export async function AccessBanner({ ws }: { ws: ReadyWorkspace & { activeStore: Store | null } }) {
-  const t = shellBanners[await getLocale()];
+  const locale = await getLocale();
+  const t = shellBanners[locale];
   const f = await getFormat();
   const { entitlements: e, activeStore } = ws;
   const realStore = ws.stores.find((s) => !s.is_demo);
@@ -38,6 +41,20 @@ export async function AccessBanner({ ws }: { ws: ReadyWorkspace & { activeStore:
       action: (
         <Link href="/app/billing" className="font-medium underline-offset-2 hover:underline">
           {t.updatePayment}
+        </Link>
+      ),
+    });
+  }
+  if (e.access === "free" && e.stockLimit !== null) {
+    const p = planMessages[locale];
+    items.push({
+      key: "free",
+      tone: "info",
+      icon: <Package aria-hidden />,
+      text: p.freeBanner(e.stockLimit),
+      action: (
+        <Link href="/app/billing" className="font-medium underline-offset-2 hover:underline">
+          {p.upgrade}
         </Link>
       ),
     });

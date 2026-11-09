@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import { PLANS, TRIAL_DAYS } from "@/config/plans";
+import { FREE_STOCK_ITEMS, PLANS, TRIAL_DAYS } from "@/config/plans";
 import type { Locale } from "@/i18n/config";
 import { createFormat } from "@/i18n/format";
 import { marketingCommon } from "@/i18n/messages/marketing-common";
@@ -13,7 +13,7 @@ export function Faq({ locale }: { locale: Locale }) {
     t.platforms,
     t.customerData,
     t.vat,
-    { q: t.trial.q, a: t.trial.a(TRIAL_DAYS, f.money(PLANS.pro.priceMinor, PLANS.pro.currency)) },
+    { q: t.trial.q, a: t.trial.a(TRIAL_DAYS, f.money(PLANS.pro.priceMinor, PLANS.pro.currency), f.money(PLANS.reseller.priceMinor, PLANS.reseller.currency), FREE_STOCK_ITEMS) },
     t.attribution,
     t.export,
   ];

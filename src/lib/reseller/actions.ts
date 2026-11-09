@@ -3,7 +3,9 @@
 import { refresh } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { FREE_STOCK_ITEMS } from "@/config/plans";
 import { catalogCommon } from "@/i18n/messages/catalog-common";
+import { planMessages } from "@/i18n/messages/plans";
 import { resellerMessages } from "@/i18n/messages/reseller";
 import { getRequestLocale } from "@/i18n/request";
 import { audit } from "@/lib/audit";
@@ -25,7 +27,8 @@ import { itemInput, parseItem, parseSale, saleInput, type ItemInput, type SaleIn
  * parsing, rate-limit, write through the user's session (RLS), refresh().
  */
 
-type Result<T = object> = ({ ok: true } & T) | { ok: false; message: string; fieldErrors?: Record<string, string> };
+/** `upgrade`: the free plan's stock limit refused the write; the interface links to the plans. */
+type Result<T = object> = ({ ok: true } & T) | { ok: false; message: string; fieldErrors?: Record<string, string>; upgrade?: boolean };
 
 const uuid = z.string().uuid();
 
@@ -59,7 +62,7 @@ async function insertItem(
   organizationId: string,
   storeId: string,
   item: { name: string; unitCostE4: number | null; acquiredOn: string | null; quantity: number },
-): Promise<{ ok: true; id: string; name: string; unit_cost_e4: number | null } | { ok: false; code: string | undefined }> {
+): Promise<{ ok: true; id: string; name: string; unit_cost_e4: number | null } | { ok: false; code: string | undefined; message?: string; details?: string }> {
   const quantity = storedQuantity(item.quantity);
   for (let attempt = 0; attempt < 3; attempt++) {
     const { data, error } = await supabase
@@ -77,9 +80,17 @@ async function insertItem(
       .select("id, name, unit_cost_e4")
       .single();
     if (data) return { ok: true, ...data };
-    if (error?.code !== "23505") return { ok: false, code: error?.code };
+    if (error?.code !== "23505") return { ok: false, code: error?.code, message: error?.message, details: error?.details };
   }
   return { ok: false, code: "23505" };
+}
+
+/** The free plan's stock limit (products_free_stock_limit trigger): message 'free_stock_limit', detail = the limit. */
+const isFreeStockLimit = (error: { message?: string } | null | undefined) => error?.message === "free_stock_limit";
+
+function freeStockLimitError(locale: keyof typeof planMessages, details: string | undefined) {
+  const limit = Number(details) || FREE_STOCK_ITEMS;
+  return { ok: false as const, message: planMessages[locale].freeStockLimit(limit), upgrade: true };
 }
 
 function itemWriteError(code: string | undefined, t: (typeof resellerMessages)["en"], c: (typeof catalogCommon)["en"]) {
@@ -102,6 +113,7 @@ export async function addItem(input: ItemInput): Promise<Result<{ productId: str
   if (!item.ok) return { ok: false, message: c.checkFields, fieldErrors: item.fieldErrors };
 
   const created = await insertItem(await createClient(), ws.organization.id, ws.activeStore.id, item.value);
+  if (!created.ok && isFreeStockLimit(created)) return freeStockLimitError(locale, created.details);
   if (!created.ok) return { ok: false, message: itemWriteError(created.code, t, c) };
   refresh();
   return { ok: true, productId: created.id };
@@ -148,6 +160,7 @@ export async function updateItem(productId: string, input: ItemInput): Promise<R
     const sold = Number(error.details) || (await soldUnits(supabase, productId));
     return { ok: false, message: c.checkFields, fieldErrors: { quantity: t.items.quantityBelowSold(sold) } };
   }
+  if (isFreeStockLimit(error)) return freeStockLimitError(locale, error?.details);
   if (error) return { ok: false, message: itemWriteError(error.code, t, c) };
   if (!data?.length) return { ok: false, message: t.actions.itemNotFound };
   refresh();
@@ -199,6 +212,7 @@ export async function sellItem(input: SaleInput): Promise<Result<{ orderId: stri
     product = data;
   } else {
     const created = await insertItem(supabase, ws.organization.id, store.id, { ...v.newItem!, acquiredOn: null, quantity: v.quantity });
+    if (!created.ok && isFreeStockLimit(created)) return freeStockLimitError(locale, created.details);
     if (!created.ok) return { ok: false, message: itemWriteError(created.code, t, c) };
     product = created;
   }
@@ -327,6 +341,8 @@ export async function updateBusinessModel(model: string): Promise<Result> {
   if (ws.activeStore.business_model === parsed.data) return { ok: true };
   const supabase = await createClient();
   const { error } = await supabase.from("stores").update({ business_model: parsed.data }).eq("id", ws.activeStore.id);
+  // Free and Revendeur plans: the database keeps the stores in reseller mode (stores_business_model_plan).
+  if (error?.message === "ecommerce_requires_pro") return { ok: false, message: planMessages[locale].ecommerceRequiresPro, upgrade: true };
   if (error) return { ok: false, message: error.code === "42501" ? c.paused : t.settings.failed };
   audit("store.updated", { organizationId: ws.organization.id, actorId: ws.user.id }, { type: "store", id: ws.activeStore.id }, { business_model: parsed.data });
   refresh();
